@@ -1340,37 +1340,41 @@ var Juggler;
         ];
         const BALL_GROUPS = [
             { groupIndex: 0, offset: 0 },
-            { groupIndex: 1, offset: 7 },
-            { groupIndex: 2, offset: 3 }
+            { groupIndex: 1, offset: 8 },
+            { groupIndex: 2, offset: 16 }
         ];
         const LEFT_ARM_GROUP = 12;
         const RIGHT_ARM_GROUP = 11;
         const TAU = Math.PI * 2;
+        // Reconstructed from manually labeled reference frames.
+        // 72-frame single-ball cycle (fall → hand-transition → rise) compressed 3× to 24 entries.
+        // Seam at index 23→0 is ~0.16 world units — smooth wraparound.
+        // offsets: group0=0 (apex at source 0), group1=8 (left hand), group2=16 (right throw)
         const BALL_PATH = [
-            [-0.9, -2.1, 5.3],
-            [-0.75, -1.8, 6.0],
-            [-0.55, -1.5, 6.6],
-            [-0.4, -1.2, 6.8],
-            [-0.35, -0.6, 7.05],
-            [-0.45, 0.2, 6.95],
-            [-0.7, 1.1, 6.5],
-            [-1.1, 1.9, 5.9],
-            [-1.2, 2.1, 5.2],
-            [-1.1, 1.7, 5.0],
-            [-0.9, 1.2, 5.0],
-            [-0.65, 0.5, 5.2],
-            [-0.45, 0.0, 5.4],
-            [-0.55, -0.6, 5.7],
-            [-0.8, -1.2, 6.1],
-            [-1.0, -1.8, 5.8],
-            [-1.1, -2.1, 5.2],
-            [-1.0, -1.7, 5.0],
-            [-0.8, -1.2, 5.0],
-            [-0.55, -0.6, 5.2],
-            [-0.35, 0.0, 5.5],
-            [-0.45, 0.7, 6.0],
-            [-0.7, 1.4, 6.2],
-            [-0.95, 2.0, 5.7]
+            [-0.076, 0.641, 7.191],
+            [-0.148, 0.757, 7.033],
+            [-0.228, 0.834, 6.757],
+            [-0.308, 0.911, 6.482],
+            [-0.420, 0.977, 6.009],
+            [-0.539, 1.040, 5.497],
+            [-0.707, 1.156, 4.827],
+            [-0.820, 1.080, 4.079],
+            [-1.001, 1.191, 3.330],
+            [-0.880, 1.022, 3.645],
+            [-0.777, 0.882, 3.921],
+            [-0.688, 0.737, 4.118],
+            [-0.567, 0.426, 4.158],
+            [-0.494, 0.205, 4.118],
+            [-0.429, -0.055, 3.961],
+            [-0.413, -0.262, 3.645],
+            [-0.382, -0.570, 3.212],
+            [-0.258, -0.383, 4.236],
+            [-0.171, -0.174, 5.103],
+            [-0.101, -0.042, 5.733],
+            [-0.062, 0.114, 6.245],
+            [-0.022, 0.270, 6.757],
+            [-0.029, 0.410, 6.994],
+            [-0.043, 0.511, 7.112]
         ];
         function availableMotions(scene) {
             return Motion.MOTIONS.filter((motion) => motion.id === "static" || supportsJugglerMotion(scene));
@@ -1439,9 +1443,12 @@ var Juggler;
             return samplePath(BALL_PATH, sampleFrame);
         }
         function armControls(side, sourceFrame) {
+            // Throws happen every 8 frames (path indices 8=left-hand, 16=right-hand).
+            // Left arm (side>0) peaks at index 8 → source frames 0,8,16.
+            // Right arm (side<0) peaks at index 16 → source frames 0,8,16 (staggered via position).
             const pulse = side > 0
-                ? Math.max(throwPulse(sourceFrame, 0), throwPulse(sourceFrame, 12))
-                : Math.max(throwPulse(sourceFrame, 6), throwPulse(sourceFrame, 18));
+                ? Math.max(throwPulse(sourceFrame, 0), throwPulse(sourceFrame, 8), throwPulse(sourceFrame, 16))
+                : Math.max(throwPulse(sourceFrame, 4), throwPulse(sourceFrame, 12), throwPulse(sourceFrame, 20));
             const settle = 1 - pulse;
             return [
                 {

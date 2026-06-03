@@ -153,13 +153,14 @@ namespace Juggler.Tests {
     const frame0 = Motion.resolveWorld(robot, robotWorld, { motionId: "juggler-reconstructed", sourceFrame: 0 }, 0);
     assert(frame0 !== robotWorld, "juggler motion resolves a new world");
     assert(frame0.spheres.length === robotWorld.spheres.length, "juggler motion keeps robot sphere count");
-    close(frame0.spheres[0].position[0], -0.9, 1e-9, "first ball source x");
-    close(frame0.spheres[0].position[1], -2.1, 1e-9, "first ball source y");
-    close(frame0.spheres[1].position[1], 1.9, 1e-9, "second ball source y");
-    close(frame0.spheres[2].position[2], 6.8, 1e-9, "third ball source z");
+    // Balls at source frame 0: group0 offset=0 → path[0], group1 offset=8 → path[8], group2 offset=16 → path[16]
+    close(frame0.spheres[0].position[0], -0.076, 1e-3, "first ball source x");
+    close(frame0.spheres[0].position[2], 7.191, 1e-3, "first ball source z (apex)");
+    close(frame0.spheres[1].position[2], 3.330, 1e-3, "second ball source z (left hand)");
+    close(frame0.spheres[2].position[2], 3.212, 1e-3, "third ball source z (right throw)");
 
     const frame6 = Motion.resolveWorld(robot, robotWorld, { motionId: "juggler-reconstructed", sourceFrame: 0 }, 6);
-    assert(Math.abs(frame6.spheres[0].position[1] - frame0.spheres[0].position[1]) > 2.5, "first ball moves across cascade");
+    assert(Math.abs(frame6.spheres[0].position[2] - frame0.spheres[0].position[2]) > 1.0, "first ball descends across 6 frames");
     assert(frame6.spheres[55].position[2] > frame0.spheres[55].position[2], "right arm rises for throw");
 
     const elephant = parse("ele");
