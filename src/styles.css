@@ -183,8 +183,8 @@ canvas {
   image-rendering: crisp-edges;
 }
 
-/* Scanline overlay */
-.canvas-frame::after {
+/* Scanline overlay — hidden when body has .no-scanlines */
+body:not(.no-scanlines) .canvas-frame::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -238,7 +238,7 @@ progress::-moz-progress-bar {
   flex-direction: column;
   gap: 6px;
   overflow-y: auto;
-  max-height: calc(100vh - 38px);
+  align-content: start;
 }
 
 /* ─── Form elements ─────────────────────────────────── */
@@ -406,6 +406,70 @@ button:disabled {
   line-height: 1.45;
   color: var(--wb-black);
   text-transform: none;
+}
+
+/* ─── Collapsible WB windows (control panel only) ──── */
+
+/* Titlebar is the click target — cursor signals interactivity */
+.control-panel .wb-titlebar {
+  cursor: pointer;
+}
+
+.control-panel .wb-titlebar:hover {
+  background: color-mix(in srgb, var(--wb-blue) 78%, var(--wb-white));
+}
+
+/* WB snap-collapse: Amiga windows opened/closed instantly, no animation */
+.control-panel .wb-window[data-collapsed="true"] .wb-body {
+  display: none;
+}
+
+/* Close gadget: filled square = expanded, hollow square = collapsed */
+.control-panel .wb-window[data-collapsed="true"] .wb-gadget-close::after {
+  background: transparent;
+  border: 2px solid var(--wb-black);
+}
+
+/* ─── Screen bar CRT toggle button ─────────────────── */
+.wb-screen-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.wb-screen-btn {
+  height: 18px;
+  padding: 0 7px;
+  font: inherit;
+  font-size: 13px;
+  text-transform: uppercase;
+  color: var(--wb-black);
+  background: var(--wb-gray);
+  border-top:    1px solid var(--wb-hi);
+  border-left:   1px solid var(--wb-hi);
+  border-bottom: 1px solid var(--wb-lo);
+  border-right:  1px solid var(--wb-lo);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.wb-screen-btn:hover {
+  background: #BBBBBB;
+}
+
+/* Pressed / active state = scanlines ON (default) */
+.wb-screen-btn[data-active="true"] {
+  background: var(--wb-black);
+  color: var(--wb-white);
+  border-top-color:    var(--wb-lo);
+  border-left-color:   var(--wb-lo);
+  border-bottom-color: var(--wb-hi);
+  border-right-color:  var(--wb-hi);
+}
+
+.wb-screen-btn[data-active="true"]:hover {
+  background: #111;
 }
 
 /* ─── Responsive ────────────────────────────────────── */

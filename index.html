@@ -193,8 +193,8 @@ canvas {
   image-rendering: crisp-edges;
 }
 
-/* Scanline overlay */
-.canvas-frame::after {
+/* Scanline overlay — hidden when body has .no-scanlines */
+body:not(.no-scanlines) .canvas-frame::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -248,7 +248,7 @@ progress::-moz-progress-bar {
   flex-direction: column;
   gap: 6px;
   overflow-y: auto;
-  max-height: calc(100vh - 38px);
+  align-content: start;
 }
 
 /* ─── Form elements ─────────────────────────────────── */
@@ -418,6 +418,70 @@ button:disabled {
   text-transform: none;
 }
 
+/* ─── Collapsible WB windows (control panel only) ──── */
+
+/* Titlebar is the click target — cursor signals interactivity */
+.control-panel .wb-titlebar {
+  cursor: pointer;
+}
+
+.control-panel .wb-titlebar:hover {
+  background: color-mix(in srgb, var(--wb-blue) 78%, var(--wb-white));
+}
+
+/* WB snap-collapse: Amiga windows opened/closed instantly, no animation */
+.control-panel .wb-window[data-collapsed="true"] .wb-body {
+  display: none;
+}
+
+/* Close gadget: filled square = expanded, hollow square = collapsed */
+.control-panel .wb-window[data-collapsed="true"] .wb-gadget-close::after {
+  background: transparent;
+  border: 2px solid var(--wb-black);
+}
+
+/* ─── Screen bar CRT toggle button ─────────────────── */
+.wb-screen-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.wb-screen-btn {
+  height: 18px;
+  padding: 0 7px;
+  font: inherit;
+  font-size: 13px;
+  text-transform: uppercase;
+  color: var(--wb-black);
+  background: var(--wb-gray);
+  border-top:    1px solid var(--wb-hi);
+  border-left:   1px solid var(--wb-hi);
+  border-bottom: 1px solid var(--wb-lo);
+  border-right:  1px solid var(--wb-lo);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.wb-screen-btn:hover {
+  background: #BBBBBB;
+}
+
+/* Pressed / active state = scanlines ON (default) */
+.wb-screen-btn[data-active="true"] {
+  background: var(--wb-black);
+  color: var(--wb-white);
+  border-top-color:    var(--wb-lo);
+  border-left-color:   var(--wb-lo);
+  border-bottom-color: var(--wb-hi);
+  border-right-color:  var(--wb-hi);
+}
+
+.wb-screen-btn[data-active="true"]:hover {
+  background: #111;
+}
+
 /* ─── Responsive ────────────────────────────────────── */
 @media (max-width: 900px) {
   .app-shell {
@@ -443,6 +507,9 @@ button:disabled {
 <body>
   <div class="wb-screen-bar" role="banner">
     <span class="wb-screen-title">The Juggler Raytracer</span>
+    <span class="wb-screen-controls">
+      <button id="scanlineToggle" class="wb-screen-btn" data-active="true" title="Toggle CRT scanlines">CRT</button>
+    </span>
     <span class="wb-screen-meta">Eric Graham, 1987 &bull; Amiga Raytrace Reconstruction</span>
   </div>
 
@@ -468,7 +535,7 @@ button:disabled {
 
     <aside class="control-panel" aria-label="Render controls">
 
-      <section class="wb-window" aria-labelledby="title-scene">
+      <section class="wb-window" data-collapsed="false" aria-labelledby="title-scene">
         <div class="wb-titlebar">
           <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
           <span class="wb-title-text" id="title-scene">Scene</span>
@@ -495,7 +562,7 @@ button:disabled {
         </div>
       </section>
 
-      <section class="wb-window" aria-labelledby="title-render">
+      <section class="wb-window" data-collapsed="false" aria-labelledby="title-render">
         <div class="wb-titlebar">
           <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
           <span class="wb-title-text" id="title-render">Render</span>
@@ -530,7 +597,7 @@ button:disabled {
         </div>
       </section>
 
-      <section class="wb-window" aria-labelledby="title-camera">
+      <section class="wb-window" data-collapsed="true" aria-labelledby="title-camera">
         <div class="wb-titlebar">
           <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
           <span class="wb-title-text" id="title-camera">Camera</span>
@@ -553,7 +620,7 @@ button:disabled {
         </div>
       </section>
 
-      <section class="wb-window" aria-labelledby="title-animation">
+      <section class="wb-window" data-collapsed="true" aria-labelledby="title-animation">
         <div class="wb-titlebar">
           <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
           <span class="wb-title-text" id="title-animation">Animation</span>
@@ -630,7 +697,7 @@ button:disabled {
         </div>
       </section>
 
-      <section class="wb-window source-note" aria-labelledby="title-source">
+      <section class="wb-window source-note" data-collapsed="true" aria-labelledby="title-source">
         <div class="wb-titlebar">
           <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
           <span class="wb-title-text" id="title-source">Source</span>
@@ -2668,6 +2735,24 @@ var Juggler;
 })(Juggler || (Juggler = {}));
 window.addEventListener("DOMContentLoaded", () => Juggler.App.start());
 
+  </script>
+  <script>
+    // WB window zip/unzip — click any title bar in the control panel to collapse
+    document.querySelectorAll('.control-panel .wb-window[data-collapsed]').forEach(function(win) {
+      win.querySelector('.wb-titlebar').addEventListener('click', function() {
+        var isCollapsed = win.getAttribute('data-collapsed') === 'true';
+        win.setAttribute('data-collapsed', isCollapsed ? 'false' : 'true');
+      });
+    });
+
+    // CRT scanline toggle
+    var scanBtn = document.getElementById('scanlineToggle');
+    if (scanBtn) {
+      scanBtn.addEventListener('click', function() {
+        var scanOn = document.body.classList.toggle('no-scanlines');
+        scanBtn.setAttribute('data-active', scanOn ? 'false' : 'true');
+      });
+    }
   </script>
 </body>
 </html>

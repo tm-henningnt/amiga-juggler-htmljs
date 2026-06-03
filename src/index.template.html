@@ -14,6 +14,9 @@
 <body>
   <div class="wb-screen-bar" role="banner">
     <span class="wb-screen-title">The Juggler Raytracer</span>
+    <span class="wb-screen-controls">
+      <button id="scanlineToggle" class="wb-screen-btn" data-active="true" title="Toggle CRT scanlines">CRT</button>
+    </span>
     <span class="wb-screen-meta">Eric Graham, 1987 &bull; Amiga Raytrace Reconstruction</span>
   </div>
 
@@ -39,7 +42,7 @@
 
     <aside class="control-panel" aria-label="Render controls">
 
-      <section class="wb-window" aria-labelledby="title-scene">
+      <section class="wb-window" data-collapsed="false" aria-labelledby="title-scene">
         <div class="wb-titlebar">
           <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
           <span class="wb-title-text" id="title-scene">Scene</span>
@@ -66,7 +69,7 @@
         </div>
       </section>
 
-      <section class="wb-window" aria-labelledby="title-render">
+      <section class="wb-window" data-collapsed="false" aria-labelledby="title-render">
         <div class="wb-titlebar">
           <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
           <span class="wb-title-text" id="title-render">Render</span>
@@ -101,7 +104,7 @@
         </div>
       </section>
 
-      <section class="wb-window" aria-labelledby="title-camera">
+      <section class="wb-window" data-collapsed="true" aria-labelledby="title-camera">
         <div class="wb-titlebar">
           <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
           <span class="wb-title-text" id="title-camera">Camera</span>
@@ -124,7 +127,7 @@
         </div>
       </section>
 
-      <section class="wb-window" aria-labelledby="title-animation">
+      <section class="wb-window" data-collapsed="true" aria-labelledby="title-animation">
         <div class="wb-titlebar">
           <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
           <span class="wb-title-text" id="title-animation">Animation</span>
@@ -201,7 +204,7 @@
         </div>
       </section>
 
-      <section class="wb-window source-note" aria-labelledby="title-source">
+      <section class="wb-window source-note" data-collapsed="true" aria-labelledby="title-source">
         <div class="wb-titlebar">
           <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
           <span class="wb-title-text" id="title-source">Source</span>
@@ -222,6 +225,24 @@
   </main>
   <script>
 /*__INLINE_JS__*/
+  </script>
+  <script>
+    // WB window zip/unzip — click any title bar in the control panel to collapse
+    document.querySelectorAll('.control-panel .wb-window[data-collapsed]').forEach(function(win) {
+      win.querySelector('.wb-titlebar').addEventListener('click', function() {
+        var isCollapsed = win.getAttribute('data-collapsed') === 'true';
+        win.setAttribute('data-collapsed', isCollapsed ? 'false' : 'true');
+      });
+    });
+
+    // CRT scanline toggle
+    var scanBtn = document.getElementById('scanlineToggle');
+    if (scanBtn) {
+      scanBtn.addEventListener('click', function() {
+        var scanOn = document.body.classList.toggle('no-scanlines');
+        scanBtn.setAttribute('data-active', scanOn ? 'false' : 'true');
+      });
+    }
   </script>
 </body>
 </html>
