@@ -2,3 +2,6 @@ node_modules/
 dist/
 dist-test/
 tmp/
+CLAUDE.md
+.impeccable.md
+.playwright-cli/

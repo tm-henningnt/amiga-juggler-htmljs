@@ -4,150 +4,265 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Eric Graham's Juggler Raytracer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
   <style>
 :root {
-  color-scheme: dark;
-  --bg: #101114;
-  --panel: #191a1f;
-  --panel-2: #22242a;
-  --line: #383b44;
-  --text: #f2f0e8;
-  --muted: #b6b1a5;
-  --accent: #ffcc4d;
-  --accent-2: #67c7b9;
-  --danger: #e37164;
-  font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --wb-blue:      #0055AA;
+  --wb-gray:      #AAAAAA;
+  --wb-white:     #FFFFFF;
+  --wb-black:     #000000;
+  --wb-orange:    #FF8800;
+  --wb-hi:        #FFFFFF;
+  --wb-lo:        #333333;
+  --wb-lo-mid:    #666666;
+
+  font-family: 'VT323', 'Courier New', monospace;
+  font-size: 18px;
+  line-height: 1.25;
 }
 
-* {
+*, *::before, *::after {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
   min-height: 100vh;
-  margin: 0;
-  background:
-    linear-gradient(90deg, rgba(255, 204, 77, 0.055) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(255, 204, 77, 0.045) 1px, transparent 1px),
-    var(--bg);
-  background-size: 28px 28px;
-  color: var(--text);
+  background: var(--wb-blue);
+  color: var(--wb-black);
 }
 
-button,
-input,
-select {
-  font: inherit;
+/* ─── Screen title bar ──────────────────────────────── */
+.wb-screen-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 22px;
+  padding: 0 8px;
+  background: var(--wb-gray);
+  border-bottom: 2px solid var(--wb-lo);
+  font-size: 16px;
+  user-select: none;
+  gap: 16px;
 }
 
+.wb-screen-title {
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.wb-screen-meta {
+  color: var(--wb-lo-mid);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* ─── App shell ─────────────────────────────────────── */
 .app-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 18px;
-  min-height: 100vh;
-  padding: 18px;
-}
-
-.render-stage,
-.control-panel {
-  min-width: 0;
-}
-
-.stage-header {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 14px;
-}
-
-.eyebrow {
-  margin: 0 0 4px;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-h1,
-h2 {
-  margin: 0;
-  letter-spacing: 0;
-}
-
-h1 {
-  font-size: clamp(26px, 4vw, 46px);
-  line-height: 1;
-}
-
-h2 {
-  font-size: 15px;
-}
-
-.status-strip {
-  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: 8px;
-  min-width: min(340px, 38vw);
-  color: var(--muted);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
+  padding: 8px;
+  min-height: calc(100vh - 22px);
 }
 
-progress {
-  width: 100%;
+/* ─── WB window chrome ──────────────────────────────── */
+.wb-window {
+  background: var(--wb-gray);
+  border-top:    2px solid var(--wb-hi);
+  border-left:   2px solid var(--wb-hi);
+  border-bottom: 2px solid var(--wb-lo);
+  border-right:  2px solid var(--wb-lo);
+}
+
+.wb-titlebar {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 3px;
+  background: var(--wb-blue);
+  color: var(--wb-white);
+  user-select: none;
+  gap: 3px;
+}
+
+.wb-title-text {
+  flex: 1;
+  text-align: center;
+  font-size: 16px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Gadgets (close / depth) */
+.wb-gadget {
+  flex-shrink: 0;
+  width: 18px;
+  height: 16px;
+  background: var(--wb-gray);
+  border-top:    1px solid var(--wb-hi);
+  border-left:   1px solid var(--wb-hi);
+  border-bottom: 1px solid var(--wb-lo);
+  border-right:  1px solid var(--wb-lo);
+  position: relative;
+}
+
+.wb-gadget-close::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  background: var(--wb-black);
+}
+
+.wb-gadget-depth::before {
+  content: '';
+  position: absolute;
+  width: 10px;
   height: 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--panel);
+  background: var(--wb-gray);
+  border: 1px solid var(--wb-black);
+  top: 2px;
+  right: 2px;
 }
 
-progress::-webkit-progress-bar {
-  border-radius: 999px;
-  background: var(--panel);
+.wb-gadget-depth::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 8px;
+  background: var(--wb-blue);
+  border: 1px solid var(--wb-black);
+  top: 5px;
+  left: 2px;
 }
 
-progress::-webkit-progress-value {
-  border-radius: 999px;
-  background: var(--accent-2);
+.wb-body {
+  padding: 8px;
+}
+
+/* ─── Render stage ──────────────────────────────────── */
+.render-stage {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.render-stage > .wb-window {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.render-stage .wb-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+/* Canvas in a recessed CRT-frame */
+.canvas-frame {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  background: var(--wb-black);
+  /* inset bevel: dark top/left, light bottom/right */
+  border-top:    2px solid var(--wb-lo);
+  border-left:   2px solid var(--wb-lo);
+  border-bottom: 2px solid var(--wb-hi);
+  border-right:  2px solid var(--wb-hi);
+  position: relative;
 }
 
 canvas {
   display: block;
   width: 100%;
-  max-height: calc(100vh - 108px);
+  max-height: calc(100vh - 170px);
   aspect-ratio: 16 / 10;
   object-fit: contain;
-  background: #050505;
-  border: 1px solid var(--line);
+  background: var(--wb-black);
   image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
-.control-panel {
+/* Scanline overlay */
+.canvas-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 1px,
+    rgba(0, 0, 0, 0.18) 1px,
+    rgba(0, 0, 0, 0.18) 2px
+  );
+  pointer-events: none;
+}
+
+/* Status strip */
+.status-strip {
   display: grid;
-  align-content: start;
-  gap: 12px;
+  gap: 4px;
+  font-size: 16px;
+  color: var(--wb-black);
+  font-variant-numeric: tabular-nums;
 }
 
-.control-group {
-  padding: 14px;
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  border: 1px solid var(--line);
+progress {
+  width: 100%;
+  height: 16px;
+  /* recessed */
+  border-top:    1px solid var(--wb-lo);
+  border-left:   1px solid var(--wb-lo);
+  border-bottom: 1px solid var(--wb-hi);
+  border-right:  1px solid var(--wb-hi);
+  background: var(--wb-black);
+  appearance: none;
+  -webkit-appearance: none;
 }
 
-.control-group h2 {
-  margin-bottom: 12px;
-  color: var(--accent);
+progress::-webkit-progress-bar {
+  background: var(--wb-black);
 }
 
+progress::-webkit-progress-value {
+  background: var(--wb-orange);
+}
+
+progress::-moz-progress-bar {
+  background: var(--wb-orange);
+}
+
+/* ─── Control panel ─────────────────────────────────── */
+.control-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  max-height: calc(100vh - 38px);
+}
+
+/* ─── Form elements ─────────────────────────────────── */
 label {
   display: grid;
-  gap: 6px;
-  margin: 0 0 12px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
+  gap: 3px;
+  margin-bottom: 8px;
+  color: var(--wb-black);
+  font-size: 16px;
   text-transform: uppercase;
+}
+
+label:last-child {
+  margin-bottom: 0;
 }
 
 select,
@@ -156,82 +271,133 @@ input[type="file"],
 textarea {
   width: 100%;
   min-width: 0;
-  padding: 9px 10px;
-  color: var(--text);
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 4px;
+  padding: 3px 6px;
+  color: var(--wb-black);
+  background: var(--wb-white);
+  font: inherit;
+  font-size: 16px;
+  text-transform: none;
+  /* recessed bevel */
+  border-top:    1px solid var(--wb-lo);
+  border-left:   1px solid var(--wb-lo);
+  border-bottom: 1px solid var(--wb-hi);
+  border-right:  1px solid var(--wb-hi);
 }
 
 textarea {
   resize: vertical;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.35;
-  text-transform: none;
+  min-height: 80px;
 }
 
 input[type="range"] {
   width: 100%;
-  accent-color: var(--accent-2);
+  height: 18px;
+  accent-color: var(--wb-orange);
+  cursor: pointer;
 }
 
 .check-row {
+  display: grid;
   grid-template-columns: auto 1fr;
   align-items: center;
-  color: var(--text);
+  gap: 8px;
   text-transform: none;
+  font-size: 16px;
+  color: var(--wb-black);
+  margin-bottom: 8px;
 }
 
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--wb-orange);
+  cursor: pointer;
+}
+
+/* ─── Buttons ───────────────────────────────────────── */
 .button-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 4px;
+  margin-bottom: 8px;
 }
 
 .button-row.three {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.button-row:last-child {
+  margin-bottom: 0;
+}
+
 .split-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 6px;
 }
 
 button {
-  min-height: 40px;
-  padding: 9px 12px;
-  color: #14120c;
-  font-weight: 800;
-  background: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 60%, #000);
-  border-radius: 4px;
+  min-height: 28px;
+  padding: 3px 8px;
+  color: var(--wb-black);
+  font: inherit;
+  font-size: 16px;
+  text-transform: uppercase;
+  background: var(--wb-gray);
+  border-top:    2px solid var(--wb-hi);
+  border-left:   2px solid var(--wb-hi);
+  border-bottom: 2px solid var(--wb-lo);
+  border-right:  2px solid var(--wb-lo);
   cursor: pointer;
+  white-space: nowrap;
 }
 
 button:hover {
-  filter: brightness(1.07);
+  background: #BBBBBB;
+}
+
+button:active {
+  border-top-color:    var(--wb-lo);
+  border-left-color:   var(--wb-lo);
+  border-bottom-color: var(--wb-hi);
+  border-right-color:  var(--wb-hi);
 }
 
 button:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+  color: var(--wb-lo-mid);
 }
 
 #abort {
-  color: var(--text);
-  background: transparent;
-  border-color: var(--danger);
+  background: var(--wb-black);
+  color: var(--wb-white);
+  border-top-color:    var(--wb-lo);
+  border-left-color:   var(--wb-lo);
+  border-bottom-color: var(--wb-hi);
+  border-right-color:  var(--wb-hi);
 }
 
+#abort:hover {
+  background: #222;
+}
+
+#abort:active {
+  border-top-color:    var(--wb-hi);
+  border-left-color:   var(--wb-hi);
+  border-bottom-color: var(--wb-lo);
+  border-right-color:  var(--wb-lo);
+}
+
+/* ─── Facts dl ──────────────────────────────────────── */
 .facts {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 6px 12px;
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
+  gap: 2px 10px;
+  color: var(--wb-black);
+  font-size: 14px;
+  margin-top: 6px;
 }
 
 .facts dt,
@@ -240,31 +406,31 @@ button:disabled {
 }
 
 .facts dd {
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
+/* ─── Source note ───────────────────────────────────── */
 .source-note p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.45;
+  color: var(--wb-black);
+  text-transform: none;
 }
 
+/* ─── Responsive ────────────────────────────────────── */
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;
   }
 
-  .stage-header {
-    align-items: start;
-    flex-direction: column;
+  .render-stage {
+    min-height: 0;
   }
 
-  .status-strip {
-    min-width: 0;
-    width: 100%;
+  .control-panel {
+    max-height: none;
+    overflow-y: visible;
   }
 
   canvas {
@@ -275,171 +441,212 @@ button:disabled {
   </style>
 </head>
 <body>
+  <div class="wb-screen-bar" role="banner">
+    <span class="wb-screen-title">The Juggler Raytracer</span>
+    <span class="wb-screen-meta">Eric Graham, 1987 &bull; Amiga Raytrace Reconstruction</span>
+  </div>
+
   <main class="app-shell">
     <section class="render-stage" aria-label="Rendered frame">
-      <div class="stage-header">
-        <div>
-          <p class="eyebrow">Eric Graham, 1987</p>
-          <h1>The Juggler Raytracer</h1>
+      <div class="wb-window">
+        <div class="wb-titlebar" aria-hidden="true">
+          <span class="wb-gadget wb-gadget-close"></span>
+          <span class="wb-title-text">Render Stage</span>
+          <span class="wb-gadget wb-gadget-depth"></span>
         </div>
-        <div class="status-strip">
-          <span id="status">Ready</span>
-          <progress id="progress" max="1" value="0"></progress>
+        <div class="wb-body">
+          <div class="canvas-frame">
+            <canvas id="frame" width="320" height="200"></canvas>
+          </div>
+          <div class="status-strip">
+            <span id="status">Ready</span>
+            <progress id="progress" max="1" value="0"></progress>
+          </div>
         </div>
       </div>
-      <canvas id="frame" width="320" height="200"></canvas>
     </section>
 
     <aside class="control-panel" aria-label="Render controls">
-      <section class="control-group">
-        <h2>Scene</h2>
-        <label>
-          Source
-          <select id="scene"></select>
-        </label>
-        <label>
-          Load .dat
-          <input id="file" type="file" accept=".dat,text/plain">
-        </label>
-        <label>
-          Motion
-          <select id="sceneMotion"></select>
-        </label>
-        <label>
-          Source frame
-          <input id="motionFrame" type="range" min="0" max="0" value="0">
-        </label>
-        <dl id="sceneFacts" class="facts"></dl>
-      </section>
 
-      <section class="control-group">
-        <h2>Render</h2>
-        <label>
-          Resolution
-          <select id="resolution">
-            <option value="160x100">160 x 100</option>
-            <option value="320x200" selected>320 x 200 source</option>
-            <option value="640x400">640 x 400 doubled</option>
-            <option value="800x600">800 x 600</option>
-          </select>
-        </label>
-        <label>
-          Profile
-          <select id="renderProfile">
-          </select>
-        </label>
-        <label>
-          Rows per tick
-          <input id="rowsPerTick" type="range" min="1" max="32" value="4">
-        </label>
-        <label>
-          Mirror depth
-          <input id="maxDepth" type="number" min="1" max="8" value="4">
-        </label>
-        <div class="button-row">
-          <button id="render">Render Still</button>
-          <button id="abort">Abort</button>
+      <section class="wb-window" aria-labelledby="title-scene">
+        <div class="wb-titlebar">
+          <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
+          <span class="wb-title-text" id="title-scene">Scene</span>
+          <span class="wb-gadget wb-gadget-depth" aria-hidden="true"></span>
+        </div>
+        <div class="wb-body">
+          <label>
+            Source
+            <select id="scene"></select>
+          </label>
+          <label>
+            Load .dat
+            <input id="file" type="file" accept=".dat,text/plain">
+          </label>
+          <label>
+            Motion
+            <select id="sceneMotion"></select>
+          </label>
+          <label>
+            Source frame
+            <input id="motionFrame" type="range" min="0" max="0" value="0">
+          </label>
+          <dl id="sceneFacts" class="facts"></dl>
         </div>
       </section>
 
-      <section class="control-group">
-        <h2>Camera</h2>
-        <label class="check-row">
-          <input id="orbitEnabled" type="checkbox">
-          Orbit around scene center
-        </label>
-        <label>
-          Orbit angle
-          <input id="orbitAngle" type="range" min="0" max="360" value="0">
-        </label>
-        <label>
-          Orbit radius
-          <input id="orbitRadius" type="number" min="1" max="120" value="10">
-        </label>
-        <dl id="cameraFacts" class="facts"></dl>
+      <section class="wb-window" aria-labelledby="title-render">
+        <div class="wb-titlebar">
+          <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
+          <span class="wb-title-text" id="title-render">Render</span>
+          <span class="wb-gadget wb-gadget-depth" aria-hidden="true"></span>
+        </div>
+        <div class="wb-body">
+          <label>
+            Resolution
+            <select id="resolution">
+              <option value="160x100">160 x 100</option>
+              <option value="320x200" selected>320 x 200 source</option>
+              <option value="640x400">640 x 400 doubled</option>
+              <option value="800x600">800 x 600</option>
+            </select>
+          </label>
+          <label>
+            Profile
+            <select id="renderProfile"></select>
+          </label>
+          <label>
+            Rows per tick
+            <input id="rowsPerTick" type="range" min="1" max="32" value="4">
+          </label>
+          <label>
+            Mirror depth
+            <input id="maxDepth" type="number" min="1" max="8" value="4">
+          </label>
+          <div class="button-row">
+            <button id="render">Render Still</button>
+            <button id="abort">Abort</button>
+          </div>
+        </div>
       </section>
 
-      <section class="control-group">
-        <h2>Animation</h2>
-        <label>
-          Path
-          <select id="animationPath"></select>
-        </label>
-        <div class="split-row">
-          <label>
-            Frames
-            <input id="animationFrames" type="number" min="1" max="360" value="24">
-          </label>
-          <label>
-            FPS
-            <input id="animationFps" type="number" min="1" max="60" value="12">
-          </label>
+      <section class="wb-window" aria-labelledby="title-camera">
+        <div class="wb-titlebar">
+          <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
+          <span class="wb-title-text" id="title-camera">Camera</span>
+          <span class="wb-gadget wb-gadget-depth" aria-hidden="true"></span>
         </div>
-        <div class="split-row">
-          <label>
-            Start angle
-            <input id="animationStartAngle" type="number" step="1" value="0">
+        <div class="wb-body">
+          <label class="check-row">
+            <input id="orbitEnabled" type="checkbox">
+            Orbit around scene center
           </label>
           <label>
-            End angle
-            <input id="animationEndAngle" type="number" step="1" value="360">
+            Orbit angle
+            <input id="orbitAngle" type="range" min="0" max="360" value="0">
           </label>
-        </div>
-        <div class="split-row">
           <label>
             Orbit radius
-            <input id="animationOrbitRadius" type="number" min="1" max="120" step="0.5" value="10">
+            <input id="orbitRadius" type="number" min="1" max="120" value="10">
           </label>
-          <label>
-            Height offset
-            <input id="animationOrbitHeight" type="number" min="-80" max="80" step="0.5" value="0">
-          </label>
+          <dl id="cameraFacts" class="facts"></dl>
         </div>
-        <div class="split-row">
-          <label>
-            Dolly start
-            <input id="animationDollyStart" type="number" min="1" max="160" step="0.5" value="14">
-          </label>
-          <label>
-            Dolly end
-            <input id="animationDollyEnd" type="number" min="1" max="160" step="0.5" value="7">
-          </label>
-        </div>
-        <label>
-          Custom keyframes
-          <textarea id="customKeyframes" rows="7" spellcheck="false"></textarea>
-        </label>
-        <div class="button-row">
-          <button id="renderAnimation">Render Animation</button>
-          <button id="clearAnimation">Clear Frames</button>
-        </div>
-        <label>
-          Timeline
-          <input id="timeline" type="range" min="0" max="0" value="0">
-        </label>
-        <div class="button-row three">
-          <button id="playAnimation" disabled>Play</button>
-          <button id="pauseAnimation" disabled>Pause</button>
-          <button id="stopAnimation" disabled>Stop</button>
-        </div>
-        <div class="button-row three">
-          <button id="exportWebm" disabled>WebM</button>
-          <button id="exportMp4" disabled>MP4</button>
-          <button id="exportPng" disabled>PNG Frames</button>
-        </div>
-        <dl id="animationFacts" class="facts"></dl>
       </section>
 
-      <section class="control-group source-note">
-        <h2>Source</h2>
-        <p>
-          Original C and scene data are from AlphaPixel's archive of Eric Graham's
-          1987 Juggler raytracer. This rebuild keeps the render path intentionally
-          close to that source before adding modern modes. The juggling cycle is
-          reconstructed from the historical movie/still output because the text
-          scene data contains no embedded motion tracks.
-        </p>
+      <section class="wb-window" aria-labelledby="title-animation">
+        <div class="wb-titlebar">
+          <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
+          <span class="wb-title-text" id="title-animation">Animation</span>
+          <span class="wb-gadget wb-gadget-depth" aria-hidden="true"></span>
+        </div>
+        <div class="wb-body">
+          <label>
+            Path
+            <select id="animationPath"></select>
+          </label>
+          <div class="split-row">
+            <label>
+              Frames
+              <input id="animationFrames" type="number" min="1" max="360" value="24">
+            </label>
+            <label>
+              FPS
+              <input id="animationFps" type="number" min="1" max="60" value="12">
+            </label>
+          </div>
+          <div class="split-row">
+            <label>
+              Start angle
+              <input id="animationStartAngle" type="number" step="1" value="0">
+            </label>
+            <label>
+              End angle
+              <input id="animationEndAngle" type="number" step="1" value="360">
+            </label>
+          </div>
+          <div class="split-row">
+            <label>
+              Orbit radius
+              <input id="animationOrbitRadius" type="number" min="1" max="120" step="0.5" value="10">
+            </label>
+            <label>
+              Height offset
+              <input id="animationOrbitHeight" type="number" min="-80" max="80" step="0.5" value="0">
+            </label>
+          </div>
+          <div class="split-row">
+            <label>
+              Dolly start
+              <input id="animationDollyStart" type="number" min="1" max="160" step="0.5" value="14">
+            </label>
+            <label>
+              Dolly end
+              <input id="animationDollyEnd" type="number" min="1" max="160" step="0.5" value="7">
+            </label>
+          </div>
+          <label>
+            Custom keyframes
+            <textarea id="customKeyframes" rows="5" spellcheck="false"></textarea>
+          </label>
+          <div class="button-row">
+            <button id="renderAnimation">Render Anim</button>
+            <button id="clearAnimation">Clear Frames</button>
+          </div>
+          <label>
+            Timeline
+            <input id="timeline" type="range" min="0" max="0" value="0">
+          </label>
+          <div class="button-row three">
+            <button id="playAnimation" disabled>Play</button>
+            <button id="pauseAnimation" disabled>Pause</button>
+            <button id="stopAnimation" disabled>Stop</button>
+          </div>
+          <div class="button-row three">
+            <button id="exportWebm" disabled>WebM</button>
+            <button id="exportMp4" disabled>MP4</button>
+            <button id="exportPng" disabled>PNG</button>
+          </div>
+          <dl id="animationFacts" class="facts"></dl>
+        </div>
       </section>
+
+      <section class="wb-window source-note" aria-labelledby="title-source">
+        <div class="wb-titlebar">
+          <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
+          <span class="wb-title-text" id="title-source">Source</span>
+          <span class="wb-gadget wb-gadget-depth" aria-hidden="true"></span>
+        </div>
+        <div class="wb-body">
+          <p>
+            Original C and scene data are from AlphaPixel's archive of Eric Graham's
+            1987 Juggler raytracer. This rebuild keeps the render path intentionally
+            close to that source before adding modern modes. The juggling cycle is
+            reconstructed from the historical movie/still output because the text
+            scene data contains no embedded motion tracks.
+          </p>
+        </div>
+      </section>
+
     </aside>
   </main>
   <script>

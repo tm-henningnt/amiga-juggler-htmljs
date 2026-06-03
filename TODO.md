@@ -1,7 +1,5 @@
 # TODO
 
-This backlog replaces the original PRD and keeps the remaining work focused on historical accuracy, usable rendering tools, and future research.
-
 ## Historical Accuracy
 
 - Decode or document the `movie.data` and `movie2.data` compressed HAM movie formats.
