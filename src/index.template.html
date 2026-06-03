@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Eric Graham's Juggler Raytracer</title>
+  <style>
+/*__INLINE_CSS__*/
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <section class="render-stage" aria-label="Rendered frame">
+      <div class="stage-header">
+        <div>
+          <p class="eyebrow">Eric Graham, 1987</p>
+          <h1>The Juggler Raytracer</h1>
+        </div>
+        <div class="status-strip">
+          <span id="status">Ready</span>
+          <progress id="progress" max="1" value="0"></progress>
+        </div>
+      </div>
+      <canvas id="frame" width="320" height="200"></canvas>
+    </section>
+
+    <aside class="control-panel" aria-label="Render controls">
+      <section class="control-group">
+        <h2>Scene</h2>
+        <label>
+          Source
+          <select id="scene"></select>
+        </label>
+        <label>
+          Load .dat
+          <input id="file" type="file" accept=".dat,text/plain">
+        </label>
+        <label>
+          Motion
+          <select id="sceneMotion"></select>
+        </label>
+        <label>
+          Source frame
+          <input id="motionFrame" type="range" min="0" max="0" value="0">
+        </label>
+        <dl id="sceneFacts" class="facts"></dl>
+      </section>
+
+      <section class="control-group">
+        <h2>Render</h2>
+        <label>
+          Resolution
+          <select id="resolution">
+            <option value="160x100">160 x 100</option>
+            <option value="320x200" selected>320 x 200 source</option>
+            <option value="640x400">640 x 400 doubled</option>
+            <option value="800x600">800 x 600</option>
+          </select>
+        </label>
+        <label>
+          Profile
+          <select id="renderProfile">
+          </select>
+        </label>
+        <label>
+          Rows per tick
+          <input id="rowsPerTick" type="range" min="1" max="32" value="4">
+        </label>
+        <label>
+          Mirror depth
+          <input id="maxDepth" type="number" min="1" max="8" value="4">
+        </label>
+        <div class="button-row">
+          <button id="render">Render Still</button>
+          <button id="abort">Abort</button>
+        </div>
+      </section>
+
+      <section class="control-group">
+        <h2>Camera</h2>
+        <label class="check-row">
+          <input id="orbitEnabled" type="checkbox">
+          Orbit around scene center
+        </label>
+        <label>
+          Orbit angle
+          <input id="orbitAngle" type="range" min="0" max="360" value="0">
+        </label>
+        <label>
+          Orbit radius
+          <input id="orbitRadius" type="number" min="1" max="120" value="10">
+        </label>
+        <dl id="cameraFacts" class="facts"></dl>
+      </section>
+
+      <section class="control-group">
+        <h2>Animation</h2>
+        <label>
+          Path
+          <select id="animationPath"></select>
+        </label>
+        <div class="split-row">
+          <label>
+            Frames
+            <input id="animationFrames" type="number" min="1" max="360" value="24">
+          </label>
+          <label>
+            FPS
+            <input id="animationFps" type="number" min="1" max="60" value="12">
+          </label>
+        </div>
+        <div class="split-row">
+          <label>
+            Start angle
+            <input id="animationStartAngle" type="number" step="1" value="0">
+          </label>
+          <label>
+            End angle
+            <input id="animationEndAngle" type="number" step="1" value="360">
+          </label>
+        </div>
+        <div class="split-row">
+          <label>
+            Orbit radius
+            <input id="animationOrbitRadius" type="number" min="1" max="120" step="0.5" value="10">
+          </label>
+          <label>
+            Height offset
+            <input id="animationOrbitHeight" type="number" min="-80" max="80" step="0.5" value="0">
+          </label>
+        </div>
+        <div class="split-row">
+          <label>
+            Dolly start
+            <input id="animationDollyStart" type="number" min="1" max="160" step="0.5" value="14">
+          </label>
+          <label>
+            Dolly end
+            <input id="animationDollyEnd" type="number" min="1" max="160" step="0.5" value="7">
+          </label>
+        </div>
+        <label>
+          Custom keyframes
+          <textarea id="customKeyframes" rows="7" spellcheck="false"></textarea>
+        </label>
+        <div class="button-row">
+          <button id="renderAnimation">Render Animation</button>
+          <button id="clearAnimation">Clear Frames</button>
+        </div>
+        <label>
+          Timeline
+          <input id="timeline" type="range" min="0" max="0" value="0">
+        </label>
+        <div class="button-row three">
+          <button id="playAnimation" disabled>Play</button>
+          <button id="pauseAnimation" disabled>Pause</button>
+          <button id="stopAnimation" disabled>Stop</button>
+        </div>
+        <div class="button-row three">
+          <button id="exportWebm" disabled>WebM</button>
+          <button id="exportMp4" disabled>MP4</button>
+          <button id="exportPng" disabled>PNG Frames</button>
+        </div>
+        <dl id="animationFacts" class="facts"></dl>
+      </section>
+
+      <section class="control-group source-note">
+        <h2>Source</h2>
+        <p>
+          Original C and scene data are from AlphaPixel's archive of Eric Graham's
+          1987 Juggler raytracer. This rebuild keeps the render path intentionally
+          close to that source before adding modern modes. The juggling cycle is
+          reconstructed from the historical movie/still output because the text
+          scene data contains no embedded motion tracks.
+        </p>
+      </section>
+    </aside>
+  </main>
+  <script>
+/*__INLINE_JS__*/
+  </script>
+</body>
+</html>

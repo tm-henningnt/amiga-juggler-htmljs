@@ -1,0 +1,266 @@
+:root {
+  color-scheme: dark;
+  --bg: #101114;
+  --panel: #191a1f;
+  --panel-2: #22242a;
+  --line: #383b44;
+  --text: #f2f0e8;
+  --muted: #b6b1a5;
+  --accent: #ffcc4d;
+  --accent-2: #67c7b9;
+  --danger: #e37164;
+  font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    linear-gradient(90deg, rgba(255, 204, 77, 0.055) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 204, 77, 0.045) 1px, transparent 1px),
+    var(--bg);
+  background-size: 28px 28px;
+  color: var(--text);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 18px;
+  min-height: 100vh;
+  padding: 18px;
+}
+
+.render-stage,
+.control-panel {
+  min-width: 0;
+}
+
+.stage-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1,
+h2 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+h1 {
+  font-size: clamp(26px, 4vw, 46px);
+  line-height: 1;
+}
+
+h2 {
+  font-size: 15px;
+}
+
+.status-strip {
+  display: grid;
+  gap: 8px;
+  min-width: min(340px, 38vw);
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+progress {
+  width: 100%;
+  height: 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+}
+
+progress::-webkit-progress-bar {
+  border-radius: 999px;
+  background: var(--panel);
+}
+
+progress::-webkit-progress-value {
+  border-radius: 999px;
+  background: var(--accent-2);
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  max-height: calc(100vh - 108px);
+  aspect-ratio: 16 / 10;
+  object-fit: contain;
+  background: #050505;
+  border: 1px solid var(--line);
+  image-rendering: pixelated;
+}
+
+.control-panel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.control-group {
+  padding: 14px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--line);
+}
+
+.control-group h2 {
+  margin-bottom: 12px;
+  color: var(--accent);
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+select,
+input[type="number"],
+input[type="file"],
+textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+textarea {
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.35;
+  text-transform: none;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent-2);
+}
+
+.check-row {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  color: var(--text);
+  text-transform: none;
+}
+
+.button-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.button-row.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.split-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+button {
+  min-height: 40px;
+  padding: 9px 12px;
+  color: #14120c;
+  font-weight: 800;
+  background: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, #000);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(1.07);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+#abort {
+  color: var(--text);
+  background: transparent;
+  border-color: var(--danger);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.facts dt,
+.facts dd {
+  margin: 0;
+}
+
+.facts dd {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.source-note p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .stage-header {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .status-strip {
+    min-width: 0;
+    width: 100%;
+  }
+
+  canvas {
+    max-height: none;
+  }
+}

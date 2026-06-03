@@ -1,0 +1,2466 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Eric Graham's Juggler Raytracer</title>
+  <style>
+:root {
+  color-scheme: dark;
+  --bg: #101114;
+  --panel: #191a1f;
+  --panel-2: #22242a;
+  --line: #383b44;
+  --text: #f2f0e8;
+  --muted: #b6b1a5;
+  --accent: #ffcc4d;
+  --accent-2: #67c7b9;
+  --danger: #e37164;
+  font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    linear-gradient(90deg, rgba(255, 204, 77, 0.055) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 204, 77, 0.045) 1px, transparent 1px),
+    var(--bg);
+  background-size: 28px 28px;
+  color: var(--text);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 18px;
+  min-height: 100vh;
+  padding: 18px;
+}
+
+.render-stage,
+.control-panel {
+  min-width: 0;
+}
+
+.stage-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1,
+h2 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+h1 {
+  font-size: clamp(26px, 4vw, 46px);
+  line-height: 1;
+}
+
+h2 {
+  font-size: 15px;
+}
+
+.status-strip {
+  display: grid;
+  gap: 8px;
+  min-width: min(340px, 38vw);
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+progress {
+  width: 100%;
+  height: 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+}
+
+progress::-webkit-progress-bar {
+  border-radius: 999px;
+  background: var(--panel);
+}
+
+progress::-webkit-progress-value {
+  border-radius: 999px;
+  background: var(--accent-2);
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  max-height: calc(100vh - 108px);
+  aspect-ratio: 16 / 10;
+  object-fit: contain;
+  background: #050505;
+  border: 1px solid var(--line);
+  image-rendering: pixelated;
+}
+
+.control-panel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.control-group {
+  padding: 14px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--line);
+}
+
+.control-group h2 {
+  margin-bottom: 12px;
+  color: var(--accent);
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+select,
+input[type="number"],
+input[type="file"],
+textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+textarea {
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.35;
+  text-transform: none;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent-2);
+}
+
+.check-row {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  color: var(--text);
+  text-transform: none;
+}
+
+.button-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.button-row.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.split-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+button {
+  min-height: 40px;
+  padding: 9px 12px;
+  color: #14120c;
+  font-weight: 800;
+  background: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, #000);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(1.07);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+#abort {
+  color: var(--text);
+  background: transparent;
+  border-color: var(--danger);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.facts dt,
+.facts dd {
+  margin: 0;
+}
+
+.facts dd {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.source-note p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .stage-header {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .status-strip {
+    min-width: 0;
+    width: 100%;
+  }
+
+  canvas {
+    max-height: none;
+  }
+}
+
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <section class="render-stage" aria-label="Rendered frame">
+      <div class="stage-header">
+        <div>
+          <p class="eyebrow">Eric Graham, 1987</p>
+          <h1>The Juggler Raytracer</h1>
+        </div>
+        <div class="status-strip">
+          <span id="status">Ready</span>
+          <progress id="progress" max="1" value="0"></progress>
+        </div>
+      </div>
+      <canvas id="frame" width="320" height="200"></canvas>
+    </section>
+
+    <aside class="control-panel" aria-label="Render controls">
+      <section class="control-group">
+        <h2>Scene</h2>
+        <label>
+          Source
+          <select id="scene"></select>
+        </label>
+        <label>
+          Load .dat
+          <input id="file" type="file" accept=".dat,text/plain">
+        </label>
+        <label>
+          Motion
+          <select id="sceneMotion"></select>
+        </label>
+        <label>
+          Source frame
+          <input id="motionFrame" type="range" min="0" max="0" value="0">
+        </label>
+        <dl id="sceneFacts" class="facts"></dl>
+      </section>
+
+      <section class="control-group">
+        <h2>Render</h2>
+        <label>
+          Resolution
+          <select id="resolution">
+            <option value="160x100">160 x 100</option>
+            <option value="320x200" selected>320 x 200 source</option>
+            <option value="640x400">640 x 400 doubled</option>
+            <option value="800x600">800 x 600</option>
+          </select>
+        </label>
+        <label>
+          Profile
+          <select id="renderProfile">
+          </select>
+        </label>
+        <label>
+          Rows per tick
+          <input id="rowsPerTick" type="range" min="1" max="32" value="4">
+        </label>
+        <label>
+          Mirror depth
+          <input id="maxDepth" type="number" min="1" max="8" value="4">
+        </label>
+        <div class="button-row">
+          <button id="render">Render Still</button>
+          <button id="abort">Abort</button>
+        </div>
+      </section>
+
+      <section class="control-group">
+        <h2>Camera</h2>
+        <label class="check-row">
+          <input id="orbitEnabled" type="checkbox">
+          Orbit around scene center
+        </label>
+        <label>
+          Orbit angle
+          <input id="orbitAngle" type="range" min="0" max="360" value="0">
+        </label>
+        <label>
+          Orbit radius
+          <input id="orbitRadius" type="number" min="1" max="120" value="10">
+        </label>
+        <dl id="cameraFacts" class="facts"></dl>
+      </section>
+
+      <section class="control-group">
+        <h2>Animation</h2>
+        <label>
+          Path
+          <select id="animationPath"></select>
+        </label>
+        <div class="split-row">
+          <label>
+            Frames
+            <input id="animationFrames" type="number" min="1" max="360" value="24">
+          </label>
+          <label>
+            FPS
+            <input id="animationFps" type="number" min="1" max="60" value="12">
+          </label>
+        </div>
+        <div class="split-row">
+          <label>
+            Start angle
+            <input id="animationStartAngle" type="number" step="1" value="0">
+          </label>
+          <label>
+            End angle
+            <input id="animationEndAngle" type="number" step="1" value="360">
+          </label>
+        </div>
+        <div class="split-row">
+          <label>
+            Orbit radius
+            <input id="animationOrbitRadius" type="number" min="1" max="120" step="0.5" value="10">
+          </label>
+          <label>
+            Height offset
+            <input id="animationOrbitHeight" type="number" min="-80" max="80" step="0.5" value="0">
+          </label>
+        </div>
+        <div class="split-row">
+          <label>
+            Dolly start
+            <input id="animationDollyStart" type="number" min="1" max="160" step="0.5" value="14">
+          </label>
+          <label>
+            Dolly end
+            <input id="animationDollyEnd" type="number" min="1" max="160" step="0.5" value="7">
+          </label>
+        </div>
+        <label>
+          Custom keyframes
+          <textarea id="customKeyframes" rows="7" spellcheck="false"></textarea>
+        </label>
+        <div class="button-row">
+          <button id="renderAnimation">Render Animation</button>
+          <button id="clearAnimation">Clear Frames</button>
+        </div>
+        <label>
+          Timeline
+          <input id="timeline" type="range" min="0" max="0" value="0">
+        </label>
+        <div class="button-row three">
+          <button id="playAnimation" disabled>Play</button>
+          <button id="pauseAnimation" disabled>Pause</button>
+          <button id="stopAnimation" disabled>Stop</button>
+        </div>
+        <div class="button-row three">
+          <button id="exportWebm" disabled>WebM</button>
+          <button id="exportMp4" disabled>MP4</button>
+          <button id="exportPng" disabled>PNG Frames</button>
+        </div>
+        <dl id="animationFacts" class="facts"></dl>
+      </section>
+
+      <section class="control-group source-note">
+        <h2>Source</h2>
+        <p>
+          Original C and scene data are from AlphaPixel's archive of Eric Graham's
+          1987 Juggler raytracer. This rebuild keeps the render path intentionally
+          close to that source before adding modern modes. The juggling cycle is
+          reconstructed from the historical movie/still output because the text
+          scene data contains no embedded motion tracks.
+        </p>
+      </section>
+    </aside>
+  </main>
+  <script>
+"use strict";
+var Juggler;
+(function (Juggler) {
+    Juggler.DULL = 0;
+    Juggler.BRIGHT = 1;
+    Juggler.MIRROR = 2;
+    Juggler.BIG = 1.0e10;
+    Juggler.SOURCE_EPSILON = 1.0e-3;
+    Juggler.REFERENCE_EPSILON = 1.0e-5;
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var Math3;
+    (function (Math3) {
+        function vec(x = 0, y = 0, z = 0) {
+            return [x, y, z];
+        }
+        Math3.vec = vec;
+        function add(a, b) {
+            return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+        }
+        Math3.add = add;
+        function sub(a, b) {
+            return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+        }
+        Math3.sub = sub;
+        function mul(a, scalar) {
+            return [a[0] * scalar, a[1] * scalar, a[2] * scalar];
+        }
+        Math3.mul = mul;
+        function dot(a, b) {
+            return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        }
+        Math3.dot = dot;
+        function cross(a, b) {
+            return [
+                a[1] * b[2] - a[2] * b[1],
+                a[2] * b[0] - a[0] * b[2],
+                a[0] * b[1] - a[1] * b[0]
+            ];
+        }
+        Math3.cross = cross;
+        function length(a) {
+            return Math.sqrt(dot(a, a));
+        }
+        Math3.length = length;
+        function normalize(a) {
+            const len = length(a);
+            return len > 0 ? mul(a, 1 / len) : [0, 0, 0];
+        }
+        Math3.normalize = normalize;
+        function lerp(a, b, t) {
+            return a + (b - a) * t;
+        }
+        Math3.lerp = lerp;
+        function lerpVec(a, b, t) {
+            return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+        }
+        Math3.lerpVec = lerpVec;
+        function isFiniteVec(a) {
+            return Number.isFinite(a[0]) && Number.isFinite(a[1]) && Number.isFinite(a[2]);
+        }
+        Math3.isFiniteVec = isFiniteVec;
+        function clampByte(value) {
+            return Math.max(0, Math.min(255, Math.round(value)));
+        }
+        Math3.clampByte = clampByte;
+        function clampNibble(value) {
+            return Math.max(0, Math.min(15, Math.round(value)));
+        }
+        Math3.clampNibble = clampNibble;
+        function formatVec(a, places = 2) {
+            return `${a[0].toFixed(places)}, ${a[1].toFixed(places)}, ${a[2].toFixed(places)}`;
+        }
+        Math3.formatVec = formatVec;
+    })(Math3 = Juggler.Math3 || (Juggler.Math3 = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var Profiles;
+    (function (Profiles) {
+        Profiles.ALL = [
+            {
+                id: "reference",
+                label: "Reference image",
+                outputMode: "source-ham",
+                reflectionMode: "standard",
+                epsilon: Juggler.REFERENCE_EPSILON
+            },
+            {
+                id: "wright-rgb",
+                label: "Wright RGB article",
+                outputMode: "modern-rgb",
+                reflectionMode: "standard",
+                epsilon: Juggler.REFERENCE_EPSILON
+            },
+            {
+                id: "source-quirk",
+                label: "Source quirk study",
+                outputMode: "source-ham",
+                reflectionMode: "source-quirk",
+                epsilon: Juggler.SOURCE_EPSILON
+            }
+        ];
+        function byId(id) {
+            return Profiles.ALL.find((profile) => profile.id === id) ?? Profiles.ALL[0];
+        }
+        Profiles.byId = byId;
+    })(Profiles = Juggler.Profiles || (Juggler.Profiles = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    Juggler.ORIGINAL_DAT = {
+        robot: `
+(-10,-4,5.5)
+[-10,20]
+35
+
+
+  <.9,.9,.9> 2  (-0.9,-2.1,5.3):0.6;
+  <.9,.9,.9> 2  (-1.1,1.9,5.9):0.6;
+  <.9,.9,.9> 2  (-0.4,-1.2,6.8):0.6;
+  <1,.7,.7>  1  (0,0,6.1):0.5;
+  <.2,.1,.1> 1  (0.02,0,6.12):0.5;
+  <.1,.1,1.> 1  (-0.4,0.2,6.1):0.15;
+  <.1,.1,1.> 1  (-0.4,-0.2,6.1):0.15;
+  <1,.7,.7>  1  (0,0,5.5):0.2;
+  <1,.1,.1>  1  (0,0,4.6):0.8 5 (0,0,3.3):0.6;
+  <1,.7,.7>  1  (0,0.6,2.9):0.2 6 (-0.6,0.6,1.6):0.2
+              7 (-0.4,0.6,0):0.1;
+  <1,.7,.7>  1  (0,-0.6,2.9):0.2 6 (0.2,-0.6,1.6):0.2
+              7 (0.4,-0.6,0):0.1;
+  <1,.7,.7>  1  (0,-0.7,5.1):0.2 6 (-0.2,-1.2,4.2):0.2
+              7 (-1.1,-2.0,4.1):0.1;
+  <1,.7,.7>  1  (0,0.7,5.1):0.2 6 (-0.2,1.2,4.2):0.2
+              7 (-1.0,1.9,4.8):0.1;;
+ 
+1
+   (-100,50,150):15 <1,1,1>
+ 
+<1.5,1.5,0>  <0,1.5,0> <.25,.25,.25> <.1,.1,1> <.7,.7,1>
+`,
+        ele: `
+(0,-22,3)
+[13,61]
+28
+ 
+<.7,.6,.7> 0
+   (1,-5,2):0.2 6 (1.7,-4.3,2.8):0.3
+                5 (2.0,-4,4.0):0.4
+                5 (2.3,-3.7,5.5):0.5
+                5 (2.7,-3.3,7.0):0.55
+                5 (3.0,-3.0,8.5):0.6
+                5 (4.,-2.0,10.0):0.65;
+ 
+<0.7,0.6,0.7> 0  (6.0,0,11.0):3.0;
+<1,0,0> 1        (3.0,0.0,12.0):0.5;
+<1,0,0> 1        (6.0,-3.0,12.0):0.5;
+ 
+<.7,.6,.7> 0   (11,0,8):3.5 4 (18,0,7.2):3.5
+             4 (25,0,8):3.5;
+ 
+<.7,.6,.7> 0 (28,0,10):0.2 4 (29,0,9.8):0.2
+                          4 (30,0,9.0):0.2
+                          4 (30,0,8.0):0.15;
+ 
+<.7,.6,.7> 0   (11,3,6):1 5 (9,4,3):1
+                        5 (9,4,0):1;
+ 
+<.7,.6,.7> 0  (11,-3,6):1 5 (12,-4,3):1
+                         5 (13,-4,0):1;
+ 
+<.7,.6,.7> 0  (25,3,6):1 5 (26,4,3):1
+                        5 (27,4,0):1;
+ 
+<.7,.6,.7> 0  (25,-3,6):1 5 (23,-4,3):1
+                          5 (23,-4,0):1;;
+ 
+ 
+ 
+1
+   (-15,-50,40):15 <1,1,1>
+ 
+<1.5,1.,0>  <1.5,1.,0> <.25,.25,.25> <.1,.1,1> <.7,.7,1>
+`,
+        dragon: `
+(-22,-44,11)
+[9,61]
+28
+ 
+<1.0,.7,.7> 1 (26,6,15):15;
+ 
+<0.2,1.0,0.2> 0
+   (-5,4.5,16):0.5      10
+   (-8,3,14):0.7        5
+   (-9.2,1,13.4):0.8    5
+   (-10,-2.5,13):0.9    5
+   (-9,-6,12.5):1.0     5
+   (-6,-9,12.5):1.1     5
+   (-2,-10.5,14):1.2    5
+   (3,-10,16):1.4       5
+   (9,-8.5,17.5):1.6    4
+   (13.5,-6,17):1.8     4
+   (15.5,-5,14.8):1.9   3
+   (16,-4,12):2.0       3
+   (14.9,-2.75,10):2.15 3
+   (13,-1.5,8):2.3      3
+   (7.5,0,6):3          2
+   (2,0,8):4.2          2
+   (0,0,12):6           1
+   (0,0,18):5           1
+   (0,0,23):3.5         1
+   (0,0,28):2.5         1
+   (-0.2,0,31):2        1
+   (-0.5,0,34):1.9      1
+   (-0.7,0,37.5):1.8    1
+   (-1.2,0,39):1.7      1
+   (-2.8,0,39.5):1.6    1
+   (-5,-.5,38.5):1.4    1
+   (-6.5,-2,36.5):1.2;
+ 
+<0.2,1.0,0.2> 0   (-1,-3.2,23):1  8 (-2,-4.4,18):0.9 8 (-8,-5,21):0.7;
+<0.2,1.0,0.2> 0   (-1,3.2,23):1  8 (-3,4.4,20):0.9 8 (-8,5,19):0.7;
+ 
+<0.2,1.0,0.2> 0   (-9.7,-2.2,34.5):2  5 (-5.9,-5.4,34.5):2;
+ 
+<1.0,0,0> 1       (-11.3,-2,34):1.5;
+<1.0,0,0> 1       (-5.4,-6.8,34):1.5;
+ 
+<0.2,1.0,0.2> 0   (-10.2,-4.3,32.5):1  5 (-15.1,-11.3,24.5):0.8;
+<0.2,1.0,0.2> 0   (-9.5,-4.9,32.5):1  5 (-15.0,-11.9,24.5):0.8;
+<0.2,1.0,0.2> 0   (-8.7,-5.7,32.5):1  5 (-14.4,-12.4,24.5):0.8;
+<0.2,1.0,0.2> 0   (-7.9,-6.3,32.5):1  5 (-13.8,-12.4,24.5):0.8;
+ 
+<0.2,0.2,1.0> 1   (-15.3,-12.8,24):0.5 7
+                  (-17,-13.6,22.5):0.5 7
+                  (-17.9,-14.6,21.5):0.5 7
+                  (-18.3,-15.6,20.5):0.3;
+ 
+<0.2,0.2,1.0> 1
+                  (-17.9,-14.6,21.5):0.5 7
+                  (-19,-15,20.5):0.3;
+ 
+ 
+<0.2,1.0,0.2> 0   (2,-4,10):3  5 (7,-6,4):2 7 (5,-6,0):1;
+ 
+<0.2,1.0,0.2> 0   (4,-6,0.5):0.5 5 (-1,-6,0.3):0.3;
+<0.2,1.0,0.2> 0   (4,-6,0.5):0.5 5 (-1,-4,0.3):0.3;
+<0.2,1.0,0.2> 0   (4,-6,0.5):0.5 5 (-1,-8,0.3):0.3;
+ 
+<0.2,1.0,0.2> 0   (2,4,10):3  5 (3,6,4):2 7 (2,6,0):1;
+ 
+<0.2,1.0,0.2> 0   (1,6,0.5):0.5 5 (-4,6,0.3):0.3;
+<0.2,1.0,0.2> 0   (1,6,0.5):0.5 5 (-4,4,0.3):0.3;
+<0.2,1.0,0.2> 0   (1,6,0.5):0.5 5 (-4,8,0.3):0.3;
+ 
+;
+ 
+1
+   (-45,-150,120):15 <1,1,1>
+ 
+<1.5,1.,0>  <1.5,1.,0> <.25,.25,.25> <.1,.1,1> <.7,.7,1>
+`
+    };
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var Scenes;
+    (function (Scenes) {
+        const RAD = Math.PI / 180;
+        function builtInSceneSources() {
+            return [
+                {
+                    id: "robot",
+                    name: "robot.dat humanoid",
+                    datText: Juggler.ORIGINAL_DAT.robot,
+                    sourcePath: "Raytracer_1987_Graham_Source_Code/robot.dat"
+                },
+                {
+                    id: "ele",
+                    name: "ele.dat elephant",
+                    datText: Juggler.ORIGINAL_DAT.ele,
+                    sourcePath: "Raytracer_1987_Graham_Source_Code/ele.dat"
+                },
+                {
+                    id: "dragon",
+                    name: "dragon.dat dragon",
+                    datText: Juggler.ORIGINAL_DAT.dragon,
+                    sourcePath: "Raytracer_1987_Graham_Source_Code/dragon.dat"
+                }
+            ];
+        }
+        Scenes.builtInSceneSources = builtInSceneSources;
+        function buildWorld(scene) {
+            const spheres = [];
+            scene.groups.forEach((group, groupIndex) => {
+                const expanded = expandControls(group.controls);
+                for (const control of expanded) {
+                    spheres.push({
+                        position: control.center,
+                        radius: control.radius,
+                        color: [...group.color],
+                        type: group.type,
+                        groupIndex
+                    });
+                }
+            });
+            const lamps = scene.lamps.map((lamp) => ({
+                position: [...lamp.position],
+                radius: lamp.radius,
+                color: [...lamp.color]
+            }));
+            const world = {
+                spheres,
+                lamps,
+                horizon: [
+                    { position: [0, 0, 0], normal: [0, 0, 1], color: [...scene.horizon[0]] },
+                    { position: [0, 0, 0], normal: [0, 0, 1], color: [...scene.horizon[1]] }
+                ],
+                illum: [...scene.illum],
+                skyZenith: [...scene.skyZenith],
+                skyHorizon: [...scene.skyHorizon],
+                lampExposure: 1
+            };
+            world.lampExposure = applySourceExposure(world);
+            return world;
+        }
+        Scenes.buildWorld = buildWorld;
+        function createObserver(scene, world, nx, ny, orbit) {
+            if (orbit.enabled) {
+                const center = sceneTarget(world);
+                const angle = orbit.angleDeg * RAD;
+                const position = [
+                    center[0] - orbit.radius * Math.cos(angle),
+                    center[1] - orbit.radius * Math.sin(angle),
+                    scene.observerPosition[2]
+                ];
+                const direction = Juggler.Math3.sub(center, position);
+                const azimuthDeg = Math.atan2(direction[1], direction[0]) / RAD;
+                const altitudeDeg = Math.atan2(direction[2], Math.hypot(direction[0], direction[1])) / RAD;
+                return orientObserver(position, altitudeDeg, azimuthDeg, scene.focalLength, nx, ny);
+            }
+            return orientObserver(scene.observerPosition, scene.altitudeDeg, scene.azimuthDeg, scene.focalLength, nx, ny);
+        }
+        Scenes.createObserver = createObserver;
+        function createObserverFromPose(pose, nx, ny) {
+            const direction = Juggler.Math3.sub(pose.target, pose.position);
+            const azimuthDeg = Math.atan2(direction[1], direction[0]) / RAD;
+            const altitudeDeg = Math.atan2(direction[2], Math.hypot(direction[0], direction[1])) / RAD;
+            return orientObserver(pose.position, altitudeDeg, azimuthDeg, pose.focalLength, nx, ny);
+        }
+        Scenes.createObserverFromPose = createObserverFromPose;
+        function staticCameraPose(scene) {
+            const altitudeRad = scene.altitudeDeg * RAD;
+            const azimuthRad = scene.azimuthDeg * RAD;
+            const viewDir = [
+                Math.cos(azimuthRad) * Math.cos(altitudeRad),
+                Math.sin(azimuthRad) * Math.cos(altitudeRad),
+                Math.sin(altitudeRad)
+            ];
+            return {
+                position: [...scene.observerPosition],
+                target: Juggler.Math3.add(scene.observerPosition, viewDir),
+                focalLength: scene.focalLength
+            };
+        }
+        Scenes.staticCameraPose = staticCameraPose;
+        function sceneTarget(world) {
+            if (!world.spheres.length) {
+                return [0, 0, 0];
+            }
+            const min = [Juggler.BIG, Juggler.BIG, Juggler.BIG];
+            const max = [-Juggler.BIG, -Juggler.BIG, -Juggler.BIG];
+            for (const sphere of world.spheres) {
+                for (let axis = 0; axis < 3; axis += 1) {
+                    min[axis] = Math.min(min[axis], sphere.position[axis] - sphere.radius);
+                    max[axis] = Math.max(max[axis], sphere.position[axis] + sphere.radius);
+                }
+            }
+            return [
+                (min[0] + max[0]) * 0.5,
+                (min[1] + max[1]) * 0.5,
+                Math.min(5.2, (min[2] + max[2]) * 0.5)
+            ];
+        }
+        Scenes.sceneTarget = sceneTarget;
+        function summarizeControls(scene) {
+            let controls = 0;
+            let interpolatedSegments = 0;
+            for (const group of scene.groups) {
+                controls += group.controls.length;
+                interpolatedSegments += group.controls.filter((control) => control.interpolationFromPrevious !== null).length;
+            }
+            return { groups: scene.groups.length, controls, interpolatedSegments };
+        }
+        Scenes.summarizeControls = summarizeControls;
+        function expandControls(controls) {
+            if (!controls.length) {
+                return [];
+            }
+            const expanded = [{
+                    center: [...controls[0].center],
+                    radius: controls[0].radius,
+                    interpolationFromPrevious: null
+                }];
+            for (let i = 1; i < controls.length; i += 1) {
+                const previous = controls[i - 1];
+                const next = controls[i];
+                const steps = Math.max(1, Math.round(next.interpolationFromPrevious ?? 1));
+                for (let step = 1; step <= steps; step += 1) {
+                    const t = step / steps;
+                    expanded.push({
+                        center: Juggler.Math3.lerpVec(previous.center, next.center, t),
+                        radius: Juggler.Math3.lerp(previous.radius, next.radius, t),
+                        interpolationFromPrevious: step === steps ? next.interpolationFromPrevious : null
+                    });
+                }
+            }
+            return expanded;
+        }
+        function orientObserver(position, altitudeDeg, azimuthDeg, focalLength, nx, ny) {
+            const altitudeRad = altitudeDeg * RAD;
+            const azimuthRad = azimuthDeg * RAD;
+            return {
+                position: [...position],
+                viewDir: [
+                    Math.cos(azimuthRad) * Math.cos(altitudeRad),
+                    Math.sin(azimuthRad) * Math.cos(altitudeRad),
+                    Math.sin(altitudeRad)
+                ],
+                uhat: [Math.sin(azimuthRad), -Math.cos(azimuthRad), 0],
+                vhat: [
+                    -Math.cos(azimuthRad) * Math.sin(altitudeRad),
+                    -Math.sin(azimuthRad) * Math.sin(altitudeRad),
+                    Math.cos(altitudeRad)
+                ],
+                focalLength: 0.028 * focalLength,
+                px: 1 / nx,
+                py: 0.75 / ny,
+                nx,
+                ny,
+                altitudeRad,
+                azimuthRad
+            };
+        }
+        function applySourceExposure(world) {
+            let lampfac = Juggler.BIG;
+            for (const sphere of world.spheres) {
+                for (const lamp of world.lamps) {
+                    const delta = Juggler.Math3.sub(sphere.position, lamp.position);
+                    let radius = Math.sqrt(Juggler.Math3.dot(delta, delta));
+                    radius -= sphere.radius;
+                    for (let channel = 0; channel < 3; channel += 1) {
+                        const direct = sphere.color[channel] * lamp.color[channel] / (radius * radius);
+                        if (direct === 0) {
+                            continue;
+                        }
+                        const candidate = (1 - sphere.color[channel] * world.illum[channel]) / direct;
+                        if (candidate < lampfac) {
+                            lampfac = candidate;
+                        }
+                    }
+                }
+            }
+            if (!Number.isFinite(lampfac) || lampfac === Juggler.BIG) {
+                lampfac = 1;
+            }
+            for (const lamp of world.lamps) {
+                for (let channel = 0; channel < 3; channel += 1) {
+                    lamp.color[channel] *= lampfac;
+                }
+            }
+            return lampfac;
+        }
+    })(Scenes = Juggler.Scenes || (Juggler.Scenes = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var Parser;
+    (function (Parser) {
+        class Scanner {
+            constructor(text, sourceName) {
+                this.text = text;
+                this.sourceName = sourceName;
+                this.index = 0;
+            }
+            eof() {
+                this.skipWhitespace();
+                return this.index >= this.text.length;
+            }
+            skipWhitespace() {
+                while (this.index < this.text.length && /\s/.test(this.text[this.index])) {
+                    this.index += 1;
+                }
+            }
+            consume(char) {
+                this.skipWhitespace();
+                if (this.text[this.index] === char) {
+                    this.index += 1;
+                    return true;
+                }
+                return false;
+            }
+            expect(char) {
+                if (!this.consume(char)) {
+                    this.fail(`Expected '${char}'`);
+                }
+            }
+            readNumber() {
+                this.skipWhitespace();
+                const match = /^[+-]?(?:(?:\d+(?:\.\d*)?)|(?:\.\d+))(?:[eE][+-]?\d+)?/.exec(this.text.slice(this.index));
+                if (!match) {
+                    this.fail("Expected number");
+                }
+                this.index += match[0].length;
+                return Number(match[0]);
+            }
+            readVec(open, close) {
+                this.skipWhitespace();
+                this.expect(open);
+                const values = [];
+                for (let i = 0; i < 3; i += 1) {
+                    values.push(this.readNumber());
+                    if (i < 2) {
+                        this.expect(",");
+                    }
+                }
+                this.expect(close);
+                return [values[0], values[1], values[2]];
+            }
+            readAnglePair() {
+                this.skipWhitespace();
+                this.expect("[");
+                const altitude = this.readNumber();
+                this.expect(",");
+                const azimuth = this.readNumber();
+                this.expect("]");
+                return [altitude, azimuth];
+            }
+            readSphereControl(interpolationFromPrevious) {
+                const center = this.readVec("(", ")");
+                this.expect(":");
+                const radius = this.readNumber();
+                return { center, radius, interpolationFromPrevious };
+            }
+            fail(message) {
+                const before = this.text.slice(Math.max(0, this.index - 32), this.index);
+                const after = this.text.slice(this.index, this.index + 48);
+                throw new Error(`${this.sourceName}: ${message} near "${before}>>${after}"`);
+            }
+        }
+        function parseDatScene(text, sourceName = "scene.dat") {
+            const scanner = new Scanner(text, sourceName);
+            const observerPosition = scanner.readVec("(", ")");
+            const [altitudeDeg, azimuthDeg] = scanner.readAnglePair();
+            const focalLength = scanner.readNumber();
+            const groups = [];
+            while (!scanner.eof()) {
+                if (scanner.consume(";")) {
+                    break;
+                }
+                const color = scanner.readVec("<", ">");
+                const sourceType = Math.round(scanner.readNumber());
+                const type = normalizeSurfaceType(sourceType);
+                const controls = [scanner.readSphereControl(null)];
+                while (true) {
+                    if (scanner.consume(";")) {
+                        break;
+                    }
+                    const interpolation = Math.max(1, Math.round(scanner.readNumber()));
+                    controls.push(scanner.readSphereControl(interpolation));
+                }
+                groups.push({ color, type, sourceType, controls });
+            }
+            const lampCount = Math.max(0, Math.round(scanner.readNumber()));
+            const lamps = [];
+            for (let i = 0; i < lampCount; i += 1) {
+                const control = scanner.readSphereControl(null);
+                lamps.push({
+                    position: control.center,
+                    radius: control.radius,
+                    color: scanner.readVec("<", ">")
+                });
+            }
+            const horizon0 = scanner.readVec("<", ">");
+            const horizon1 = scanner.readVec("<", ">");
+            const illum = scanner.readVec("<", ">");
+            const skyZenith = scanner.readVec("<", ">");
+            const skyHorizon = scanner.readVec("<", ">");
+            return {
+                sourceName,
+                observerPosition,
+                altitudeDeg,
+                azimuthDeg,
+                focalLength,
+                groups,
+                lamps,
+                horizon: [horizon0, horizon1],
+                illum,
+                skyZenith,
+                skyHorizon
+            };
+        }
+        Parser.parseDatScene = parseDatScene;
+        function normalizeSurfaceType(value) {
+            if (value === Juggler.DULL || value === Juggler.BRIGHT || value === Juggler.MIRROR) {
+                return value;
+            }
+            return Juggler.DULL;
+        }
+    })(Parser = Juggler.Parser || (Juggler.Parser = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var Motion;
+    (function (Motion) {
+        Motion.SOURCE_FRAME_COUNT = 24;
+        Motion.MOTIONS = [
+            { id: "static", label: "Static .dat pose" },
+            { id: "juggler-reconstructed", label: "Reconstructed 24-frame juggling" }
+        ];
+        const BALL_GROUPS = [
+            { groupIndex: 0, offset: 0 },
+            { groupIndex: 1, offset: 7 },
+            { groupIndex: 2, offset: 3 }
+        ];
+        const LEFT_ARM_GROUP = 12;
+        const RIGHT_ARM_GROUP = 11;
+        const TAU = Math.PI * 2;
+        const BALL_PATH = [
+            [-0.9, -2.1, 5.3],
+            [-0.75, -1.8, 6.0],
+            [-0.55, -1.5, 6.6],
+            [-0.4, -1.2, 6.8],
+            [-0.35, -0.6, 7.05],
+            [-0.45, 0.2, 6.95],
+            [-0.7, 1.1, 6.5],
+            [-1.1, 1.9, 5.9],
+            [-1.2, 2.1, 5.2],
+            [-1.1, 1.7, 5.0],
+            [-0.9, 1.2, 5.0],
+            [-0.65, 0.5, 5.2],
+            [-0.45, 0.0, 5.4],
+            [-0.55, -0.6, 5.7],
+            [-0.8, -1.2, 6.1],
+            [-1.0, -1.8, 5.8],
+            [-1.1, -2.1, 5.2],
+            [-1.0, -1.7, 5.0],
+            [-0.8, -1.2, 5.0],
+            [-0.55, -0.6, 5.2],
+            [-0.35, 0.0, 5.5],
+            [-0.45, 0.7, 6.0],
+            [-0.7, 1.4, 6.2],
+            [-0.95, 2.0, 5.7]
+        ];
+        function availableMotions(scene) {
+            return Motion.MOTIONS.filter((motion) => motion.id === "static" || supportsJugglerMotion(scene));
+        }
+        Motion.availableMotions = availableMotions;
+        function supportsMotion(scene, motionId) {
+            return motionId === "static" || supportsJugglerMotion(scene);
+        }
+        Motion.supportsMotion = supportsMotion;
+        function sourceFrameCount(motionId) {
+            return motionId === "juggler-reconstructed" ? Motion.SOURCE_FRAME_COUNT : 1;
+        }
+        Motion.sourceFrameCount = sourceFrameCount;
+        function labelFor(motionId) {
+            return Motion.MOTIONS.find((motion) => motion.id === motionId)?.label ?? motionId;
+        }
+        Motion.labelFor = labelFor;
+        function animationSampleFrame(settings, frameIndex, frameCount) {
+            if (settings.motionId === "static") {
+                return 0;
+            }
+            const outputFrames = Math.max(1, Math.round(frameCount));
+            const cycleT = outputFrames === 1 ? 0 : frameIndex / outputFrames;
+            return settings.sourceFrame + cycleT * Motion.SOURCE_FRAME_COUNT;
+        }
+        Motion.animationSampleFrame = animationSampleFrame;
+        function resolveWorld(scene, baseWorld, settings, sourceFrame) {
+            if (settings.motionId !== "juggler-reconstructed" || !supportsJugglerMotion(scene)) {
+                return baseWorld;
+            }
+            const animated = cloneScene(scene);
+            for (const ball of BALL_GROUPS) {
+                const group = animated.groups[ball.groupIndex];
+                const source = scene.groups[ball.groupIndex];
+                if (!group || !source) {
+                    continue;
+                }
+                group.controls = [{
+                        center: sampleBall(ball.offset + sourceFrame),
+                        radius: source.controls[0]?.radius ?? 0.6,
+                        interpolationFromPrevious: null
+                    }];
+            }
+            animated.groups[RIGHT_ARM_GROUP].controls = armControls(-1, sourceFrame);
+            animated.groups[LEFT_ARM_GROUP].controls = armControls(1, sourceFrame);
+            return Juggler.Scenes.buildWorld(animated);
+        }
+        Motion.resolveWorld = resolveWorld;
+        function motionSummary(scene, settings) {
+            if (settings.motionId === "juggler-reconstructed" && supportsJugglerMotion(scene)) {
+                return `source frame ${Math.floor(mod(settings.sourceFrame, Motion.SOURCE_FRAME_COUNT)) + 1}/${Motion.SOURCE_FRAME_COUNT}`;
+            }
+            return "static source pose";
+        }
+        Motion.motionSummary = motionSummary;
+        function supportsJugglerMotion(scene) {
+            if (scene.groups.length < 13) {
+                return false;
+            }
+            return BALL_GROUPS.every((ball) => {
+                const group = scene.groups[ball.groupIndex];
+                return group?.type === Juggler.MIRROR && group.controls.length === 1 && Math.abs(group.controls[0].radius - 0.6) < 0.01;
+            });
+        }
+        function sampleBall(sampleFrame) {
+            return samplePath(BALL_PATH, sampleFrame);
+        }
+        function armControls(side, sourceFrame) {
+            const pulse = side > 0
+                ? Math.max(throwPulse(sourceFrame, 0), throwPulse(sourceFrame, 12))
+                : Math.max(throwPulse(sourceFrame, 6), throwPulse(sourceFrame, 18));
+            const settle = 1 - pulse;
+            return [
+                {
+                    center: [0, side * 0.7, 5.1],
+                    radius: 0.2,
+                    interpolationFromPrevious: null
+                },
+                {
+                    center: [-0.25 - 0.08 * pulse, side * (1.18 + 0.16 * settle), 4.24 + 0.46 * pulse],
+                    radius: 0.2,
+                    interpolationFromPrevious: 6
+                },
+                {
+                    center: [-1.06 + 0.12 * pulse, side * (1.95 - 0.22 * pulse), 4.1 + 0.72 * pulse],
+                    radius: 0.1,
+                    interpolationFromPrevious: 7
+                }
+            ];
+        }
+        function throwPulse(sourceFrame, centerFrame) {
+            const distance = circularDistance(sourceFrame, centerFrame, Motion.SOURCE_FRAME_COUNT);
+            const normalized = Math.max(0, 1 - distance / 4);
+            return normalized * normalized;
+        }
+        function samplePath(path, sampleFrame) {
+            const wrapped = mod(sampleFrame, path.length);
+            const leftIndex = Math.floor(wrapped);
+            const rightIndex = (leftIndex + 1) % path.length;
+            const t = wrapped - leftIndex;
+            return Juggler.Math3.lerpVec(path[leftIndex], path[rightIndex], smoothstep(t));
+        }
+        function circularDistance(frame, center, cycle) {
+            const delta = Math.abs(mod(frame - center, cycle));
+            return Math.min(delta, cycle - delta);
+        }
+        function smoothstep(t) {
+            return t * t * (3 - 2 * t);
+        }
+        function cloneScene(scene) {
+            return {
+                sourceName: scene.sourceName,
+                observerPosition: [...scene.observerPosition],
+                altitudeDeg: scene.altitudeDeg,
+                azimuthDeg: scene.azimuthDeg,
+                focalLength: scene.focalLength,
+                groups: scene.groups.map((group) => ({
+                    color: [...group.color],
+                    type: group.type,
+                    sourceType: group.sourceType,
+                    controls: group.controls.map((control) => ({
+                        center: [...control.center],
+                        radius: control.radius,
+                        interpolationFromPrevious: control.interpolationFromPrevious
+                    }))
+                })),
+                lamps: scene.lamps.map((lamp) => ({
+                    position: [...lamp.position],
+                    radius: lamp.radius,
+                    color: [...lamp.color]
+                })),
+                horizon: [[...scene.horizon[0]], [...scene.horizon[1]]],
+                illum: [...scene.illum],
+                skyZenith: [...scene.skyZenith],
+                skyHorizon: [...scene.skyHorizon]
+            };
+        }
+        function mod(value, divisor) {
+            return ((value % divisor) + divisor) % divisor;
+        }
+    })(Motion = Juggler.Motion || (Juggler.Motion = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var Ham;
+    (function (Ham) {
+        class HamEncoder {
+            constructor() {
+                this.threshold = 4;
+                this.colorRegisters = [
+                    [0, 0, 0],
+                    [15, 15, 15],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0]
+                ];
+                this.allocated = 2;
+                this.previous = [0, 0, 0];
+            }
+            beginLine() {
+                this.previous = [0, 0, 0];
+            }
+            encodePixel(x, brightness) {
+                const pix = [
+                    Juggler.Math3.clampNibble(16 * brightness[0] + 0.5),
+                    Juggler.Math3.clampNibble(16 * brightness[1] + 0.5),
+                    Juggler.Math3.clampNibble(16 * brightness[2] + 0.5)
+                ];
+                const output = this.ham2(x, pix);
+                return [output[0] * 17, output[1] * 17, output[2] * 17];
+            }
+            ham2(x, pix) {
+                if (x === 0) {
+                    const nearest = this.nearestPaletteIndex(pix).index;
+                    this.previous = [...this.colorRegisters[nearest]];
+                    return [...this.previous];
+                }
+                const distanceIfHam = this.colorDistanceAfterWorstCorrection(pix, this.previous);
+                if (distanceIfHam !== 0) {
+                    const nearest = this.nearestPaletteIndex(pix);
+                    if (nearest.distance < distanceIfHam) {
+                        this.previous = [...this.colorRegisters[nearest.index]];
+                        return [...this.previous];
+                    }
+                }
+                let channel = 0;
+                let maxDifference = 0;
+                for (let k = 0; k < 3; k += 1) {
+                    const difference = Math.abs(pix[k] - this.previous[k]);
+                    if (difference > maxDifference) {
+                        maxDifference = difference;
+                        channel = k;
+                    }
+                }
+                this.previous[channel] = pix[channel];
+                return [...this.previous];
+            }
+            nearestPaletteIndex(color) {
+                let nearest = 0;
+                let minDistance = Number.POSITIVE_INFINITY;
+                for (let i = 0; i < this.allocated; i += 1) {
+                    const distance = this.colorDistance(color, this.colorRegisters[i]);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        nearest = i;
+                    }
+                }
+                if (minDistance > this.threshold && this.allocated < 16) {
+                    this.colorRegisters[this.allocated] = [...color];
+                    nearest = this.allocated;
+                    this.allocated += 1;
+                    minDistance = 0;
+                }
+                return { index: nearest, distance: minDistance };
+            }
+            colorDistanceAfterWorstCorrection(a, b) {
+                let result = 0;
+                let maximum = 0;
+                for (let k = 0; k < 3; k += 1) {
+                    const difference = Math.abs(a[k] - b[k]);
+                    result += difference;
+                    maximum = Math.max(maximum, difference);
+                }
+                return result - maximum;
+            }
+            colorDistance(a, b) {
+                return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+            }
+        }
+        Ham.HamEncoder = HamEncoder;
+    })(Ham = Juggler.Ham || (Juggler.Ham = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var Renderer;
+    (function (Renderer) {
+        class FrameRenderer {
+            constructor(world, observer, options) {
+                this.world = world;
+                this.observer = observer;
+                this.options = options;
+                this.stats = { rays: 0, mirrorFallbacks: 0 };
+                this.row = 0;
+                this.data = new Uint8ClampedArray(observer.nx * observer.ny * 4);
+                this.hamEncoder = options.outputMode === "source-ham" ? new Juggler.Ham.HamEncoder() : null;
+            }
+            renderRows(count) {
+                const limit = Math.min(this.observer.ny, this.row + count);
+                for (; this.row < limit; this.row += 1) {
+                    if (this.hamEncoder) {
+                        this.hamEncoder.beginLine();
+                    }
+                    for (let x = 0; x < this.observer.nx; x += 1) {
+                        const brightness = trace(pixelRay(this.observer, x, this.row), this.world, this.options, this.stats, 0);
+                        const rgb = this.options.outputMode === "source-ham"
+                            ? this.hamEncoder.encodePixel(x, brightness)
+                            : modernRgb(brightness);
+                        const offset = (this.row * this.observer.nx + x) * 4;
+                        this.data[offset] = Juggler.Math3.clampByte(rgb[0]);
+                        this.data[offset + 1] = Juggler.Math3.clampByte(rgb[1]);
+                        this.data[offset + 2] = Juggler.Math3.clampByte(rgb[2]);
+                        this.data[offset + 3] = 255;
+                    }
+                }
+                return this.row;
+            }
+            done() {
+                return this.row >= this.observer.ny;
+            }
+            progress() {
+                return this.row / this.observer.ny;
+            }
+        }
+        Renderer.FrameRenderer = FrameRenderer;
+        function pixelRay(observer, i, j) {
+            const y = (0.5 * observer.ny - j) * observer.py;
+            const x = (i - 0.5 * observer.nx) * observer.px;
+            const target = Juggler.Math3.add(Juggler.Math3.add(Juggler.Math3.add(Juggler.Math3.mul(observer.viewDir, observer.focalLength), Juggler.Math3.mul(observer.vhat, y)), Juggler.Math3.mul(observer.uhat, x)), observer.position);
+            return { origin: observer.position, direction: Juggler.Math3.sub(target, observer.position) };
+        }
+        Renderer.pixelRay = pixelRay;
+        function trace(ray, world, options, stats, depth) {
+            stats.rays += 1;
+            let tMin = Juggler.BIG;
+            let nearestSphere = null;
+            for (const sphere of world.spheres) {
+                const t = intersectSphere(ray, sphere, options.epsilon);
+                if (t !== null && t < tMin) {
+                    tMin = t;
+                    nearestSphere = sphere;
+                }
+            }
+            for (const lamp of world.lamps) {
+                const t = intersectLamp(ray, lamp, options.epsilon);
+                if (t !== null && t < tMin) {
+                    return [
+                        lamp.color[0] / (lamp.radius * lamp.radius),
+                        lamp.color[1] / (lamp.radius * lamp.radius),
+                        lamp.color[2] / (lamp.radius * lamp.radius)
+                    ];
+                }
+            }
+            const groundT = intersectGround(ray, options.epsilon);
+            if (groundT !== null && groundT < tMin) {
+                const position = pointOnRay(ray, groundT);
+                const tile = gingham(position);
+                const patch = {
+                    position,
+                    normal: world.horizon[tile].normal,
+                    color: world.horizon[tile].color,
+                    sphere: null
+                };
+                return patchBrightness(patch, world, options);
+            }
+            if (nearestSphere) {
+                const position = pointOnRay(ray, tMin);
+                const normal = Juggler.Math3.mul(Juggler.Math3.sub(position, nearestSphere.position), 1 / nearestSphere.radius);
+                const patch = {
+                    position,
+                    normal,
+                    color: nearestSphere.color,
+                    sphere: nearestSphere
+                };
+                if (nearestSphere.type === Juggler.BRIGHT && glint(patch, world, ray, options, stats)) {
+                    return [1, 1, 1];
+                }
+                if (nearestSphere.type === Juggler.MIRROR) {
+                    return mirrorBrightness(patch, world, ray, options, stats, depth);
+                }
+                return patchBrightness(patch, world, options);
+            }
+            return skyBrightness(ray, world);
+        }
+        Renderer.trace = trace;
+        function intersectSphere(ray, sphere, epsilon = Juggler.SOURCE_EPSILON) {
+            const oc = Juggler.Math3.sub(ray.origin, sphere.position);
+            const a = Juggler.Math3.dot(ray.direction, ray.direction);
+            const b = 2 * Juggler.Math3.dot(oc, ray.direction);
+            const c = Juggler.Math3.dot(oc, oc) - sphere.radius * sphere.radius;
+            const d = b * b - 4 * a * c;
+            if (d <= 0) {
+                return null;
+            }
+            const root = Math.sqrt(d);
+            let t = -(b + root) / (a + a);
+            if (t < epsilon) {
+                t = (root - b) / (a + a);
+            }
+            return t > epsilon ? t : null;
+        }
+        Renderer.intersectSphere = intersectSphere;
+        function intersectGround(ray, epsilon = Juggler.SOURCE_EPSILON) {
+            if (ray.direction[2] === 0) {
+                return null;
+            }
+            const t = -ray.origin[2] / ray.direction[2];
+            return t > epsilon ? t : null;
+        }
+        Renderer.intersectGround = intersectGround;
+        function gingham(position) {
+            let x = position[0];
+            let y = position[1];
+            let kx = 0;
+            let ky = 0;
+            if (x < 0) {
+                x = -x;
+                kx += 1;
+            }
+            if (y < 0) {
+                y = -y;
+                ky += 1;
+            }
+            return (((Math.trunc(x) + kx) / 3 | 0) + ((Math.trunc(y) + ky) / 3 | 0)) % 2;
+        }
+        Renderer.gingham = gingham;
+        function intersectLamp(ray, lamp, epsilon) {
+            return intersectSphere(ray, {
+                position: lamp.position,
+                radius: lamp.radius,
+                color: lamp.color,
+                type: Juggler.BRIGHT,
+                groupIndex: -1
+            }, epsilon);
+        }
+        function pointOnRay(ray, t) {
+            return Juggler.Math3.add(ray.origin, Juggler.Math3.mul(ray.direction, t));
+        }
+        function skyBrightness(ray, world) {
+            const sin2 = ray.direction[2] * ray.direction[2] / Juggler.Math3.dot(ray.direction, ray.direction);
+            const cos2 = 1 - sin2;
+            return [
+                cos2 * world.skyHorizon[0] + sin2 * world.skyZenith[0],
+                cos2 * world.skyHorizon[1] + sin2 * world.skyZenith[1],
+                cos2 * world.skyHorizon[2] + sin2 * world.skyZenith[2]
+            ];
+        }
+        function patchBrightness(patch, world, options) {
+            const diffuse = (Juggler.Math3.dot([0, 0, 1], patch.normal) + 1.5) * 0.4;
+            const brightness = [
+                diffuse * world.illum[0] * patch.color[0],
+                diffuse * world.illum[1] * patch.color[1],
+                diffuse * world.illum[2] * patch.color[2]
+            ];
+            for (const lamp of world.lamps) {
+                const lampVector = Juggler.Math3.sub(lamp.position, patch.position);
+                const cosi = Juggler.Math3.dot(lampVector, patch.normal);
+                if (cosi <= 0) {
+                    continue;
+                }
+                const shadowRay = { origin: patch.position, direction: lampVector };
+                let shadowed = false;
+                for (const sphere of world.spheres) {
+                    if (sphere === patch.sphere) {
+                        continue;
+                    }
+                    if (intersectSphere(shadowRay, sphere, options.epsilon) !== null) {
+                        shadowed = true;
+                        break;
+                    }
+                }
+                if (shadowed) {
+                    continue;
+                }
+                const r = Math.sqrt(Juggler.Math3.dot(lampVector, lampVector));
+                const direct = cosi / (r * r * r);
+                for (let channel = 0; channel < 3; channel += 1) {
+                    brightness[channel] += direct * patch.color[channel] * lamp.color[channel];
+                }
+            }
+            return brightness;
+        }
+        function glint(patch, world, incident, options, stats) {
+            let reflected = null;
+            let reflectedLength2 = 0;
+            for (const lamp of world.lamps) {
+                const lampVector = Juggler.Math3.sub(lamp.position, patch.position);
+                const cosi = Juggler.Math3.dot(lampVector, patch.normal);
+                if (cosi <= 0) {
+                    continue;
+                }
+                const shadowRay = { origin: patch.position, direction: lampVector };
+                let shadowed = false;
+                for (const sphere of world.spheres) {
+                    if (sphere === patch.sphere) {
+                        continue;
+                    }
+                    if (intersectSphere(shadowRay, sphere, options.epsilon) !== null) {
+                        shadowed = true;
+                        break;
+                    }
+                }
+                if (shadowed) {
+                    continue;
+                }
+                if (!reflected) {
+                    reflected = reflectVector(incident.direction, patch.normal, options.reflectionMode, options.epsilon, stats);
+                    reflectedLength2 = Juggler.Math3.dot(reflected, reflected);
+                }
+                const t = Juggler.Math3.dot(lampVector, reflected);
+                const highlight = t * t / (Juggler.Math3.dot(lampVector, lampVector) * reflectedLength2);
+                if (highlight > 0.95) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        function mirrorBrightness(patch, world, incident, options, stats, depth) {
+            const normalDotIncident = Juggler.Math3.dot(patch.normal, incident.direction);
+            if (normalDotIncident >= 0) {
+                return [0, 0, 0];
+            }
+            if (depth >= options.maxDepth) {
+                return [0, 0, 0];
+            }
+            const reflected = reflectVector(incident.direction, patch.normal, options.reflectionMode, options.epsilon, stats);
+            const brightness = trace({ origin: patch.position, direction: reflected }, world, options, stats, depth + 1);
+            return [
+                brightness[0] * patch.color[0],
+                brightness[1] * patch.color[1],
+                brightness[2] * patch.color[2]
+            ];
+        }
+        function reflectVector(direction, normal, mode, epsilon = Juggler.REFERENCE_EPSILON, stats = null) {
+            if (mode === "standard") {
+                return reflectPhysical(direction, normal);
+            }
+            return reflectSourceWithFallback(direction, normal, epsilon, stats);
+        }
+        Renderer.reflectVector = reflectVector;
+        function reflectSourceWithFallback(direction, normal, epsilon, stats) {
+            const u = Juggler.Math3.cross(direction, normal);
+            if (u[0] === 0 && u[1] === 0 && u[2] === 0) {
+                return [-direction[0], -direction[1], -direction[2]];
+            }
+            const v = Juggler.Math3.cross(u, normal);
+            const vv = Juggler.Math3.dot(v, v);
+            const xv = Juggler.Math3.dot(direction, v) / vv;
+            const xn = Juggler.Math3.dot(direction, normal);
+            const source = [
+                xv * v[0] / (xn * normal[0]),
+                xv * v[1] / (xn * normal[1]),
+                xv * v[2] / (xn * normal[2])
+            ];
+            if (Juggler.Math3.isFiniteVec(source) && Juggler.Math3.dot(source, source) > epsilon * epsilon) {
+                return source;
+            }
+            if (stats) {
+                stats.mirrorFallbacks += 1;
+            }
+            return reflectPhysical(direction, normal);
+        }
+        function reflectPhysical(direction, normal) {
+            return Juggler.Math3.sub(direction, Juggler.Math3.mul(normal, 2 * Juggler.Math3.dot(direction, normal)));
+        }
+        function modernRgb(brightness) {
+            return [
+                Juggler.Math3.clampByte(Math.pow(Math.max(0, brightness[0]), 0.82) * 255),
+                Juggler.Math3.clampByte(Math.pow(Math.max(0, brightness[1]), 0.82) * 255),
+                Juggler.Math3.clampByte(Math.pow(Math.max(0, brightness[2]), 0.82) * 255)
+            ];
+        }
+    })(Renderer = Juggler.Renderer || (Juggler.Renderer = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var Animation;
+    (function (Animation) {
+        Animation.PATHS = [
+            { id: "static", label: "Static .dat camera" },
+            { id: "orbit-360", label: "Orbit 360" },
+            { id: "orbit-arc", label: "Orbit arc" },
+            { id: "dolly", label: "Dolly" },
+            { id: "custom-keyframes", label: "Custom keyframes" }
+        ];
+        function sceneHasCameraPathData(_scene) {
+            return false;
+        }
+        Animation.sceneHasCameraPathData = sceneHasCameraPathData;
+        function defaultSettings() {
+            return {
+                pathId: "orbit-360",
+                frameCount: 24,
+                fps: 12,
+                startAngleDeg: 0,
+                endAngleDeg: 360,
+                orbitRadius: 10,
+                orbitHeight: 0,
+                dollyStartRadius: 14,
+                dollyEndRadius: 7,
+                customKeyframes: []
+            };
+        }
+        Animation.defaultSettings = defaultSettings;
+        function evaluateCameraPath(scene, world, settings, frameIndex) {
+            const frameCount = Math.max(1, Math.round(settings.frameCount));
+            const t = frameCount === 1 ? 0 : frameIndex / (frameCount - 1);
+            const target = Juggler.Scenes.sceneTarget(world);
+            const baseZ = scene.observerPosition[2] + settings.orbitHeight;
+            const focalLength = scene.focalLength;
+            switch (settings.pathId) {
+                case "static":
+                    return Juggler.Scenes.staticCameraPose(scene);
+                case "orbit-360":
+                    return orbitPose(target, settings.orbitRadius, baseZ, settings.startAngleDeg + 360 * t, focalLength);
+                case "orbit-arc":
+                    return orbitPose(target, settings.orbitRadius, baseZ, Juggler.Math3.lerp(settings.startAngleDeg, settings.endAngleDeg, t), focalLength);
+                case "dolly":
+                    return orbitPose(target, Juggler.Math3.lerp(settings.dollyStartRadius, settings.dollyEndRadius, t), baseZ, Juggler.Math3.lerp(settings.startAngleDeg, settings.endAngleDeg, t), focalLength);
+                case "custom-keyframes":
+                    return evaluateKeyframes(settings.customKeyframes, t, Juggler.Scenes.staticCameraPose(scene));
+            }
+        }
+        Animation.evaluateCameraPath = evaluateCameraPath;
+        function parseCustomKeyframes(text) {
+            const trimmed = text.trim();
+            if (!trimmed) {
+                return [];
+            }
+            const raw = JSON.parse(trimmed);
+            if (!Array.isArray(raw)) {
+                throw new Error("Custom keyframes must be a JSON array");
+            }
+            const keyframes = raw.map((entry, index) => {
+                if (!entry || typeof entry !== "object") {
+                    throw new Error(`Keyframe ${index + 1} must be an object`);
+                }
+                const source = entry;
+                const t = Number(source.t);
+                const position = readVec(source.position, `Keyframe ${index + 1} position`);
+                const target = readVec(source.target, `Keyframe ${index + 1} target`);
+                const focalLength = Number(source.focalLength);
+                if (!Number.isFinite(t) || !Number.isFinite(focalLength)) {
+                    throw new Error(`Keyframe ${index + 1} must include numeric t and focalLength`);
+                }
+                return { t, position, target, focalLength };
+            }).sort((a, b) => a.t - b.t);
+            if (keyframes.length < 2) {
+                throw new Error("Custom keyframes require at least two poses");
+            }
+            if (keyframes[0].t > 0 || keyframes[keyframes.length - 1].t < 1) {
+                throw new Error("Custom keyframes must cover t=0 through t=1");
+            }
+            return keyframes;
+        }
+        Animation.parseCustomKeyframes = parseCustomKeyframes;
+        function defaultCustomKeyframes(scene, world, settings) {
+            const target = Juggler.Scenes.sceneTarget(world);
+            const start = Juggler.Scenes.staticCameraPose(scene);
+            const end = orbitPose(target, settings.orbitRadius, scene.observerPosition[2] + settings.orbitHeight, 180, scene.focalLength);
+            return [
+                { t: 0, position: start.position, target: start.target, focalLength: start.focalLength },
+                { t: 1, position: end.position, target: end.target, focalLength: end.focalLength }
+            ];
+        }
+        Animation.defaultCustomKeyframes = defaultCustomKeyframes;
+        class AnimationRenderer {
+            constructor(scene, world, width, height, renderOptions, pathSettings, motionSettings = { motionId: "static", sourceFrame: 0 }) {
+                this.scene = scene;
+                this.world = world;
+                this.width = width;
+                this.height = height;
+                this.renderOptions = renderOptions;
+                this.pathSettings = pathSettings;
+                this.motionSettings = motionSettings;
+                this.frames = [];
+                this.frameIndex = 0;
+                this.frameRenderer = null;
+                this.frameStarted = 0;
+                this.currentPose = null;
+            }
+            step(rowsPerTick) {
+                const frameCount = Math.max(1, Math.round(this.pathSettings.frameCount));
+                if (this.frameIndex >= frameCount) {
+                    return this.progress(null, true);
+                }
+                if (!this.frameRenderer) {
+                    const sourceFrame = Juggler.Motion.animationSampleFrame(this.motionSettings, this.frameIndex, frameCount);
+                    const frameWorld = Juggler.Motion.resolveWorld(this.scene, this.world, this.motionSettings, sourceFrame);
+                    this.currentPose = evaluateCameraPath(this.scene, this.world, this.pathSettings, this.frameIndex);
+                    const observer = Juggler.Scenes.createObserverFromPose(this.currentPose, this.width, this.height);
+                    this.frameRenderer = new Juggler.Renderer.FrameRenderer(frameWorld, observer, this.renderOptions);
+                    this.frameStarted = now();
+                }
+                this.frameRenderer.renderRows(rowsPerTick);
+                let completedFrame = null;
+                if (this.frameRenderer.done()) {
+                    completedFrame = {
+                        index: this.frameIndex,
+                        width: this.width,
+                        height: this.height,
+                        data: new Uint8ClampedArray(this.frameRenderer.data),
+                        stats: { ...this.frameRenderer.stats },
+                        renderMs: now() - this.frameStarted,
+                        pose: this.currentPose,
+                        sceneFrame: Juggler.Motion.animationSampleFrame(this.motionSettings, this.frameIndex, frameCount),
+                        motionId: this.motionSettings.motionId
+                    };
+                    this.frames.push(completedFrame);
+                    this.frameIndex += 1;
+                    this.frameRenderer = null;
+                    this.currentPose = null;
+                }
+                return this.progress(completedFrame, this.frameIndex >= frameCount);
+            }
+            progress(completedFrame, done) {
+                const frameCount = Math.max(1, Math.round(this.pathSettings.frameCount));
+                const rowProgress = this.frameRenderer ? this.frameRenderer.progress() : 0;
+                const overallProgress = Math.min(1, (this.frameIndex + rowProgress) / frameCount);
+                return {
+                    frameIndex: Math.min(this.frameIndex, frameCount - 1),
+                    frameCount,
+                    rowProgress,
+                    overallProgress,
+                    done,
+                    completedFrame,
+                    currentData: this.frameRenderer ? this.frameRenderer.data : completedFrame?.data ?? null
+                };
+            }
+        }
+        Animation.AnimationRenderer = AnimationRenderer;
+        function orbitPose(target, radius, z, angleDeg, focalLength) {
+            const angle = angleDeg * Math.PI / 180;
+            return {
+                position: [target[0] - radius * Math.cos(angle), target[1] - radius * Math.sin(angle), z],
+                target: [...target],
+                focalLength
+            };
+        }
+        function evaluateKeyframes(keyframes, t, fallback) {
+            if (keyframes.length < 2) {
+                return fallback;
+            }
+            let left = keyframes[0];
+            let right = keyframes[keyframes.length - 1];
+            for (let i = 0; i < keyframes.length - 1; i += 1) {
+                if (t >= keyframes[i].t && t <= keyframes[i + 1].t) {
+                    left = keyframes[i];
+                    right = keyframes[i + 1];
+                    break;
+                }
+            }
+            const span = Math.max(1e-9, right.t - left.t);
+            const localT = Math.max(0, Math.min(1, (t - left.t) / span));
+            return {
+                position: Juggler.Math3.lerpVec(left.position, right.position, localT),
+                target: Juggler.Math3.lerpVec(left.target, right.target, localT),
+                focalLength: Juggler.Math3.lerp(left.focalLength, right.focalLength, localT)
+            };
+        }
+        function readVec(value, label) {
+            if (!Array.isArray(value) || value.length !== 3) {
+                throw new Error(`${label} must be a 3-number array`);
+            }
+            const vec = value.map((part) => Number(part));
+            if (!vec.every(Number.isFinite)) {
+                throw new Error(`${label} must contain finite numbers`);
+            }
+            return [vec[0], vec[1], vec[2]];
+        }
+        function now() {
+            return typeof performance !== "undefined" ? performance.now() : Date.now();
+        }
+    })(Animation = Juggler.Animation || (Juggler.Animation = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var App;
+    (function (App) {
+        const sceneSelect = document.getElementById("scene");
+        const fileInput = document.getElementById("file");
+        const sceneMotionSelect = document.getElementById("sceneMotion");
+        const motionFrameInput = document.getElementById("motionFrame");
+        const resolutionSelect = document.getElementById("resolution");
+        const profileSelect = document.getElementById("renderProfile");
+        const rowsPerTickInput = document.getElementById("rowsPerTick");
+        const maxDepthInput = document.getElementById("maxDepth");
+        const orbitEnabledInput = document.getElementById("orbitEnabled");
+        const orbitAngleInput = document.getElementById("orbitAngle");
+        const orbitRadiusInput = document.getElementById("orbitRadius");
+        const renderButton = document.getElementById("render");
+        const abortButton = document.getElementById("abort");
+        const statusElement = document.getElementById("status");
+        const progressElement = document.getElementById("progress");
+        const sceneFacts = document.getElementById("sceneFacts");
+        const cameraFacts = document.getElementById("cameraFacts");
+        const animationFacts = document.getElementById("animationFacts");
+        const animationPathSelect = document.getElementById("animationPath");
+        const animationFramesInput = document.getElementById("animationFrames");
+        const animationFpsInput = document.getElementById("animationFps");
+        const animationStartAngleInput = document.getElementById("animationStartAngle");
+        const animationEndAngleInput = document.getElementById("animationEndAngle");
+        const animationOrbitRadiusInput = document.getElementById("animationOrbitRadius");
+        const animationOrbitHeightInput = document.getElementById("animationOrbitHeight");
+        const animationDollyStartInput = document.getElementById("animationDollyStart");
+        const animationDollyEndInput = document.getElementById("animationDollyEnd");
+        const customKeyframesInput = document.getElementById("customKeyframes");
+        const renderAnimationButton = document.getElementById("renderAnimation");
+        const clearAnimationButton = document.getElementById("clearAnimation");
+        const timelineInput = document.getElementById("timeline");
+        const playAnimationButton = document.getElementById("playAnimation");
+        const pauseAnimationButton = document.getElementById("pauseAnimation");
+        const stopAnimationButton = document.getElementById("stopAnimation");
+        const exportWebmButton = document.getElementById("exportWebm");
+        const exportMp4Button = document.getElementById("exportMp4");
+        const exportPngButton = document.getElementById("exportPng");
+        const canvas = document.getElementById("frame");
+        const context = canvas.getContext("2d");
+        const sources = Juggler.Scenes.builtInSceneSources();
+        let active;
+        let abortToken = 0;
+        let animationFrames = [];
+        let playbackTimer = 0;
+        let playbackIndex = 0;
+        function start() {
+            if (!context) {
+                throw new Error("Canvas 2D context is unavailable");
+            }
+            for (const source of sources) {
+                const option = document.createElement("option");
+                option.value = source.id;
+                option.textContent = source.name;
+                sceneSelect.appendChild(option);
+            }
+            for (const profile of Juggler.Profiles.ALL) {
+                const option = document.createElement("option");
+                option.value = profile.id;
+                option.textContent = profile.label;
+                profileSelect.appendChild(option);
+            }
+            for (const path of Juggler.Animation.PATHS) {
+                const option = document.createElement("option");
+                option.value = path.id;
+                option.textContent = path.label;
+                animationPathSelect.appendChild(option);
+            }
+            animationPathSelect.value = Juggler.Animation.defaultSettings().pathId;
+            sceneSelect.addEventListener("change", () => {
+                const source = sources.find((candidate) => candidate.id === sceneSelect.value) ?? sources[0];
+                setActiveSource(source);
+            });
+            fileInput.addEventListener("change", handleFile);
+            sceneMotionSelect.addEventListener("change", () => {
+                refreshMotionFrameBounds();
+                resetAnimationBuffer();
+                renderFacts();
+                refreshAnimationFacts();
+            });
+            motionFrameInput.addEventListener("input", () => {
+                resetAnimationBuffer();
+                renderFacts();
+                refreshAnimationFacts();
+            });
+            renderButton.addEventListener("click", () => renderStill());
+            abortButton.addEventListener("click", abortWork);
+            renderAnimationButton.addEventListener("click", () => renderAnimation());
+            clearAnimationButton.addEventListener("click", clearAnimationFrames);
+            playAnimationButton.addEventListener("click", playAnimation);
+            pauseAnimationButton.addEventListener("click", pauseAnimation);
+            stopAnimationButton.addEventListener("click", stopAnimation);
+            exportWebmButton.addEventListener("click", () => exportVideo("webm"));
+            exportMp4Button.addEventListener("click", () => exportVideo("mp4"));
+            exportPngButton.addEventListener("click", () => exportPngFrames());
+            timelineInput.addEventListener("input", () => {
+                pauseAnimation();
+                showFrame(Number(timelineInput.value) || 0);
+            });
+            for (const control of [orbitEnabledInput, orbitAngleInput, orbitRadiusInput, resolutionSelect]) {
+                control.addEventListener("change", refreshCameraFacts);
+                control.addEventListener("input", refreshCameraFacts);
+            }
+            for (const control of [
+                animationPathSelect,
+                animationFramesInput,
+                animationFpsInput,
+                animationStartAngleInput,
+                animationEndAngleInput,
+                animationOrbitRadiusInput,
+                animationOrbitHeightInput,
+                animationDollyStartInput,
+                animationDollyEndInput
+            ]) {
+                control.addEventListener("change", refreshAnimationFacts);
+                control.addEventListener("input", refreshAnimationFacts);
+            }
+            setActiveSource(sources[0]);
+            renderStill();
+        }
+        App.start = start;
+        function setActiveSource(source) {
+            try {
+                const parsed = Juggler.Parser.parseDatScene(source.datText, source.name);
+                const world = Juggler.Scenes.buildWorld(parsed);
+                active = { source, parsed, world };
+                resetAnimationBuffer();
+                refreshMotionOptions();
+                writeDefaultCustomKeyframes();
+                setStatus(`Loaded ${source.name}`);
+                renderFacts();
+                refreshCameraFacts();
+                refreshAnimationFacts();
+            }
+            catch (error) {
+                setStatus(error instanceof Error ? error.message : String(error));
+            }
+        }
+        function handleFile() {
+            const file = fileInput.files?.[0];
+            if (!file) {
+                return;
+            }
+            const reader = new FileReader();
+            reader.addEventListener("load", () => {
+                const source = {
+                    id: `file:${file.name}`,
+                    name: file.name,
+                    datText: String(reader.result ?? ""),
+                    sourcePath: file.name
+                };
+                setActiveSource(source);
+            });
+            reader.readAsText(file);
+        }
+        function renderStill() {
+            if (!context || !active) {
+                return;
+            }
+            abortWork();
+            const token = abortToken;
+            const [width, height] = parseResolution();
+            const motionSettings = readSceneMotionSettings();
+            const renderWorld = Juggler.Motion.resolveWorld(active.parsed, active.world, motionSettings, motionSettings.sourceFrame);
+            const observer = Juggler.Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
+            const profile = Juggler.Profiles.byId(profileSelect.value);
+            const renderer = new Juggler.Renderer.FrameRenderer(renderWorld, observer, readRenderOptions(profile));
+            const rowsPerTick = readRowsPerTick();
+            const image = new ImageData(renderer.data, width, height);
+            canvas.width = width;
+            canvas.height = height;
+            context.imageSmoothingEnabled = false;
+            renderButton.disabled = true;
+            progressElement.value = 0;
+            setStatus(`Rendering ${active.source.name}, ${Juggler.Motion.labelFor(motionSettings.motionId)} ` +
+                `(${Juggler.Motion.motionSummary(active.parsed, motionSettings)}) at ${width} x ${height} with ${profile.label}`);
+            const started = performance.now();
+            const tick = () => {
+                if (token !== abortToken) {
+                    renderButton.disabled = false;
+                    return;
+                }
+                renderer.renderRows(rowsPerTick);
+                context.putImageData(image, 0, 0);
+                progressElement.value = renderer.progress();
+                if (!renderer.done()) {
+                    window.requestAnimationFrame(tick);
+                    return;
+                }
+                const seconds = (performance.now() - started) / 1000;
+                renderButton.disabled = false;
+                setStatus(`Done in ${seconds.toFixed(2)}s, ${profile.label}, ${active.world.spheres.length} spheres, ` +
+                    `${Juggler.Motion.motionSummary(active.parsed, motionSettings)}, ` +
+                    `${renderer.stats.rays} rays, ${renderer.stats.mirrorFallbacks} source-reflection fallbacks`);
+            };
+            window.requestAnimationFrame(tick);
+        }
+        function renderAnimation() {
+            if (!context || !active) {
+                return;
+            }
+            abortWork();
+            clearPlaybackOnly();
+            animationFrames = [];
+            playbackIndex = 0;
+            updateAnimationButtons(true);
+            let settings;
+            try {
+                settings = readAnimationSettings();
+            }
+            catch (error) {
+                updateAnimationButtons(false);
+                setStatus(error instanceof Error ? error.message : String(error));
+                return;
+            }
+            const token = abortToken;
+            const [width, height] = parseResolution();
+            const profile = Juggler.Profiles.byId(profileSelect.value);
+            const motionSettings = readSceneMotionSettings();
+            const renderer = new Juggler.Animation.AnimationRenderer(active.parsed, active.world, width, height, readRenderOptions(profile), settings, motionSettings);
+            const rowsPerTick = readRowsPerTick();
+            canvas.width = width;
+            canvas.height = height;
+            context.imageSmoothingEnabled = false;
+            timelineInput.max = "0";
+            timelineInput.value = "0";
+            progressElement.value = 0;
+            setStatus(`Rendering ${settings.frameCount} animation frames with ` +
+                `${Juggler.Animation.PATHS.find((path) => path.id === settings.pathId)?.label ?? settings.pathId} and ` +
+                `${Juggler.Motion.labelFor(motionSettings.motionId)}`);
+            const started = performance.now();
+            const tick = () => {
+                if (token !== abortToken) {
+                    updateAnimationButtons(false);
+                    return;
+                }
+                const progress = renderer.step(rowsPerTick);
+                if (progress.currentData) {
+                    drawImageData(progress.currentData, width, height);
+                }
+                if (progress.completedFrame) {
+                    animationFrames = renderer.frames;
+                    timelineInput.max = String(Math.max(0, animationFrames.length - 1));
+                    timelineInput.value = String(animationFrames.length - 1);
+                }
+                progressElement.value = progress.overallProgress;
+                setStatus(`Animation frame ${Math.min(progress.frameIndex + 1, progress.frameCount)}/${progress.frameCount}, ` +
+                    `${Juggler.Motion.labelFor(motionSettings.motionId)}, ` +
+                    `${Math.round(progress.rowProgress * 100)}% row pass`);
+                if (!progress.done) {
+                    window.requestAnimationFrame(tick);
+                    return;
+                }
+                const seconds = (performance.now() - started) / 1000;
+                updateAnimationButtons(false);
+                refreshAnimationFacts();
+                setStatus(`Animation ready: ${animationFrames.length} frames at ${settings.fps} fps in ${seconds.toFixed(2)}s, ` +
+                    `${Juggler.Motion.labelFor(motionSettings.motionId)}`);
+            };
+            window.requestAnimationFrame(tick);
+        }
+        function playAnimation() {
+            if (!animationFrames.length) {
+                return;
+            }
+            pauseAnimation();
+            const fps = readAnimationSettingsLenient().fps;
+            playAnimationButton.disabled = true;
+            pauseAnimationButton.disabled = false;
+            stopAnimationButton.disabled = false;
+            playbackTimer = window.setInterval(() => {
+                showFrame(playbackIndex);
+                playbackIndex = (playbackIndex + 1) % animationFrames.length;
+            }, 1000 / fps);
+        }
+        function pauseAnimation() {
+            clearPlaybackOnly();
+            updateAnimationButtons(false);
+        }
+        function stopAnimation() {
+            clearPlaybackOnly();
+            playbackIndex = 0;
+            showFrame(0);
+            updateAnimationButtons(false);
+        }
+        function showFrame(index) {
+            if (!animationFrames.length) {
+                return;
+            }
+            const safeIndex = Math.max(0, Math.min(animationFrames.length - 1, index));
+            const frame = animationFrames[safeIndex];
+            drawImageData(frame.data, frame.width, frame.height);
+            timelineInput.value = String(safeIndex);
+            playbackIndex = safeIndex;
+            const fps = readAnimationSettingsLenient().fps;
+            const sourceFrame = frame.motionId === "juggler-reconstructed"
+                ? `, source frame ${Math.floor(frame.sceneFrame % Juggler.Motion.SOURCE_FRAME_COUNT) + 1}/${Juggler.Motion.SOURCE_FRAME_COUNT}`
+                : "";
+            setStatus(`Frame ${safeIndex + 1}/${animationFrames.length}${sourceFrame} at ${fps} fps`);
+        }
+        function clearAnimationFrames() {
+            abortWork();
+            animationFrames = [];
+            playbackIndex = 0;
+            timelineInput.max = "0";
+            timelineInput.value = "0";
+            progressElement.value = 0;
+            updateAnimationButtons(false);
+            refreshAnimationFacts();
+            setStatus("Animation frames cleared.");
+        }
+        async function exportVideo(kind) {
+            if (!animationFrames.length) {
+                return;
+            }
+            const mimeType = pickVideoMimeType(kind);
+            if (!mimeType || !canvas.captureStream || typeof MediaRecorder === "undefined") {
+                setStatus(`${kind.toUpperCase()} export is not supported in this browser.`);
+                return;
+            }
+            pauseAnimation();
+            const fps = readAnimationSettingsLenient().fps;
+            const stream = canvas.captureStream(fps);
+            const chunks = [];
+            const recorder = new MediaRecorder(stream, { mimeType });
+            const stopped = new Promise((resolve) => {
+                recorder.addEventListener("dataavailable", (event) => {
+                    if (event.data.size) {
+                        chunks.push(event.data);
+                    }
+                });
+                recorder.addEventListener("stop", () => {
+                    stream.getTracks().forEach((track) => track.stop());
+                    resolve(new Blob(chunks, { type: mimeType }));
+                });
+            });
+            recorder.start();
+            let index = 0;
+            const delay = 1000 / fps;
+            const drawNext = () => {
+                if (index >= animationFrames.length) {
+                    window.setTimeout(() => recorder.stop(), delay);
+                    return;
+                }
+                showFrame(index);
+                index += 1;
+                window.setTimeout(drawNext, delay);
+            };
+            drawNext();
+            const blob = await stopped;
+            const extension = kind === "mp4" ? "mp4" : "webm";
+            downloadBlob(blob, `${active.source.id}-${animationFrames.length}f.${extension}`);
+            setStatus(`Exported ${extension.toUpperCase()} (${formatBytes(blob.size)})`);
+        }
+        async function exportPngFrames() {
+            if (!animationFrames.length) {
+                return;
+            }
+            pauseAnimation();
+            const exportCanvas = document.createElement("canvas");
+            const exportContext = exportCanvas.getContext("2d");
+            if (!exportContext) {
+                setStatus("PNG export failed: no canvas context.");
+                return;
+            }
+            for (const frame of animationFrames) {
+                exportCanvas.width = frame.width;
+                exportCanvas.height = frame.height;
+                exportContext.putImageData(new ImageData(frame.data, frame.width, frame.height), 0, 0);
+                const blob = await canvasToBlob(exportCanvas);
+                downloadBlob(blob, `${active.source.id}-${String(frame.index).padStart(4, "0")}.png`);
+            }
+            setStatus(`Exported ${animationFrames.length} PNG frames.`);
+        }
+        function abortWork() {
+            abortToken += 1;
+            clearPlaybackOnly();
+            renderButton.disabled = false;
+            updateAnimationButtons(false);
+        }
+        function clearPlaybackOnly() {
+            if (playbackTimer) {
+                window.clearInterval(playbackTimer);
+            }
+            playbackTimer = 0;
+        }
+        function updateAnimationButtons(rendering) {
+            renderAnimationButton.disabled = rendering;
+            clearAnimationButton.disabled = rendering || !animationFrames.length;
+            playAnimationButton.disabled = rendering || !animationFrames.length || !!playbackTimer;
+            pauseAnimationButton.disabled = rendering || !playbackTimer;
+            stopAnimationButton.disabled = rendering || !animationFrames.length;
+            exportWebmButton.disabled = rendering || !animationFrames.length || !pickVideoMimeType("webm");
+            exportMp4Button.disabled = rendering || !animationFrames.length || !pickVideoMimeType("mp4");
+            exportPngButton.disabled = rendering || !animationFrames.length;
+        }
+        function refreshMotionOptions() {
+            const previous = sceneMotionSelect.value;
+            const options = Juggler.Motion.availableMotions(active.parsed);
+            sceneMotionSelect.innerHTML = "";
+            for (const motion of options) {
+                const option = document.createElement("option");
+                option.value = motion.id;
+                option.textContent = motion.label;
+                sceneMotionSelect.appendChild(option);
+            }
+            let preferred = "static";
+            if (previous && options.some((motion) => motion.id === previous)) {
+                preferred = previous;
+            }
+            else if (options.some((motion) => motion.id === "juggler-reconstructed")) {
+                preferred = "juggler-reconstructed";
+            }
+            sceneMotionSelect.value = preferred;
+            refreshMotionFrameBounds();
+        }
+        function refreshMotionFrameBounds() {
+            const motionId = sceneMotionSelect.value;
+            const frameCount = Juggler.Motion.sourceFrameCount(motionId);
+            motionFrameInput.min = "0";
+            motionFrameInput.max = String(Math.max(0, frameCount - 1));
+            motionFrameInput.step = "1";
+            motionFrameInput.disabled = frameCount <= 1;
+            motionFrameInput.value = String(clampInt(Number(motionFrameInput.value), 0, Math.max(0, frameCount - 1), 0));
+        }
+        function renderFacts() {
+            const controls = Juggler.Scenes.summarizeControls(active.parsed);
+            const motionSettings = readSceneMotionSettings();
+            setFacts(sceneFacts, [
+                ["Groups", String(controls.groups)],
+                ["Controls", String(controls.controls)],
+                ["Interpolated", String(controls.interpolatedSegments)],
+                ["Spheres", String(active.world.spheres.length)],
+                ["Lamps", String(active.world.lamps.length)],
+                ["Camera paths", Juggler.Animation.sceneHasCameraPathData(active.parsed) ? "embedded" : "none in .dat"],
+                ["Scene motion", Juggler.Motion.labelFor(motionSettings.motionId)],
+                ["Motion source", Juggler.Motion.motionSummary(active.parsed, motionSettings)],
+                ["Lamp exposure", active.world.lampExposure.toFixed(2)]
+            ]);
+        }
+        function refreshCameraFacts() {
+            if (!active) {
+                return;
+            }
+            const [width, height] = parseResolution();
+            const observer = Juggler.Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
+            setFacts(cameraFacts, [
+                ["Position", Juggler.Math3.formatVec(observer.position, 2)],
+                ["Altitude", `${(observer.altitudeRad * 180 / Math.PI).toFixed(2)} deg`],
+                ["Azimuth", `${(observer.azimuthRad * 180 / Math.PI).toFixed(2)} deg`],
+                ["Focal", observer.focalLength.toFixed(3)]
+            ]);
+        }
+        function refreshAnimationFacts() {
+            if (!active) {
+                return;
+            }
+            const settings = readAnimationSettingsLenient();
+            const motionSettings = readSceneMotionSettings();
+            const seconds = settings.frameCount / settings.fps;
+            setFacts(animationFacts, [
+                ["Buffered frames", String(animationFrames.length)],
+                ["Duration", `${seconds.toFixed(2)}s`],
+                ["Scene motion", Juggler.Motion.labelFor(motionSettings.motionId)],
+                ["Motion offset", Juggler.Motion.motionSummary(active.parsed, motionSettings)],
+                ["WebM", pickVideoMimeType("webm") ? "available" : "unavailable"],
+                ["MP4", pickVideoMimeType("mp4") ? "available" : "unavailable"]
+            ]);
+            updateAnimationButtons(false);
+        }
+        function readAnimationSettings() {
+            const settings = readAnimationSettingsLenient();
+            if (settings.pathId === "custom-keyframes") {
+                settings.customKeyframes = Juggler.Animation.parseCustomKeyframes(customKeyframesInput.value);
+            }
+            return settings;
+        }
+        function readAnimationSettingsLenient() {
+            return {
+                pathId: animationPathSelect.value,
+                frameCount: clampInt(Number(animationFramesInput.value), 1, 360, 24),
+                fps: clampInt(Number(animationFpsInput.value), 1, 60, 12),
+                startAngleDeg: readNumber(animationStartAngleInput.value, 0),
+                endAngleDeg: readNumber(animationEndAngleInput.value, 360),
+                orbitRadius: clampNumber(Number(animationOrbitRadiusInput.value), 1, 120, 10),
+                orbitHeight: clampNumber(Number(animationOrbitHeightInput.value), -80, 80, 0),
+                dollyStartRadius: clampNumber(Number(animationDollyStartInput.value), 1, 160, 14),
+                dollyEndRadius: clampNumber(Number(animationDollyEndInput.value), 1, 160, 7),
+                customKeyframes: []
+            };
+        }
+        function readSceneMotionSettings() {
+            const requested = sceneMotionSelect.value;
+            const motionId = active && Juggler.Motion.supportsMotion(active.parsed, requested) ? requested : "static";
+            const maxFrame = Math.max(0, Juggler.Motion.sourceFrameCount(motionId) - 1);
+            return {
+                motionId,
+                sourceFrame: clampInt(Number(motionFrameInput.value), 0, maxFrame, 0)
+            };
+        }
+        function readRenderOptions(profile) {
+            return {
+                profileId: profile.id,
+                outputMode: profile.outputMode,
+                reflectionMode: profile.reflectionMode,
+                epsilon: profile.epsilon,
+                maxDepth: Math.max(1, Math.min(8, Number(maxDepthInput.value) || 4))
+            };
+        }
+        function writeDefaultCustomKeyframes() {
+            if (!active) {
+                return;
+            }
+            const settings = readAnimationSettingsLenient();
+            const keyframes = Juggler.Animation.defaultCustomKeyframes(active.parsed, active.world, settings);
+            customKeyframesInput.value = JSON.stringify(keyframes, null, 2);
+        }
+        function resetAnimationBuffer() {
+            clearPlaybackOnly();
+            animationFrames = [];
+            playbackIndex = 0;
+            timelineInput.max = "0";
+            timelineInput.value = "0";
+            progressElement.value = 0;
+            updateAnimationButtons(false);
+        }
+        function drawImageData(data, width, height) {
+            if (!context) {
+                return;
+            }
+            if (canvas.width !== width) {
+                canvas.width = width;
+            }
+            if (canvas.height !== height) {
+                canvas.height = height;
+            }
+            context.imageSmoothingEnabled = false;
+            context.putImageData(new ImageData(data, width, height), 0, 0);
+        }
+        function setFacts(node, rows) {
+            node.innerHTML = "";
+            for (const [label, value] of rows) {
+                const dt = document.createElement("dt");
+                const dd = document.createElement("dd");
+                dt.textContent = label;
+                dd.textContent = value;
+                node.append(dt, dd);
+            }
+        }
+        function parseResolution() {
+            const [width, height] = resolutionSelect.value.split("x").map((value) => Number(value));
+            return [width, height];
+        }
+        function readOrbitSettings() {
+            return {
+                enabled: orbitEnabledInput.checked,
+                angleDeg: Number(orbitAngleInput.value) || 0,
+                radius: Number(orbitRadiusInput.value) || 10
+            };
+        }
+        function readRowsPerTick() {
+            return Math.max(1, Math.min(32, Number(rowsPerTickInput.value) || 4));
+        }
+        function pickVideoMimeType(kind) {
+            if (typeof MediaRecorder === "undefined") {
+                return null;
+            }
+            const candidates = kind === "webm"
+                ? ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]
+                : ["video/mp4;codecs=avc1.42E01E", "video/mp4"];
+            return candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? null;
+        }
+        function canvasToBlob(source) {
+            return new Promise((resolve, reject) => {
+                source.toBlob((blob) => {
+                    if (blob) {
+                        resolve(blob);
+                    }
+                    else {
+                        reject(new Error("Unable to encode PNG frame"));
+                    }
+                }, "image/png");
+            });
+        }
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+        function formatBytes(bytes) {
+            if (bytes < 1024) {
+                return `${bytes} B`;
+            }
+            if (bytes < 1024 * 1024) {
+                return `${(bytes / 1024).toFixed(1)} KB`;
+            }
+            return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+        }
+        function clampInt(value, min, max, fallback) {
+            if (!Number.isFinite(value)) {
+                return fallback;
+            }
+            return Math.max(min, Math.min(max, Math.round(value)));
+        }
+        function clampNumber(value, min, max, fallback) {
+            if (!Number.isFinite(value)) {
+                return fallback;
+            }
+            return Math.max(min, Math.min(max, value));
+        }
+        function readNumber(value, fallback) {
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : fallback;
+        }
+        function setStatus(text) {
+            statusElement.textContent = text;
+        }
+    })(App = Juggler.App || (Juggler.App = {}));
+})(Juggler || (Juggler = {}));
+window.addEventListener("DOMContentLoaded", () => Juggler.App.start());
+
+  </script>
+</body>
+</html>

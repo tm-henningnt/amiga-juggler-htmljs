@@ -1,0 +1,11 @@
+{
+  "name": "amiga-juggler-htmljs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:single": "tsc -p tsconfig.json && node scripts/build-single.mjs",
+    "test": "tsc -p tsconfig.test.json && node dist-test/tests.js"
+  }
+}
