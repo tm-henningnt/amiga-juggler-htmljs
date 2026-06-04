@@ -259,6 +259,43 @@ body[data-crt-mode="soft-glow"] .canvas-frame::after {
   font-variant-numeric: tabular-nums;
 }
 
+.command-strip {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.1fr) minmax(130px, 0.9fr) repeat(4, minmax(86px, auto));
+  align-items: end;
+  gap: 6px;
+  background: var(--wb-gray);
+  border-top: 2px solid var(--wb-hi);
+  border-left: 2px solid var(--wb-hi);
+  border-bottom: 2px solid var(--wb-lo);
+  border-right: 2px solid var(--wb-lo);
+  padding: 6px;
+}
+
+.command-strip label {
+  margin: 0;
+  min-width: 0;
+}
+
+.command-strip button {
+  width: 100%;
+  min-width: 0;
+}
+
+.canvas-hint {
+  min-height: 20px;
+  padding: 2px 6px;
+  color: var(--wb-white);
+  background: var(--wb-black);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  border-top: 1px solid var(--wb-lo);
+  border-left: 1px solid var(--wb-lo);
+  border-bottom: 1px solid var(--wb-hi);
+  border-right: 1px solid var(--wb-hi);
+}
+
 progress {
   width: 100%;
   height: 16px;
@@ -572,6 +609,10 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .command-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .render-stage {
     min-height: 0;
   }
@@ -609,6 +650,21 @@ button:disabled {
           <div class="canvas-frame">
             <canvas id="frame" width="320" height="200"></canvas>
           </div>
+          <div class="command-strip" aria-label="Primary render commands">
+            <label>
+              Experience
+              <select id="experiencePreset"></select>
+            </label>
+            <label>
+              View
+              <select id="previewMode"></select>
+            </label>
+            <button id="playLive">Play Live</button>
+            <button id="pauseLive" disabled>Pause</button>
+            <button id="render">Render Still</button>
+            <button id="abort">Abort</button>
+          </div>
+          <div id="canvasHint" class="canvas-hint">Canvas: drag orbit, Shift/right drag pan, wheel dolly</div>
           <div class="status-strip">
             <span id="status">Ready</span>
             <progress id="progress" max="1" value="0"></progress>
@@ -642,14 +698,13 @@ button:disabled {
             Source frame
             <input id="motionFrame" type="range" min="0" max="0" value="0">
           </label>
-          <dl id="sceneFacts" class="facts"></dl>
         </div>
       </section>
 
-      <section class="wb-window" data-collapsed="false" aria-labelledby="title-render">
+      <section class="wb-window" data-collapsed="true" aria-labelledby="title-render">
         <div class="wb-titlebar">
           <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
-          <span class="wb-title-text" id="title-render">Render</span>
+          <span class="wb-title-text" id="title-render">Render Details</span>
           <span class="wb-gadget wb-gadget-depth" aria-hidden="true"></span>
         </div>
         <div class="wb-body">
@@ -661,10 +716,6 @@ button:disabled {
               <option value="640x400">640 x 400 doubled</option>
               <option value="800x600">800 x 600</option>
             </select>
-          </label>
-          <label>
-            View
-            <select id="previewMode"></select>
           </label>
           <label>
             Profile
@@ -682,7 +733,6 @@ button:disabled {
             Anti-alias
             <select id="antiAlias"></select>
           </label>
-          <div id="profileIndicators" class="mode-indicators" aria-live="polite"></div>
           <label>
             Rows per tick
             <input id="rowsPerTick" type="range" min="1" max="32" value="4">
@@ -691,10 +741,6 @@ button:disabled {
             Mirror depth
             <input id="maxDepth" type="number" min="1" max="8" value="4">
           </label>
-          <div class="button-row">
-            <button id="render">Render Still</button>
-            <button id="abort">Abort</button>
-          </div>
         </div>
       </section>
 
@@ -753,20 +799,9 @@ button:disabled {
             <button id="writeCameraPose">Use Pose</button>
             <button id="resetCameraPose">Reset Camera</button>
           </div>
-          <dl id="cameraFacts" class="facts"></dl>
-        </div>
-      </section>
-
-      <section class="wb-window" data-collapsed="true" aria-labelledby="title-interactive">
-        <div class="wb-titlebar">
-          <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
-          <span class="wb-title-text" id="title-interactive">Interactive</span>
-          <span class="wb-gadget wb-gadget-depth" aria-hidden="true"></span>
-        </div>
-        <div class="wb-body">
-          <label>
-            Mouse tool
-            <select id="mouseTool"></select>
+          <label class="check-row">
+            <input id="sceneEditMode" type="checkbox">
+            Scene Edit
           </label>
           <dl id="selectionFacts" class="facts"></dl>
           <div class="split-row">
@@ -786,6 +821,76 @@ button:disabled {
           <div class="button-row">
             <button id="resetGroupTransform">Reset Group</button>
             <button id="resetAllTransforms">Reset All</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="wb-window" data-collapsed="true" aria-labelledby="title-effects">
+        <div class="wb-titlebar">
+          <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
+          <span class="wb-title-text" id="title-effects">Modern Effects</span>
+          <span class="wb-gadget wb-gadget-depth" aria-hidden="true"></span>
+        </div>
+        <div class="wb-body">
+          <label class="check-row">
+            <input id="softShadowsEnabled" type="checkbox">
+            Soft shadows
+          </label>
+          <div class="split-row">
+            <label>
+              Shadow samples
+              <input id="softShadowSamples" type="number" min="1" max="16" step="1" value="1">
+            </label>
+            <label>
+              Shadow radius
+              <input id="softShadowRadius" type="number" min="0" max="3" step="0.05" value="0">
+            </label>
+          </div>
+          <label class="check-row">
+            <input id="ambientOcclusionEnabled" type="checkbox">
+            Contact AO
+          </label>
+          <div class="split-row">
+            <label>
+              AO strength
+              <input id="ambientOcclusionStrength" type="number" min="0" max="1" step="0.01" value="0">
+            </label>
+            <label>
+              AO radius
+              <input id="ambientOcclusionRadius" type="number" min="0.1" max="4" step="0.05" value="1">
+            </label>
+          </div>
+          <label class="check-row">
+            <input id="depthOfFieldEnabled" type="checkbox">
+            Depth of field
+          </label>
+          <div class="split-row">
+            <label>
+              Lens samples
+              <input id="depthOfFieldSamples" type="number" min="1" max="16" step="1" value="1">
+            </label>
+            <label>
+              Aperture
+              <input id="depthOfFieldAperture" type="number" min="0" max="0.25" step="0.005" value="0">
+            </label>
+          </div>
+          <label>
+            Focus distance
+            <input id="depthOfFieldFocus" type="number" min="0.5" max="80" step="0.25" value="10">
+          </label>
+          <label class="check-row">
+            <input id="motionBlurEnabled" type="checkbox">
+            Motion blur
+          </label>
+          <div class="split-row">
+            <label>
+              Blur strength
+              <input id="motionBlurStrength" type="number" min="0" max="0.85" step="0.01" value="0">
+            </label>
+            <label>
+              Blur samples
+              <input id="motionBlurSamples" type="number" min="1" max="4" step="1" value="1">
+            </label>
           </div>
         </div>
       </section>
@@ -882,6 +987,20 @@ button:disabled {
             <button id="exportPng" disabled>PNG</button>
             <button id="exportManifest" disabled>JSON</button>
           </div>
+        </div>
+      </section>
+
+      <section class="wb-window" data-collapsed="true" aria-labelledby="title-diagnostics">
+        <div class="wb-titlebar">
+          <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
+          <span class="wb-title-text" id="title-diagnostics">Diagnostics</span>
+          <span class="wb-gadget wb-gadget-depth" aria-hidden="true"></span>
+        </div>
+        <div class="wb-body">
+          <div id="profileIndicators" class="mode-indicators" aria-live="polite"></div>
+          <dl id="livePlaybackFacts" class="facts"></dl>
+          <dl id="sceneFacts" class="facts"></dl>
+          <dl id="cameraFacts" class="facts"></dl>
           <dl id="animationFacts" class="facts"></dl>
         </div>
       </section>
@@ -2270,7 +2389,23 @@ var Juggler;
                 diffuse * world.illum[2] * patch.color[2]
             ];
             for (const lamp of world.lamps) {
-                const lampVector = Juggler.Math3.sub(lamp.position, patch.position);
+                const direct = directLampBrightness(patch, lamp, world, options, stats, sphereIndex);
+                for (let channel = 0; channel < 3; channel += 1) {
+                    brightness[channel] += direct[channel];
+                }
+            }
+            const ao = ambientOcclusion(patch, world, options);
+            return ao > 0 ? Juggler.Math3.mul(brightness, 1 - ao) : brightness;
+        }
+        function directLampBrightness(patch, lamp, world, options, stats, sphereIndex) {
+            const effects = options.modernEffects;
+            const shadow = effects?.softShadows;
+            const usingSoftShadow = !!shadow?.enabled;
+            const samples = usingSoftShadow ? Math.max(1, Math.min(16, Math.round(shadow.samples))) : 1;
+            const total = [0, 0, 0];
+            for (let sample = 0; sample < samples; sample += 1) {
+                const lampPosition = sampledLampPosition(patch.position, lamp, sample, samples, shadow?.enabled ? shadow.radius : 0);
+                const lampVector = Juggler.Math3.sub(lampPosition, patch.position);
                 const cosi = Juggler.Math3.dot(lampVector, patch.normal);
                 if (cosi <= 0) {
                     continue;
@@ -2279,16 +2414,91 @@ var Juggler;
                 const shadowed = sphereIndex
                     ? sphereIndex.anyHit(shadowRay, options.epsilon, stats, patch.sphere)
                     : anySphereHit(shadowRay, world.spheres, options.epsilon, stats, patch.sphere);
+                if (usingSoftShadow) {
+                    incrementStat(stats, "modernEffectSamples");
+                }
                 if (shadowed) {
                     continue;
                 }
                 const r = Math.sqrt(Juggler.Math3.dot(lampVector, lampVector));
                 const direct = cosi / (r * r * r);
                 for (let channel = 0; channel < 3; channel += 1) {
-                    brightness[channel] += direct * patch.color[channel] * lamp.color[channel];
+                    total[channel] += direct * patch.color[channel] * lamp.color[channel];
                 }
             }
-            return brightness;
+            return Juggler.Math3.mul(total, 1 / samples);
+        }
+        function lampVisibility(patch, lamp, world, options, stats, sphereIndex) {
+            const effects = options.modernEffects;
+            const shadow = effects?.softShadows;
+            const usingSoftShadow = !!shadow?.enabled;
+            const samples = usingSoftShadow ? Math.max(1, Math.min(16, Math.round(shadow.samples))) : 1;
+            let visible = 0;
+            for (let sample = 0; sample < samples; sample += 1) {
+                const lampPosition = sampledLampPosition(patch.position, lamp, sample, samples, shadow?.enabled ? shadow.radius : 0);
+                const lampVector = Juggler.Math3.sub(lampPosition, patch.position);
+                const cosi = Juggler.Math3.dot(lampVector, patch.normal);
+                if (cosi <= 0) {
+                    continue;
+                }
+                const shadowRay = { origin: patch.position, direction: lampVector };
+                const shadowed = sphereIndex
+                    ? sphereIndex.anyHit(shadowRay, options.epsilon, stats, patch.sphere)
+                    : anySphereHit(shadowRay, world.spheres, options.epsilon, stats, patch.sphere);
+                if (usingSoftShadow) {
+                    incrementStat(stats, "modernEffectSamples");
+                }
+                if (!shadowed) {
+                    visible += 1;
+                }
+            }
+            return visible / samples;
+        }
+        function sampledLampPosition(patchPosition, lamp, sample, samples, radius = 0) {
+            if (radius <= 0 || samples <= 1) {
+                return lamp.position;
+            }
+            const toLamp = Juggler.Math3.normalize(Juggler.Math3.sub(lamp.position, patchPosition));
+            const fallback = Math.abs(toLamp[2]) > 0.9 ? [0, 1, 0] : [0, 0, 1];
+            const basisU = Juggler.Math3.normalize(Juggler.Math3.cross(toLamp, fallback));
+            const basisV = Juggler.Math3.normalize(Juggler.Math3.cross(toLamp, basisU));
+            const angle = (sample * 2.399963229728653) % (Math.PI * 2);
+            const ring = (sample + 0.5) / samples;
+            const distance = Math.sqrt(ring) * radius;
+            return Juggler.Math3.add(lamp.position, Juggler.Math3.add(Juggler.Math3.mul(basisU, Math.cos(angle) * distance), Juggler.Math3.mul(basisV, Math.sin(angle) * distance)));
+        }
+        function ambientOcclusion(patch, world, options) {
+            const settings = options.modernEffects?.ambientOcclusion;
+            if (!settings?.enabled || settings.strength <= 0 || settings.radius <= 0) {
+                return 0;
+            }
+            let occlusion = 0;
+            if (patch.sphere) {
+                const groundGap = Math.max(0, patch.sphere.position[2] - patch.sphere.radius);
+                const bottomFacing = Math.max(0, -patch.normal[2]);
+                occlusion += Math.max(0, 1 - groundGap / settings.radius) * bottomFacing;
+                for (const sphere of world.spheres) {
+                    if (sphere === patch.sphere) {
+                        continue;
+                    }
+                    const centerGap = Juggler.Math3.length(Juggler.Math3.sub(sphere.position, patch.sphere.position)) - sphere.radius - patch.sphere.radius;
+                    if (centerGap > settings.radius) {
+                        continue;
+                    }
+                    const towardSphere = Juggler.Math3.normalize(Juggler.Math3.sub(sphere.position, patch.position));
+                    const facing = Math.max(0, Juggler.Math3.dot(patch.normal, towardSphere));
+                    occlusion += Math.max(0, 1 - Math.max(0, centerGap) / settings.radius) * facing * 0.35;
+                }
+            }
+            else {
+                for (const sphere of world.spheres) {
+                    const planar = Math.hypot(sphere.position[0] - patch.position[0], sphere.position[1] - patch.position[1]);
+                    const height = Math.max(0, sphere.position[2] - sphere.radius);
+                    const contact = planar + height * 0.6;
+                    occlusion += Math.max(0, 1 - contact / Math.max(0.001, sphere.radius * settings.radius)) * 0.7;
+                }
+            }
+            return Math.max(0, Math.min(0.65, occlusion * settings.strength));
         }
         function glint(patch, world, incident, options, stats, sphereIndex) {
             let reflected = null;
@@ -2299,11 +2509,7 @@ var Juggler;
                 if (cosi <= 0) {
                     continue;
                 }
-                const shadowRay = { origin: patch.position, direction: lampVector };
-                const shadowed = sphereIndex
-                    ? sphereIndex.anyHit(shadowRay, options.epsilon, stats, patch.sphere)
-                    : anySphereHit(shadowRay, world.spheres, options.epsilon, stats, patch.sphere);
-                if (shadowed) {
+                if (lampVisibility(patch, lamp, world, options, stats, sphereIndex) <= 0.5) {
                     continue;
                 }
                 if (!reflected) {
@@ -2376,28 +2582,57 @@ var Juggler;
         function samplePixel(observer, x, y, world, options, stats, sphereIndex) {
             const antiAliasMode = options.antiAliasMode ?? "off";
             if (antiAliasMode === "off") {
-                return trace(pixelRay(observer, x, y), world, options, stats, 0, sphereIndex);
+                return traceCameraSample(observer, x, y, 0, 0, world, options, stats, sphereIndex);
             }
             if (antiAliasMode === "ordered-2x") {
                 return averageBrightness([
-                    trace(pixelRaySample(observer, x, y, 0.25, 0.25), world, options, stats, 0, sphereIndex),
-                    trace(pixelRaySample(observer, x, y, 0.75, 0.25), world, options, stats, 0, sphereIndex),
-                    trace(pixelRaySample(observer, x, y, 0.25, 0.75), world, options, stats, 0, sphereIndex),
-                    trace(pixelRaySample(observer, x, y, 0.75, 0.75), world, options, stats, 0, sphereIndex)
+                    traceCameraSample(observer, x, y, 0.25, 0.25, world, options, stats, sphereIndex),
+                    traceCameraSample(observer, x, y, 0.75, 0.25, world, options, stats, sphereIndex),
+                    traceCameraSample(observer, x, y, 0.25, 0.75, world, options, stats, sphereIndex),
+                    traceCameraSample(observer, x, y, 0.75, 0.75, world, options, stats, sphereIndex)
                 ]);
             }
-            const center = trace(pixelRay(observer, x, y), world, options, stats, 0, sphereIndex);
-            const a = trace(pixelRaySample(observer, x, y, 0.25, 0.25), world, options, stats, 0, sphereIndex);
-            const b = trace(pixelRaySample(observer, x, y, 0.75, 0.75), world, options, stats, 0, sphereIndex);
+            const center = traceCameraSample(observer, x, y, 0, 0, world, options, stats, sphereIndex);
+            const a = traceCameraSample(observer, x, y, 0.25, 0.25, world, options, stats, sphereIndex);
+            const b = traceCameraSample(observer, x, y, 0.75, 0.75, world, options, stats, sphereIndex);
             if (colorDistance(center, a) + colorDistance(center, b) < 0.08) {
                 return center;
             }
             return averageBrightness([
                 a,
-                trace(pixelRaySample(observer, x, y, 0.75, 0.25), world, options, stats, 0, sphereIndex),
-                trace(pixelRaySample(observer, x, y, 0.25, 0.75), world, options, stats, 0, sphereIndex),
+                traceCameraSample(observer, x, y, 0.75, 0.25, world, options, stats, sphereIndex),
+                traceCameraSample(observer, x, y, 0.25, 0.75, world, options, stats, sphereIndex),
                 b
             ]);
+        }
+        function traceCameraSample(observer, x, y, dx, dy, world, options, stats, sphereIndex) {
+            const settings = options.modernEffects?.depthOfField;
+            if (!settings?.enabled || settings.aperture <= 0 || settings.samples <= 1) {
+                return trace(pixelRaySample(observer, x, y, dx, dy), world, options, stats, 0, sphereIndex);
+            }
+            const samples = Math.max(2, Math.min(16, Math.round(settings.samples)));
+            const centerRay = pixelRaySample(observer, x, y, dx, dy);
+            const focusDistance = Math.max(0.1, settings.focusDistance);
+            const focusPoint = Juggler.Math3.add(centerRay.origin, Juggler.Math3.mul(Juggler.Math3.normalize(centerRay.direction), focusDistance));
+            const total = [0, 0, 0];
+            for (let sample = 0; sample < samples; sample += 1) {
+                const lens = deterministicDiskSample(sample, samples, settings.aperture);
+                const origin = Juggler.Math3.add(observer.position, Juggler.Math3.add(Juggler.Math3.mul(observer.uhat, lens[0]), Juggler.Math3.mul(observer.vhat, lens[1])));
+                const brightness = trace({ origin, direction: Juggler.Math3.sub(focusPoint, origin) }, world, options, stats, 0, sphereIndex);
+                total[0] += brightness[0];
+                total[1] += brightness[1];
+                total[2] += brightness[2];
+                incrementStat(stats, "modernEffectSamples");
+            }
+            return Juggler.Math3.mul(total, 1 / samples);
+        }
+        function deterministicDiskSample(sample, samples, radius) {
+            if (sample === 0) {
+                return [0, 0];
+            }
+            const angle = (sample * 2.399963229728653) % (Math.PI * 2);
+            const distance = Math.sqrt((sample + 0.5) / samples) * radius;
+            return [Math.cos(angle) * distance, Math.sin(angle) * distance];
         }
         function averageBrightness(samples) {
             const total = [0, 0, 0];
@@ -2411,6 +2646,21 @@ var Juggler;
         function colorDistance(a, b) {
             return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
         }
+        function blendMotionSamples(current, previous, settings) {
+            if (!previous || !settings?.enabled || settings.strength <= 0 || current.length !== previous.length) {
+                return current;
+            }
+            const strength = Math.max(0, Math.min(0.85, settings.strength));
+            const blended = new Uint8ClampedArray(current.length);
+            for (let i = 0; i < current.length; i += 4) {
+                blended[i] = Juggler.Math3.clampByte(current[i] * (1 - strength) + previous[i] * strength);
+                blended[i + 1] = Juggler.Math3.clampByte(current[i + 1] * (1 - strength) + previous[i + 1] * strength);
+                blended[i + 2] = Juggler.Math3.clampByte(current[i + 2] * (1 - strength) + previous[i + 2] * strength);
+                blended[i + 3] = 255;
+            }
+            return blended;
+        }
+        Renderer.blendMotionSamples = blendMotionSamples;
         function qualityLabelFor(id) {
             return Renderer.QUALITY_MODES.find((mode) => mode.id === id)?.label ?? id;
         }
@@ -2779,6 +3029,93 @@ var Juggler;
         }
         Math3.formatVec = formatVec;
     })(Math3 = Juggler.Math3 || (Juggler.Math3 = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var Experience;
+    (function (Experience) {
+        Experience.PRESETS = [
+            {
+                id: "classic-source",
+                label: "Classic Source",
+                previewMode: "raytrace",
+                profileId: "reference",
+                displayConstraintId: "ham6-approx",
+                qualityId: "legacy",
+                antiAliasMode: "off",
+                maxDepth: 4,
+                rowsPerTick: 4,
+                useSourceCamera: true,
+                orbit: { enabled: false, angleDeg: 20, radius: 10, heightOffset: 0 },
+                crtMode: "scanlines",
+                modernEffects: disabledModernEffects()
+            },
+            {
+                id: "modern-studio",
+                label: "Modern Studio",
+                previewMode: "live-raytrace",
+                profileId: "wright-rgb",
+                displayConstraintId: "rgb",
+                qualityId: "modern-quality",
+                antiAliasMode: "adaptive-2x",
+                maxDepth: 4,
+                rowsPerTick: 8,
+                useSourceCamera: false,
+                orbit: { enabled: true, angleDeg: 20, radius: 10, heightOffset: 0.5 },
+                crtMode: "soft-glow",
+                modernEffects: modernStudioEffects()
+            }
+        ];
+        function byId(id) {
+            return copyPreset(Experience.PRESETS.find((preset) => preset.id === id) ?? Experience.PRESETS[0]);
+        }
+        Experience.byId = byId;
+        function disabledModernEffects() {
+            return {
+                softShadows: { enabled: false, samples: 1, radius: 0 },
+                ambientOcclusion: { enabled: false, strength: 0, radius: 1 },
+                depthOfField: { enabled: false, samples: 1, aperture: 0, focusDistance: 10 },
+                motionBlur: { enabled: false, strength: 0, samples: 1 }
+            };
+        }
+        Experience.disabledModernEffects = disabledModernEffects;
+        function modernStudioEffects() {
+            return {
+                softShadows: { enabled: true, samples: 4, radius: 0.3 },
+                ambientOcclusion: { enabled: true, strength: 0.22, radius: 1.35 },
+                depthOfField: { enabled: false, samples: 4, aperture: 0.035, focusDistance: 10 },
+                motionBlur: { enabled: false, strength: 0.35, samples: 2 }
+            };
+        }
+        Experience.modernStudioEffects = modernStudioEffects;
+        function copyModernEffects(settings) {
+            const source = settings ?? disabledModernEffects();
+            return {
+                softShadows: { ...source.softShadows },
+                ambientOcclusion: { ...source.ambientOcclusion },
+                depthOfField: { ...source.depthOfField },
+                motionBlur: { ...source.motionBlur }
+            };
+        }
+        Experience.copyModernEffects = copyModernEffects;
+        function effectsSummary(settings) {
+            const enabled = [
+                settings.softShadows.enabled ? "soft shadows" : "",
+                settings.ambientOcclusion.enabled ? "AO" : "",
+                settings.depthOfField.enabled ? "DOF" : "",
+                settings.motionBlur.enabled ? "motion blur" : ""
+            ].filter(Boolean);
+            return enabled.length ? enabled.join(", ") : "source-clean";
+        }
+        Experience.effectsSummary = effectsSummary;
+        function copyPreset(preset) {
+            return {
+                ...preset,
+                orbit: { ...preset.orbit },
+                modernEffects: copyModernEffects(preset.modernEffects)
+            };
+        }
+    })(Experience = Juggler.Experience || (Juggler.Experience = {}));
 })(Juggler || (Juggler = {}));
 var Juggler;
 (function (Juggler) {
@@ -4248,7 +4585,23 @@ var Juggler;
                 diffuse * world.illum[2] * patch.color[2]
             ];
             for (const lamp of world.lamps) {
-                const lampVector = Juggler.Math3.sub(lamp.position, patch.position);
+                const direct = directLampBrightness(patch, lamp, world, options, stats, sphereIndex);
+                for (let channel = 0; channel < 3; channel += 1) {
+                    brightness[channel] += direct[channel];
+                }
+            }
+            const ao = ambientOcclusion(patch, world, options);
+            return ao > 0 ? Juggler.Math3.mul(brightness, 1 - ao) : brightness;
+        }
+        function directLampBrightness(patch, lamp, world, options, stats, sphereIndex) {
+            const effects = options.modernEffects;
+            const shadow = effects?.softShadows;
+            const usingSoftShadow = !!shadow?.enabled;
+            const samples = usingSoftShadow ? Math.max(1, Math.min(16, Math.round(shadow.samples))) : 1;
+            const total = [0, 0, 0];
+            for (let sample = 0; sample < samples; sample += 1) {
+                const lampPosition = sampledLampPosition(patch.position, lamp, sample, samples, shadow?.enabled ? shadow.radius : 0);
+                const lampVector = Juggler.Math3.sub(lampPosition, patch.position);
                 const cosi = Juggler.Math3.dot(lampVector, patch.normal);
                 if (cosi <= 0) {
                     continue;
@@ -4257,16 +4610,91 @@ var Juggler;
                 const shadowed = sphereIndex
                     ? sphereIndex.anyHit(shadowRay, options.epsilon, stats, patch.sphere)
                     : anySphereHit(shadowRay, world.spheres, options.epsilon, stats, patch.sphere);
+                if (usingSoftShadow) {
+                    incrementStat(stats, "modernEffectSamples");
+                }
                 if (shadowed) {
                     continue;
                 }
                 const r = Math.sqrt(Juggler.Math3.dot(lampVector, lampVector));
                 const direct = cosi / (r * r * r);
                 for (let channel = 0; channel < 3; channel += 1) {
-                    brightness[channel] += direct * patch.color[channel] * lamp.color[channel];
+                    total[channel] += direct * patch.color[channel] * lamp.color[channel];
                 }
             }
-            return brightness;
+            return Juggler.Math3.mul(total, 1 / samples);
+        }
+        function lampVisibility(patch, lamp, world, options, stats, sphereIndex) {
+            const effects = options.modernEffects;
+            const shadow = effects?.softShadows;
+            const usingSoftShadow = !!shadow?.enabled;
+            const samples = usingSoftShadow ? Math.max(1, Math.min(16, Math.round(shadow.samples))) : 1;
+            let visible = 0;
+            for (let sample = 0; sample < samples; sample += 1) {
+                const lampPosition = sampledLampPosition(patch.position, lamp, sample, samples, shadow?.enabled ? shadow.radius : 0);
+                const lampVector = Juggler.Math3.sub(lampPosition, patch.position);
+                const cosi = Juggler.Math3.dot(lampVector, patch.normal);
+                if (cosi <= 0) {
+                    continue;
+                }
+                const shadowRay = { origin: patch.position, direction: lampVector };
+                const shadowed = sphereIndex
+                    ? sphereIndex.anyHit(shadowRay, options.epsilon, stats, patch.sphere)
+                    : anySphereHit(shadowRay, world.spheres, options.epsilon, stats, patch.sphere);
+                if (usingSoftShadow) {
+                    incrementStat(stats, "modernEffectSamples");
+                }
+                if (!shadowed) {
+                    visible += 1;
+                }
+            }
+            return visible / samples;
+        }
+        function sampledLampPosition(patchPosition, lamp, sample, samples, radius = 0) {
+            if (radius <= 0 || samples <= 1) {
+                return lamp.position;
+            }
+            const toLamp = Juggler.Math3.normalize(Juggler.Math3.sub(lamp.position, patchPosition));
+            const fallback = Math.abs(toLamp[2]) > 0.9 ? [0, 1, 0] : [0, 0, 1];
+            const basisU = Juggler.Math3.normalize(Juggler.Math3.cross(toLamp, fallback));
+            const basisV = Juggler.Math3.normalize(Juggler.Math3.cross(toLamp, basisU));
+            const angle = (sample * 2.399963229728653) % (Math.PI * 2);
+            const ring = (sample + 0.5) / samples;
+            const distance = Math.sqrt(ring) * radius;
+            return Juggler.Math3.add(lamp.position, Juggler.Math3.add(Juggler.Math3.mul(basisU, Math.cos(angle) * distance), Juggler.Math3.mul(basisV, Math.sin(angle) * distance)));
+        }
+        function ambientOcclusion(patch, world, options) {
+            const settings = options.modernEffects?.ambientOcclusion;
+            if (!settings?.enabled || settings.strength <= 0 || settings.radius <= 0) {
+                return 0;
+            }
+            let occlusion = 0;
+            if (patch.sphere) {
+                const groundGap = Math.max(0, patch.sphere.position[2] - patch.sphere.radius);
+                const bottomFacing = Math.max(0, -patch.normal[2]);
+                occlusion += Math.max(0, 1 - groundGap / settings.radius) * bottomFacing;
+                for (const sphere of world.spheres) {
+                    if (sphere === patch.sphere) {
+                        continue;
+                    }
+                    const centerGap = Juggler.Math3.length(Juggler.Math3.sub(sphere.position, patch.sphere.position)) - sphere.radius - patch.sphere.radius;
+                    if (centerGap > settings.radius) {
+                        continue;
+                    }
+                    const towardSphere = Juggler.Math3.normalize(Juggler.Math3.sub(sphere.position, patch.position));
+                    const facing = Math.max(0, Juggler.Math3.dot(patch.normal, towardSphere));
+                    occlusion += Math.max(0, 1 - Math.max(0, centerGap) / settings.radius) * facing * 0.35;
+                }
+            }
+            else {
+                for (const sphere of world.spheres) {
+                    const planar = Math.hypot(sphere.position[0] - patch.position[0], sphere.position[1] - patch.position[1]);
+                    const height = Math.max(0, sphere.position[2] - sphere.radius);
+                    const contact = planar + height * 0.6;
+                    occlusion += Math.max(0, 1 - contact / Math.max(0.001, sphere.radius * settings.radius)) * 0.7;
+                }
+            }
+            return Math.max(0, Math.min(0.65, occlusion * settings.strength));
         }
         function glint(patch, world, incident, options, stats, sphereIndex) {
             let reflected = null;
@@ -4277,11 +4705,7 @@ var Juggler;
                 if (cosi <= 0) {
                     continue;
                 }
-                const shadowRay = { origin: patch.position, direction: lampVector };
-                const shadowed = sphereIndex
-                    ? sphereIndex.anyHit(shadowRay, options.epsilon, stats, patch.sphere)
-                    : anySphereHit(shadowRay, world.spheres, options.epsilon, stats, patch.sphere);
-                if (shadowed) {
+                if (lampVisibility(patch, lamp, world, options, stats, sphereIndex) <= 0.5) {
                     continue;
                 }
                 if (!reflected) {
@@ -4354,28 +4778,57 @@ var Juggler;
         function samplePixel(observer, x, y, world, options, stats, sphereIndex) {
             const antiAliasMode = options.antiAliasMode ?? "off";
             if (antiAliasMode === "off") {
-                return trace(pixelRay(observer, x, y), world, options, stats, 0, sphereIndex);
+                return traceCameraSample(observer, x, y, 0, 0, world, options, stats, sphereIndex);
             }
             if (antiAliasMode === "ordered-2x") {
                 return averageBrightness([
-                    trace(pixelRaySample(observer, x, y, 0.25, 0.25), world, options, stats, 0, sphereIndex),
-                    trace(pixelRaySample(observer, x, y, 0.75, 0.25), world, options, stats, 0, sphereIndex),
-                    trace(pixelRaySample(observer, x, y, 0.25, 0.75), world, options, stats, 0, sphereIndex),
-                    trace(pixelRaySample(observer, x, y, 0.75, 0.75), world, options, stats, 0, sphereIndex)
+                    traceCameraSample(observer, x, y, 0.25, 0.25, world, options, stats, sphereIndex),
+                    traceCameraSample(observer, x, y, 0.75, 0.25, world, options, stats, sphereIndex),
+                    traceCameraSample(observer, x, y, 0.25, 0.75, world, options, stats, sphereIndex),
+                    traceCameraSample(observer, x, y, 0.75, 0.75, world, options, stats, sphereIndex)
                 ]);
             }
-            const center = trace(pixelRay(observer, x, y), world, options, stats, 0, sphereIndex);
-            const a = trace(pixelRaySample(observer, x, y, 0.25, 0.25), world, options, stats, 0, sphereIndex);
-            const b = trace(pixelRaySample(observer, x, y, 0.75, 0.75), world, options, stats, 0, sphereIndex);
+            const center = traceCameraSample(observer, x, y, 0, 0, world, options, stats, sphereIndex);
+            const a = traceCameraSample(observer, x, y, 0.25, 0.25, world, options, stats, sphereIndex);
+            const b = traceCameraSample(observer, x, y, 0.75, 0.75, world, options, stats, sphereIndex);
             if (colorDistance(center, a) + colorDistance(center, b) < 0.08) {
                 return center;
             }
             return averageBrightness([
                 a,
-                trace(pixelRaySample(observer, x, y, 0.75, 0.25), world, options, stats, 0, sphereIndex),
-                trace(pixelRaySample(observer, x, y, 0.25, 0.75), world, options, stats, 0, sphereIndex),
+                traceCameraSample(observer, x, y, 0.75, 0.25, world, options, stats, sphereIndex),
+                traceCameraSample(observer, x, y, 0.25, 0.75, world, options, stats, sphereIndex),
                 b
             ]);
+        }
+        function traceCameraSample(observer, x, y, dx, dy, world, options, stats, sphereIndex) {
+            const settings = options.modernEffects?.depthOfField;
+            if (!settings?.enabled || settings.aperture <= 0 || settings.samples <= 1) {
+                return trace(pixelRaySample(observer, x, y, dx, dy), world, options, stats, 0, sphereIndex);
+            }
+            const samples = Math.max(2, Math.min(16, Math.round(settings.samples)));
+            const centerRay = pixelRaySample(observer, x, y, dx, dy);
+            const focusDistance = Math.max(0.1, settings.focusDistance);
+            const focusPoint = Juggler.Math3.add(centerRay.origin, Juggler.Math3.mul(Juggler.Math3.normalize(centerRay.direction), focusDistance));
+            const total = [0, 0, 0];
+            for (let sample = 0; sample < samples; sample += 1) {
+                const lens = deterministicDiskSample(sample, samples, settings.aperture);
+                const origin = Juggler.Math3.add(observer.position, Juggler.Math3.add(Juggler.Math3.mul(observer.uhat, lens[0]), Juggler.Math3.mul(observer.vhat, lens[1])));
+                const brightness = trace({ origin, direction: Juggler.Math3.sub(focusPoint, origin) }, world, options, stats, 0, sphereIndex);
+                total[0] += brightness[0];
+                total[1] += brightness[1];
+                total[2] += brightness[2];
+                incrementStat(stats, "modernEffectSamples");
+            }
+            return Juggler.Math3.mul(total, 1 / samples);
+        }
+        function deterministicDiskSample(sample, samples, radius) {
+            if (sample === 0) {
+                return [0, 0];
+            }
+            const angle = (sample * 2.399963229728653) % (Math.PI * 2);
+            const distance = Math.sqrt((sample + 0.5) / samples) * radius;
+            return [Math.cos(angle) * distance, Math.sin(angle) * distance];
         }
         function averageBrightness(samples) {
             const total = [0, 0, 0];
@@ -4389,6 +4842,21 @@ var Juggler;
         function colorDistance(a, b) {
             return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
         }
+        function blendMotionSamples(current, previous, settings) {
+            if (!previous || !settings?.enabled || settings.strength <= 0 || current.length !== previous.length) {
+                return current;
+            }
+            const strength = Math.max(0, Math.min(0.85, settings.strength));
+            const blended = new Uint8ClampedArray(current.length);
+            for (let i = 0; i < current.length; i += 4) {
+                blended[i] = Juggler.Math3.clampByte(current[i] * (1 - strength) + previous[i] * strength);
+                blended[i + 1] = Juggler.Math3.clampByte(current[i + 1] * (1 - strength) + previous[i + 1] * strength);
+                blended[i + 2] = Juggler.Math3.clampByte(current[i + 2] * (1 - strength) + previous[i + 2] * strength);
+                blended[i + 3] = 255;
+            }
+            return blended;
+        }
+        Renderer.blendMotionSamples = blendMotionSamples;
         function qualityLabelFor(id) {
             return Renderer.QUALITY_MODES.find((mode) => mode.id === id)?.label ?? id;
         }
@@ -4727,6 +5195,104 @@ var Juggler;
 })(Juggler || (Juggler = {}));
 var Juggler;
 (function (Juggler) {
+    var Viewport;
+    (function (Viewport) {
+        function orbitPoseFromDrag(startPose, dx, dy, sensitivity = 0.01) {
+            const target = [...startPose.target];
+            const offset = Juggler.Math3.sub(startPose.position, target);
+            if (Juggler.Math3.length(offset) < 0.001) {
+                return copyPose(startPose);
+            }
+            const yawed = rotateAroundAxis(offset, [0, 0, 1], -dx * sensitivity);
+            const right = Juggler.Math3.normalize(Juggler.Math3.cross([0, 0, 1], Juggler.Math3.normalize(Juggler.Math3.mul(yawed, -1))));
+            const pitchAxis = Juggler.Math3.length(right) > 0.001 ? right : [1, 0, 0];
+            const pitched = rotateAroundAxis(yawed, pitchAxis, dy * sensitivity);
+            const safeOffset = Math.abs(Juggler.Math3.normalize(pitched)[2]) > 0.985 ? yawed : pitched;
+            return {
+                position: Juggler.Math3.add(target, safeOffset),
+                target,
+                focalLength: startPose.focalLength
+            };
+        }
+        Viewport.orbitPoseFromDrag = orbitPoseFromDrag;
+        function panPoseFromDrag(startPose, observer, dx, dy, scale) {
+            const distance = Math.max(0.1, Juggler.Math3.length(Juggler.Math3.sub(startPose.target, startPose.position)));
+            const unitsPerPixel = scale ?? distance / 320;
+            const move = Juggler.Math3.add(Juggler.Math3.mul(observer.uhat, -dx * unitsPerPixel), Juggler.Math3.mul(observer.vhat, dy * unitsPerPixel));
+            return {
+                position: Juggler.Math3.add(startPose.position, move),
+                target: Juggler.Math3.add(startPose.target, move),
+                focalLength: startPose.focalLength
+            };
+        }
+        Viewport.panPoseFromDrag = panPoseFromDrag;
+        function dollyPose(startPose, deltaY, stepScale = 0.0025) {
+            const direction = Juggler.Math3.normalize(Juggler.Math3.sub(startPose.target, startPose.position));
+            const distance = Math.max(0.1, Juggler.Math3.length(Juggler.Math3.sub(startPose.target, startPose.position)));
+            const step = Math.max(-distance * 0.8, Math.min(distance * 0.8, deltaY * stepScale * distance));
+            return {
+                position: Juggler.Math3.add(startPose.position, Juggler.Math3.mul(direction, step)),
+                target: [...startPose.target],
+                focalLength: startPose.focalLength
+            };
+        }
+        Viewport.dollyPose = dollyPose;
+        function sceneEditOffsetFromDrag(startOffset, observer, dx, dy, depthMode, scale) {
+            if (depthMode) {
+                return Juggler.Math3.add(startOffset, Juggler.Math3.mul(observer.viewDir, -dy * scale));
+            }
+            return Juggler.Math3.add(startOffset, Juggler.Math3.add(Juggler.Math3.mul(observer.uhat, dx * scale), Juggler.Math3.mul(observer.vhat, -dy * scale)));
+        }
+        Viewport.sceneEditOffsetFromDrag = sceneEditOffsetFromDrag;
+        function copyPose(pose) {
+            return {
+                position: [...pose.position],
+                target: [...pose.target],
+                focalLength: pose.focalLength
+            };
+        }
+        function rotateAroundAxis(vector, axis, angle) {
+            const unit = Juggler.Math3.normalize(axis);
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            return Juggler.Math3.add(Juggler.Math3.add(Juggler.Math3.mul(vector, cos), Juggler.Math3.mul(Juggler.Math3.cross(unit, vector), sin)), Juggler.Math3.mul(unit, Juggler.Math3.dot(unit, vector) * (1 - cos)));
+        }
+    })(Viewport = Juggler.Viewport || (Juggler.Viewport = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var LivePlayback;
+    (function (LivePlayback) {
+        function nextFrame(frame, frameCount, steps = 1) {
+            const count = Math.max(1, Math.round(frameCount));
+            return ((Math.round(frame) + Math.max(1, Math.round(steps))) % count + count) % count;
+        }
+        LivePlayback.nextFrame = nextFrame;
+        function advance(currentFrame, frameCount, targetFps, dueAtMs, nowMs, renderInProgress) {
+            const interval = 1000 / Math.max(1, Math.min(60, targetFps));
+            const elapsedSteps = nowMs < dueAtMs ? 0 : Math.max(1, Math.floor((nowMs - dueAtMs) / interval) + 1);
+            if (elapsedSteps === 0) {
+                return { frame: currentFrame, skippedFrames: 0, dueAtMs };
+            }
+            const nextDue = dueAtMs + elapsedSteps * interval;
+            if (renderInProgress) {
+                return {
+                    frame: nextFrame(currentFrame, frameCount, elapsedSteps),
+                    skippedFrames: elapsedSteps,
+                    dueAtMs: nextDue
+                };
+            }
+            return {
+                frame: nextFrame(currentFrame, frameCount, elapsedSteps),
+                skippedFrames: Math.max(0, elapsedSteps - 1),
+                dueAtMs: nextDue
+            };
+        }
+        LivePlayback.advance = advance;
+    })(LivePlayback = Juggler.LivePlayback || (Juggler.LivePlayback = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
     var Animation;
     (function (Animation) {
         Animation.PATHS = [
@@ -4873,7 +5439,8 @@ var Juggler;
                     profileId: first?.profileId ?? "reference",
                     displayConstraintId: first?.displayConstraintId ?? "rgb",
                     qualityId: first?.qualityId ?? "legacy",
-                    antiAliasMode: first?.antiAliasMode ?? "off"
+                    antiAliasMode: first?.antiAliasMode ?? "off",
+                    modernEffects: Juggler.Experience.copyModernEffects(first?.modernEffects)
                 },
                 animation: copyPathSettings(pathSettings),
                 motion: { ...motionSettings },
@@ -4887,6 +5454,7 @@ var Juggler;
                     renderMs: frame.renderMs,
                     camera: copyCameraPose(frame.pose),
                     stats: { ...frame.stats },
+                    modernEffects: Juggler.Experience.copyModernEffects(frame.modernEffects),
                     motion: {
                         id: frame.motionId,
                         bodyClearance: frame.motionClearance,
@@ -4957,7 +5525,8 @@ var Juggler;
                         profileId: this.renderOptions.profileId,
                         displayConstraintId: this.renderOptions.displayConstraintId ?? "rgb",
                         qualityId: this.renderOptions.qualityId ?? "legacy",
-                        antiAliasMode: this.renderOptions.antiAliasMode ?? "off"
+                        antiAliasMode: this.renderOptions.antiAliasMode ?? "off",
+                        modernEffects: Juggler.Experience.copyModernEffects(this.renderOptions.modernEffects)
                     };
                     this.frames.push(completedFrame);
                     this.frameIndex += 1;
@@ -5073,6 +5642,13 @@ var Juggler;
 (function (Juggler) {
     var App;
     (function (App) {
+        const CRT_MODES = [
+            { id: "off", label: "CRT OFF", active: "false" },
+            { id: "scanlines", label: "CRT SCAN", active: "true" },
+            { id: "slot-mask", label: "CRT SLOT", active: "true" },
+            { id: "soft-glow", label: "CRT SOFT", active: "true" }
+        ];
+        const experienceSelect = document.getElementById("experiencePreset");
         const sceneSelect = document.getElementById("scene");
         const fileInput = document.getElementById("file");
         const sceneMotionSelect = document.getElementById("sceneMotion");
@@ -5098,17 +5674,35 @@ var Juggler;
         const cameraTargetZInput = document.getElementById("cameraTargetZ");
         const writeCameraPoseButton = document.getElementById("writeCameraPose");
         const resetCameraPoseButton = document.getElementById("resetCameraPose");
-        const mouseToolSelect = document.getElementById("mouseTool");
+        const sceneEditModeInput = document.getElementById("sceneEditMode");
         const selectionFacts = document.getElementById("selectionFacts");
         const transformXInput = document.getElementById("transformX");
         const transformYInput = document.getElementById("transformY");
         const transformZInput = document.getElementById("transformZ");
         const resetGroupTransformButton = document.getElementById("resetGroupTransform");
         const resetAllTransformsButton = document.getElementById("resetAllTransforms");
+        const playLiveButton = document.getElementById("playLive");
+        const pauseLiveButton = document.getElementById("pauseLive");
         const renderButton = document.getElementById("render");
         const abortButton = document.getElementById("abort");
         const statusElement = document.getElementById("status");
         const progressElement = document.getElementById("progress");
+        const canvasHintElement = document.getElementById("canvasHint");
+        const crtToggleButton = document.getElementById("scanlineToggle");
+        const livePlaybackFacts = document.getElementById("livePlaybackFacts");
+        const softShadowsEnabledInput = document.getElementById("softShadowsEnabled");
+        const softShadowSamplesInput = document.getElementById("softShadowSamples");
+        const softShadowRadiusInput = document.getElementById("softShadowRadius");
+        const ambientOcclusionEnabledInput = document.getElementById("ambientOcclusionEnabled");
+        const ambientOcclusionStrengthInput = document.getElementById("ambientOcclusionStrength");
+        const ambientOcclusionRadiusInput = document.getElementById("ambientOcclusionRadius");
+        const depthOfFieldEnabledInput = document.getElementById("depthOfFieldEnabled");
+        const depthOfFieldSamplesInput = document.getElementById("depthOfFieldSamples");
+        const depthOfFieldApertureInput = document.getElementById("depthOfFieldAperture");
+        const depthOfFieldFocusInput = document.getElementById("depthOfFieldFocus");
+        const motionBlurEnabledInput = document.getElementById("motionBlurEnabled");
+        const motionBlurStrengthInput = document.getElementById("motionBlurStrength");
+        const motionBlurSamplesInput = document.getElementById("motionBlurSamples");
         const sceneFacts = document.getElementById("sceneFacts");
         const cameraFacts = document.getElementById("cameraFacts");
         const animationFacts = document.getElementById("animationFacts");
@@ -5152,10 +5746,34 @@ var Juggler;
         let activeWorkerUrl = null;
         let playbackTimer = 0;
         let playbackIndex = 0;
+        let applyingExperiencePreset = false;
+        let crtModeIndex = 1;
+        let livePlayback = {
+            playing: false,
+            rafId: 0,
+            dueAtMs: 0,
+            sourceFrame: 0,
+            skippedFrames: 0,
+            lastRenderMs: 0,
+            renderInProgress: false,
+            previousData: null,
+            previousWidth: 0,
+            previousHeight: 0
+        };
         function start() {
             if (!context) {
                 throw new Error("Canvas 2D context is unavailable");
             }
+            for (const preset of Juggler.Experience.PRESETS) {
+                const option = document.createElement("option");
+                option.value = preset.id;
+                option.textContent = preset.label;
+                experienceSelect.appendChild(option);
+            }
+            const customOption = document.createElement("option");
+            customOption.value = "custom";
+            customOption.textContent = "Custom";
+            experienceSelect.appendChild(customOption);
             for (const source of sources) {
                 const option = document.createElement("option");
                 option.value = source.id;
@@ -5192,17 +5810,6 @@ var Juggler;
                 option.textContent = mode.label;
                 antiAliasSelect.appendChild(option);
             }
-            for (const tool of [
-                { id: "orbit-camera", label: "Orbit camera" },
-                { id: "free-camera", label: "Free camera" },
-                { id: "move-group", label: "Move group" },
-                { id: "none", label: "None" }
-            ]) {
-                const option = document.createElement("option");
-                option.value = tool.id;
-                option.textContent = tool.label;
-                mouseToolSelect.appendChild(option);
-            }
             for (const path of Juggler.Animation.PATHS) {
                 const option = document.createElement("option");
                 option.value = path.id;
@@ -5224,6 +5831,12 @@ var Juggler;
             animationPathSelect.value = Juggler.Animation.defaultSettings().pathId;
             animationCameraPresetSelect.value = "custom";
             animationCyclePresetSelect.value = "full-cycle";
+            experienceSelect.addEventListener("change", () => {
+                const presetId = experienceSelect.value;
+                if (presetId !== "custom") {
+                    applyExperiencePreset(presetId);
+                }
+            });
             sceneSelect.addEventListener("change", () => {
                 const source = sources.find((candidate) => candidate.id === sceneSelect.value) ?? sources[0];
                 setActiveSource(source);
@@ -5242,31 +5855,38 @@ var Juggler;
                 refreshAnimationFacts();
                 refreshActiveView();
             });
+            playLiveButton.addEventListener("click", playLiveRaytrace);
+            pauseLiveButton.addEventListener("click", pauseLiveRaytrace);
             renderButton.addEventListener("click", () => renderStill());
             abortButton.addEventListener("click", abortWork);
             previewModeSelect.addEventListener("change", () => {
                 abortWork();
+                markExperienceCustom();
                 refreshActiveView();
             });
             profileSelect.addEventListener("change", () => {
                 resetAnimationBuffer();
+                markExperienceCustom();
                 refreshProfileIndicators();
             });
             profileSelect.addEventListener("input", refreshProfileIndicators);
             displayConstraintSelect.addEventListener("change", () => {
                 resetAnimationBuffer();
+                markExperienceCustom();
                 refreshProfileIndicators();
                 refreshAnimationFacts();
                 refreshActiveView();
             });
             renderQualitySelect.addEventListener("change", () => {
                 resetAnimationBuffer();
+                markExperienceCustom();
                 refreshProfileIndicators();
                 refreshAnimationFacts();
                 refreshActiveView();
             });
             antiAliasSelect.addEventListener("change", () => {
                 resetAnimationBuffer();
+                markExperienceCustom();
                 refreshProfileIndicators();
                 refreshAnimationFacts();
                 refreshActiveView();
@@ -5286,13 +5906,20 @@ var Juggler;
             });
             animationCameraPresetSelect.addEventListener("change", applyAnimationCameraPreset);
             animationCyclePresetSelect.addEventListener("change", applyAnimationCyclePreset);
-            mouseToolSelect.value = "orbit-camera";
             canvas.addEventListener("pointerdown", handleCanvasPointerDown);
             canvas.addEventListener("pointermove", handleCanvasPointerMove);
             canvas.addEventListener("pointerup", handleCanvasPointerUp);
             canvas.addEventListener("pointerleave", handleCanvasPointerUp);
             canvas.addEventListener("wheel", handleCanvasWheel, { passive: false });
+            canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+            sceneEditModeInput.addEventListener("change", () => {
+                markExperienceCustom();
+                updateCanvasHint();
+                refreshSelectionFacts();
+            });
             for (const control of [transformXInput, transformYInput, transformZInput]) {
+                control.addEventListener("change", markExperienceCustom);
+                control.addEventListener("input", markExperienceCustom);
                 control.addEventListener("change", writeSelectedTransformFromInputs);
                 control.addEventListener("input", writeSelectedTransformFromInputs);
             }
@@ -5308,13 +5935,44 @@ var Juggler;
                 cameraTargetYInput,
                 cameraTargetZInput
             ]) {
+                control.addEventListener("change", markExperienceCustom);
                 control.addEventListener("change", writeFreeCameraPoseFromInputs);
             }
             for (const control of [orbitEnabledInput, orbitAngleInput, orbitRadiusInput, orbitHeightInput, resolutionSelect]) {
+                control.addEventListener("change", markExperienceCustom);
+                control.addEventListener("input", markExperienceCustom);
                 control.addEventListener("change", refreshCameraFacts);
                 control.addEventListener("input", refreshCameraFacts);
                 control.addEventListener("change", refreshActiveView);
                 control.addEventListener("input", refreshActiveView);
+            }
+            for (const control of [
+                rowsPerTickInput,
+                maxDepthInput,
+                softShadowsEnabledInput,
+                softShadowSamplesInput,
+                softShadowRadiusInput,
+                ambientOcclusionEnabledInput,
+                ambientOcclusionStrengthInput,
+                ambientOcclusionRadiusInput,
+                depthOfFieldEnabledInput,
+                depthOfFieldSamplesInput,
+                depthOfFieldApertureInput,
+                depthOfFieldFocusInput,
+                motionBlurEnabledInput,
+                motionBlurStrengthInput,
+                motionBlurSamplesInput
+            ]) {
+                control.addEventListener("change", () => {
+                    markExperienceCustom();
+                    refreshProfileIndicators();
+                    refreshAnimationFacts();
+                    refreshActiveView();
+                });
+                control.addEventListener("input", () => {
+                    markExperienceCustom();
+                    refreshProfileIndicators();
+                });
             }
             for (const control of [
                 animationPathSelect,
@@ -5337,11 +5995,122 @@ var Juggler;
                 control.addEventListener("change", refreshAnimationFacts);
                 control.addEventListener("input", refreshAnimationFacts);
             }
+            setupCrtToggle();
             setActiveSource(sources[0]);
+            applyExperiencePreset("classic-source", false);
+            updateCanvasHint();
+            refreshLivePlaybackFacts();
             refreshProfileIndicators();
             renderStill();
         }
         App.start = start;
+        function applyExperiencePreset(presetId, shouldRender = true) {
+            const preset = Juggler.Experience.byId(presetId);
+            applyingExperiencePreset = true;
+            experienceSelect.value = preset.id;
+            previewModeSelect.value = preset.previewMode;
+            profileSelect.value = preset.profileId;
+            displayConstraintSelect.value = preset.displayConstraintId;
+            renderQualitySelect.value = preset.qualityId;
+            antiAliasSelect.value = preset.antiAliasMode;
+            maxDepthInput.value = String(preset.maxDepth);
+            rowsPerTickInput.value = String(preset.rowsPerTick);
+            orbitEnabledInput.checked = preset.orbit.enabled;
+            orbitAngleInput.value = String(preset.orbit.angleDeg);
+            orbitRadiusInput.value = String(preset.orbit.radius);
+            orbitHeightInput.value = String(preset.orbit.heightOffset ?? 0);
+            if (preset.useSourceCamera) {
+                freeCameraPose = null;
+            }
+            if (preset.id === "modern-studio" && active && Juggler.Motion.supportsMotion(active.parsed, "juggler-reconstructed")) {
+                sceneMotionSelect.value = "juggler-reconstructed";
+                refreshMotionFrameBounds();
+            }
+            sceneEditModeInput.checked = false;
+            writeModernEffects(preset.modernEffects);
+            setCrtMode(preset.crtMode);
+            applyingExperiencePreset = false;
+            resetAnimationBuffer();
+            refreshProfileIndicators();
+            refreshCameraFacts();
+            renderFacts();
+            refreshAnimationFacts();
+            refreshSelectionFacts();
+            updateCanvasHint();
+            setStatus(`${preset.label} preset applied.`);
+            if (shouldRender) {
+                if (preset.previewMode === "raytrace") {
+                    renderStill();
+                }
+                else {
+                    refreshActiveView();
+                }
+            }
+        }
+        function setupCrtToggle() {
+            setCrtMode("scanlines");
+            crtToggleButton?.addEventListener("click", () => {
+                crtModeIndex = (crtModeIndex + 1) % CRT_MODES.length;
+                setCrtMode(CRT_MODES[crtModeIndex].id);
+                markExperienceCustom();
+            });
+        }
+        function setCrtMode(modeId) {
+            const index = CRT_MODES.findIndex((mode) => mode.id === modeId);
+            crtModeIndex = index >= 0 ? index : 0;
+            const mode = CRT_MODES[crtModeIndex];
+            document.body.setAttribute("data-crt-mode", mode.id);
+            if (crtToggleButton) {
+                crtToggleButton.textContent = mode.label;
+                crtToggleButton.setAttribute("data-active", mode.active);
+                crtToggleButton.setAttribute("title", `CRT mode: ${mode.label}`);
+            }
+        }
+        function markExperienceCustom() {
+            if (!applyingExperiencePreset && experienceSelect.value !== "custom") {
+                experienceSelect.value = "custom";
+            }
+        }
+        function readModernEffects() {
+            return {
+                softShadows: {
+                    enabled: softShadowsEnabledInput.checked,
+                    samples: clampInt(Number(softShadowSamplesInput.value), 1, 16, 1),
+                    radius: clampNumber(Number(softShadowRadiusInput.value), 0, 3, 0)
+                },
+                ambientOcclusion: {
+                    enabled: ambientOcclusionEnabledInput.checked,
+                    strength: clampNumber(Number(ambientOcclusionStrengthInput.value), 0, 1, 0),
+                    radius: clampNumber(Number(ambientOcclusionRadiusInput.value), 0.1, 4, 1)
+                },
+                depthOfField: {
+                    enabled: depthOfFieldEnabledInput.checked,
+                    samples: clampInt(Number(depthOfFieldSamplesInput.value), 1, 16, 1),
+                    aperture: clampNumber(Number(depthOfFieldApertureInput.value), 0, 0.25, 0),
+                    focusDistance: clampNumber(Number(depthOfFieldFocusInput.value), 0.5, 80, 10)
+                },
+                motionBlur: {
+                    enabled: motionBlurEnabledInput.checked,
+                    strength: clampNumber(Number(motionBlurStrengthInput.value), 0, 0.85, 0),
+                    samples: clampInt(Number(motionBlurSamplesInput.value), 1, 4, 1)
+                }
+            };
+        }
+        function writeModernEffects(settings) {
+            softShadowsEnabledInput.checked = settings.softShadows.enabled;
+            softShadowSamplesInput.value = String(settings.softShadows.samples);
+            softShadowRadiusInput.value = String(settings.softShadows.radius);
+            ambientOcclusionEnabledInput.checked = settings.ambientOcclusion.enabled;
+            ambientOcclusionStrengthInput.value = String(settings.ambientOcclusion.strength);
+            ambientOcclusionRadiusInput.value = String(settings.ambientOcclusion.radius);
+            depthOfFieldEnabledInput.checked = settings.depthOfField.enabled;
+            depthOfFieldSamplesInput.value = String(settings.depthOfField.samples);
+            depthOfFieldApertureInput.value = String(settings.depthOfField.aperture);
+            depthOfFieldFocusInput.value = String(settings.depthOfField.focusDistance);
+            motionBlurEnabledInput.checked = settings.motionBlur.enabled;
+            motionBlurStrengthInput.value = String(settings.motionBlur.strength);
+            motionBlurSamplesInput.value = String(settings.motionBlur.samples);
+        }
         function setActiveSource(source) {
             try {
                 const parsed = Juggler.Parser.parseDatScene(source.datText, source.name);
@@ -5358,6 +6127,8 @@ var Juggler;
                 refreshCameraFacts();
                 refreshAnimationFacts();
                 refreshSelectionFacts();
+                refreshLivePlaybackFacts();
+                updateCanvasHint();
             }
             catch (error) {
                 setStatus(error instanceof Error ? error.message : String(error));
@@ -5384,10 +6155,6 @@ var Juggler;
             if (!context || !active) {
                 return;
             }
-            if (readPreviewMode() !== "raytrace") {
-                refreshActiveView();
-                return;
-            }
             abortWork();
             const token = abortToken;
             const [width, height] = parseResolution();
@@ -5404,7 +6171,8 @@ var Juggler;
             progressElement.value = 0;
             setStatus(`Rendering ${active.source.name}, ${Juggler.Motion.labelFor(motionSettings.motionId)} ` +
                 `(${Juggler.Motion.motionSummary(active.parsed, motionSettings)}) at ${width} x ${height} with ` +
-                `${profile.label}, ${Juggler.Display.labelFor(displayConstraint)} display, ${Juggler.Renderer.qualityLabelFor(quality)}`);
+                `${profile.label}, ${Juggler.Display.labelFor(displayConstraint)} display, ${Juggler.Renderer.qualityLabelFor(quality)}, ` +
+                `${Juggler.Experience.effectsSummary(renderOptions.modernEffects ?? Juggler.Experience.disabledModernEffects())}`);
             if (renderStillInWorker(token, width, height, motionSettings, renderOptions, profile, displayConstraint)) {
                 return;
             }
@@ -5429,6 +6197,7 @@ var Juggler;
                 renderButton.disabled = false;
                 setStatus(`Done in ${seconds.toFixed(2)}s, ${profile.label}, ${active.world.spheres.length} spheres, ` +
                     `${Juggler.Display.labelFor(displayConstraint)} display, ${Juggler.Renderer.qualityLabelFor(quality)}, ` +
+                    `${Juggler.Experience.effectsSummary(renderOptions.modernEffects ?? Juggler.Experience.disabledModernEffects())}, ` +
                     `${Juggler.Motion.motionSummary(active.parsed, motionSettings)}, ` +
                     `${renderer.stats.rays} rays, ${renderer.stats.mirrorFallbacks} source-reflection fallbacks`);
             };
@@ -5457,6 +6226,7 @@ var Juggler;
         }
         function refreshActiveView() {
             const mode = readPreviewMode();
+            updateCanvasHint();
             if (mode === "live-raytrace") {
                 renderLiveRaytrace();
                 return;
@@ -5466,13 +6236,19 @@ var Juggler;
             }
         }
         function renderLiveRaytrace() {
+            renderLiveRaytraceFrame(readSceneMotionSettings().sourceFrame, false);
+        }
+        function renderLiveRaytraceFrame(sourceFrame, playbackFrame) {
             if (!context || !active) {
                 return;
             }
-            abortWork();
+            abortRenderOnly();
             const token = abortToken;
             const [width, height] = liveResolution();
-            const motionSettings = readSceneMotionSettings();
+            const motionSettings = {
+                ...readSceneMotionSettings(),
+                sourceFrame
+            };
             const renderWorld = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
             const observer = createDisplayObserver(width, height);
             const profile = Juggler.Profiles.byId(profileSelect.value);
@@ -5489,10 +6265,17 @@ var Juggler;
             canvas.height = height;
             context.imageSmoothingEnabled = false;
             progressElement.value = 0;
+            if (playbackFrame) {
+                livePlayback.renderInProgress = true;
+            }
             setStatus(`Live raytrace ${active.source.name}, ${Juggler.Motion.motionSummary(active.parsed, motionSettings)}`);
             const started = performance.now();
             const tick = () => {
                 if (token !== abortToken) {
+                    if (playbackFrame) {
+                        livePlayback.renderInProgress = false;
+                        refreshLivePlaybackFacts();
+                    }
                     return;
                 }
                 renderer.renderBudget(10);
@@ -5503,8 +6286,23 @@ var Juggler;
                     return;
                 }
                 const seconds = (performance.now() - started) / 1000;
-                setStatus(`Live raytrace ready in ${seconds.toFixed(2)}s, ${width} x ${height}, ` +
-                    `${renderer.stats.rays} rays, ${renderer.stats.sphereTests ?? 0} sphere tests`);
+                let data = renderer.data;
+                if (playbackFrame) {
+                    data = Juggler.Renderer.blendMotionSamples(renderer.data, livePlayback.previousData, options.modernEffects?.motionBlur);
+                    if (data !== renderer.data) {
+                        drawImageData(data, width, height);
+                    }
+                    livePlayback.previousData = new Uint8ClampedArray(data);
+                    livePlayback.previousWidth = width;
+                    livePlayback.previousHeight = height;
+                    livePlayback.lastRenderMs = performance.now() - started;
+                    livePlayback.renderInProgress = false;
+                }
+                refreshLivePlaybackFacts();
+                setStatus(livePlayback.playing
+                    ? livePlaybackStatus(sourceFrame, width, height, renderer.stats)
+                    : `Live raytrace ready in ${seconds.toFixed(2)}s, ${width} x ${height}, ` +
+                        `${renderer.stats.rays} rays, ${renderer.stats.sphereTests ?? 0} sphere tests`);
             };
             window.requestAnimationFrame(tick);
         }
@@ -5512,32 +6310,17 @@ var Juggler;
             return Juggler.Transforms.apply(Juggler.Motion.resolveWorld(active.parsed, active.world, motionSettings, sourceFrame), groupTransforms);
         }
         function handleCanvasPointerDown(event) {
-            if (!active || readPreviewMode() === "raytrace") {
+            if (!active) {
                 return;
             }
+            event.preventDefault();
             const point = canvasPoint(event);
-            const tool = readMouseTool();
-            if (tool === "orbit-camera") {
-                orbitEnabledInput.checked = true;
-                freeCameraPose = null;
-                pointerDrag = {
-                    tool,
-                    startX: point[0],
-                    startY: point[1],
-                    startAngle: readNumber(orbitAngleInput.value, 0),
-                    startHeight: readNumber(orbitHeightInput.value, 0),
-                    startOffset: [0, 0, 0],
-                    startPosition: [0, 0, 0],
-                    startTarget: [0, 0, 0],
-                    observer: null
-                };
-                canvas.setPointerCapture(event.pointerId);
-                return;
-            }
-            if (tool === "free-camera") {
+            const observer = createDisplayObserver(canvas.width || parseResolution()[0], canvas.height || parseResolution()[1]);
+            if (!sceneEditModeInput.checked) {
                 const pose = ensureFreeCameraPose();
+                const panMode = event.button === 2 || event.shiftKey;
                 pointerDrag = {
-                    tool,
+                    mode: panMode ? "pan" : "orbit",
                     startX: point[0],
                     startY: point[1],
                     startAngle: 0,
@@ -5545,84 +6328,69 @@ var Juggler;
                     startOffset: [0, 0, 0],
                     startPosition: [...pose.position],
                     startTarget: [...pose.target],
-                    observer: createDisplayObserver(canvas.width, canvas.height)
+                    observer
                 };
-                orbitEnabledInput.checked = false;
                 refreshCameraFacts();
+                updateCanvasHint();
                 canvas.setPointerCapture(event.pointerId);
                 return;
             }
-            if (tool === "move-group") {
-                const preview = previewWorldAndObserver();
-                const groupIndex = Juggler.Preview.pickGroup(preview.world, preview.observer, point[0], point[1]);
-                if (groupIndex === null) {
-                    setStatus("No group under pointer.");
-                    return;
-                }
-                selectedGroupIndex = groupIndex;
-                const startOffset = Juggler.Transforms.offsetFor(groupTransforms, groupIndex);
-                pointerDrag = {
-                    tool,
-                    startX: point[0],
-                    startY: point[1],
-                    startAngle: 0,
-                    startHeight: 0,
-                    startOffset,
-                    startPosition: [0, 0, 0],
-                    startTarget: [0, 0, 0],
-                    observer: preview.observer
-                };
-                updateTransformInputs(startOffset);
-                refreshSelectionFacts();
-                refreshActiveView();
-                canvas.setPointerCapture(event.pointerId);
+            const preview = previewWorldAndObserver();
+            const groupIndex = Juggler.Preview.pickGroup(preview.world, preview.observer, point[0], point[1]);
+            if (groupIndex === null) {
+                setStatus("No group under pointer.");
+                return;
             }
+            selectedGroupIndex = groupIndex;
+            const startOffset = Juggler.Transforms.offsetFor(groupTransforms, groupIndex);
+            pointerDrag = {
+                mode: "scene-edit",
+                startX: point[0],
+                startY: point[1],
+                startAngle: 0,
+                startHeight: 0,
+                startOffset,
+                startPosition: [0, 0, 0],
+                startTarget: [0, 0, 0],
+                observer: preview.observer
+            };
+            updateTransformInputs(startOffset);
+            refreshSelectionFacts();
+            updateCanvasHint();
+            refreshActiveView();
+            canvas.setPointerCapture(event.pointerId);
         }
         function handleCanvasPointerMove(event) {
-            if (!pointerDrag || readPreviewMode() === "raytrace") {
+            if (!pointerDrag) {
                 return;
             }
+            event.preventDefault();
             const point = canvasPoint(event);
             const dx = point[0] - pointerDrag.startX;
             const dy = point[1] - pointerDrag.startY;
-            if (pointerDrag.tool === "orbit-camera") {
-                orbitEnabledInput.checked = true;
-                orbitAngleInput.value = String(normalizeAngle(pointerDrag.startAngle + dx * 0.5));
-                if (event.shiftKey) {
-                    orbitHeightInput.value = String(clampNumber(pointerDrag.startHeight - dy * 0.04, -80, 80, 0).toFixed(2));
-                }
-                refreshCameraFacts();
-                refreshActiveView();
-                return;
-            }
-            if (pointerDrag.tool === "free-camera" && pointerDrag.observer) {
-                if (event.shiftKey) {
-                    const scale = Math.max(0.01, Juggler.Math3.length(Juggler.Math3.sub(pointerDrag.startTarget, pointerDrag.startPosition)) / 320);
-                    const move = Juggler.Math3.add(Juggler.Math3.mul(pointerDrag.observer.uhat, dx * scale), Juggler.Math3.mul(pointerDrag.observer.vhat, -dy * scale));
-                    setFreeCameraPose({
-                        position: Juggler.Math3.add(pointerDrag.startPosition, move),
-                        target: Juggler.Math3.add(pointerDrag.startTarget, move),
-                        focalLength: active.parsed.focalLength
-                    });
-                    return;
-                }
-                const startDirection = Juggler.Math3.normalize(Juggler.Math3.sub(pointerDrag.startTarget, pointerDrag.startPosition));
-                const distance = Math.max(0.1, Juggler.Math3.length(Juggler.Math3.sub(pointerDrag.startTarget, pointerDrag.startPosition)));
-                const yawed = rotateAroundAxis(startDirection, [0, 0, 1], -dx * 0.01);
-                const pitched = rotateAroundAxis(yawed, pointerDrag.observer.uhat, dy * 0.01);
-                const direction = Juggler.Math3.normalize(pitched);
-                setFreeCameraPose({
-                    position: [...pointerDrag.startPosition],
-                    target: Juggler.Math3.add(pointerDrag.startPosition, Juggler.Math3.mul(direction, distance)),
+            if (pointerDrag.mode === "orbit") {
+                markExperienceCustom();
+                setFreeCameraPose(Juggler.Viewport.orbitPoseFromDrag({
+                    position: pointerDrag.startPosition,
+                    target: pointerDrag.startTarget,
                     focalLength: active.parsed.focalLength
-                });
+                }, dx, dy));
                 return;
             }
-            if (pointerDrag.tool === "move-group" && selectedGroupIndex !== null && pointerDrag.observer) {
-                const scale = Math.max(0.01, readNumber(orbitRadiusInput.value, 10) / 320);
-                const planeMove = Juggler.Math3.add(Juggler.Math3.mul(pointerDrag.observer.uhat, dx * scale), Juggler.Math3.mul(pointerDrag.observer.vhat, -dy * scale));
-                const nextOffset = Juggler.Math3.add(pointerDrag.startOffset, planeMove);
-                setSelectedTransform(nextOffset);
+            if (pointerDrag.mode === "pan" && pointerDrag.observer) {
+                markExperienceCustom();
+                setFreeCameraPose(Juggler.Viewport.panPoseFromDrag({
+                    position: pointerDrag.startPosition,
+                    target: pointerDrag.startTarget,
+                    focalLength: active.parsed.focalLength
+                }, pointerDrag.observer, dx, dy));
+                return;
+            }
+            if (pointerDrag.mode === "scene-edit" && selectedGroupIndex !== null && pointerDrag.observer) {
+                markExperienceCustom();
+                const distance = Math.max(0.1, Juggler.Math3.length(Juggler.Math3.sub(pointerDrag.observer.position, Juggler.Scenes.sceneTarget(active.world))));
+                const scale = Math.max(0.01, distance / 320);
+                setSelectedTransform(Juggler.Viewport.sceneEditOffsetFromDrag(pointerDrag.startOffset, pointerDrag.observer, dx, dy, event.shiftKey, scale));
             }
         }
         function handleCanvasPointerUp(event) {
@@ -5639,38 +6407,20 @@ var Juggler;
             if (hadDrag && readPreviewMode() === "live-raytrace") {
                 refreshActiveView();
             }
+            updateCanvasHint();
         }
         function handleCanvasWheel(event) {
-            if (readPreviewMode() === "raytrace") {
-                return;
-            }
-            if (readMouseTool() === "free-camera") {
-                event.preventDefault();
-                const pose = ensureFreeCameraPose();
-                const direction = Juggler.Math3.normalize(Juggler.Math3.sub(pose.target, pose.position));
-                const step = Math.sign(event.deltaY) * -0.5;
-                const move = Juggler.Math3.mul(direction, step);
-                setFreeCameraPose({
-                    position: Juggler.Math3.add(pose.position, move),
-                    target: Juggler.Math3.add(pose.target, move),
-                    focalLength: pose.focalLength
-                });
-                return;
-            }
-            if (readMouseTool() !== "orbit-camera") {
+            if (!active) {
                 return;
             }
             event.preventDefault();
-            orbitEnabledInput.checked = true;
-            freeCameraPose = null;
-            const current = readNumber(orbitRadiusInput.value, 10);
-            const next = clampNumber(current + Math.sign(event.deltaY) * 0.5, 1, 120, 10);
-            orbitRadiusInput.value = String(next);
-            refreshCameraFacts();
-            refreshActiveView();
+            markExperienceCustom();
+            setFreeCameraPose(Juggler.Viewport.dollyPose(ensureFreeCameraPose(), event.deltaY));
         }
         function previewWorldAndObserver() {
-            const [width, height] = parseResolution();
+            const fallback = parseResolution();
+            const width = canvas.width || fallback[0];
+            const height = canvas.height || fallback[1];
             const motionSettings = readSceneMotionSettings();
             const world = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
             const observer = createDisplayObserver(width, height);
@@ -5732,6 +6482,7 @@ var Juggler;
             transformZInput.disabled = !hasSelection;
             resetGroupTransformButton.disabled = !hasSelection;
             setFacts(selectionFacts, [
+                ["Edit mode", sceneEditModeInput.checked ? "on" : "off"],
                 ["Selected", hasSelection ? `Group ${selectedGroupIndex}` : "none"],
                 ["Offset", Juggler.Math3.formatVec(offset, 2)],
                 ["Transforms", String(Object.keys(groupTransforms).length)]
@@ -5796,6 +6547,99 @@ var Juggler;
             resetAnimationBuffer();
             refreshCameraFacts();
             refreshActiveView();
+        }
+        function playLiveRaytrace() {
+            if (!active) {
+                return;
+            }
+            clearPlaybackOnly();
+            updateAnimationButtons(false);
+            if (readPreviewMode() !== "live-raytrace") {
+                previewModeSelect.value = "live-raytrace";
+                markExperienceCustom();
+            }
+            const motionSettings = readSceneMotionSettings();
+            livePlayback = {
+                playing: true,
+                rafId: 0,
+                dueAtMs: performance.now() + 1000 / readAnimationSettingsLenient().fps,
+                sourceFrame: motionSettings.sourceFrame,
+                skippedFrames: 0,
+                lastRenderMs: 0,
+                renderInProgress: false,
+                previousData: null,
+                previousWidth: 0,
+                previousHeight: 0
+            };
+            updateLivePlaybackButtons();
+            refreshLivePlaybackFacts();
+            renderLiveRaytraceFrame(livePlayback.sourceFrame, true);
+            livePlayback.rafId = window.requestAnimationFrame(livePlaybackTick);
+        }
+        function pauseLiveRaytrace() {
+            stopLiveRaytrace(false);
+            abortRenderOnly();
+            setStatus("Live playback paused.");
+        }
+        function stopLiveRaytrace(resetFrame) {
+            if (livePlayback.rafId) {
+                window.cancelAnimationFrame(livePlayback.rafId);
+            }
+            livePlayback.playing = false;
+            livePlayback.rafId = 0;
+            livePlayback.renderInProgress = false;
+            if (resetFrame) {
+                livePlayback.sourceFrame = readSceneMotionSettings().sourceFrame;
+                livePlayback.skippedFrames = 0;
+                livePlayback.previousData = null;
+            }
+            updateLivePlaybackButtons();
+            refreshLivePlaybackFacts();
+        }
+        function livePlaybackTick(nowMs) {
+            if (!livePlayback.playing) {
+                return;
+            }
+            const fps = readAnimationSettingsLenient().fps;
+            const frameCount = Juggler.Motion.sourceFrameCount(readSceneMotionSettings().motionId);
+            const advanced = Juggler.LivePlayback.advance(livePlayback.sourceFrame, frameCount, fps, livePlayback.dueAtMs, nowMs, livePlayback.renderInProgress);
+            const hadDueFrame = advanced.dueAtMs !== livePlayback.dueAtMs;
+            if (hadDueFrame) {
+                livePlayback.sourceFrame = advanced.frame;
+                livePlayback.skippedFrames += advanced.skippedFrames;
+                livePlayback.dueAtMs = advanced.dueAtMs;
+                motionFrameInput.value = String(livePlayback.sourceFrame);
+                renderFacts();
+                refreshAnimationFacts();
+                if (!livePlayback.renderInProgress) {
+                    renderLiveRaytraceFrame(livePlayback.sourceFrame, true);
+                }
+            }
+            refreshLivePlaybackFacts();
+            livePlayback.rafId = window.requestAnimationFrame(livePlaybackTick);
+        }
+        function updateLivePlaybackButtons() {
+            playLiveButton.disabled = livePlayback.playing;
+            pauseLiveButton.disabled = !livePlayback.playing;
+        }
+        function refreshLivePlaybackFacts() {
+            const fps = active ? readAnimationSettingsLenient().fps : 0;
+            const motionSettings = active ? readSceneMotionSettings() : { motionId: "static", sourceFrame: 0 };
+            setFacts(livePlaybackFacts, [
+                ["Live playback", livePlayback.playing ? "playing" : "paused"],
+                ["Source frame", active && motionSettings.motionId !== "static" ? Juggler.Motion.sourceFrameLabel(livePlayback.sourceFrame) : "static"],
+                ["FPS target", fps ? String(fps) : "n/a"],
+                ["Last render", livePlayback.lastRenderMs ? `${livePlayback.lastRenderMs.toFixed(0)} ms` : "n/a"],
+                ["Skipped", String(livePlayback.skippedFrames)]
+            ]);
+            updateLivePlaybackButtons();
+        }
+        function livePlaybackStatus(sourceFrame, width, height, stats) {
+            const motionSettings = readSceneMotionSettings();
+            const frameLabel = motionSettings.motionId === "static" ? "static" : Juggler.Motion.sourceFrameLabel(sourceFrame);
+            return (`Live ${frameLabel}, ${readAnimationSettingsLenient().fps} fps target, ` +
+                `${livePlayback.lastRenderMs.toFixed(0)} ms render, ${livePlayback.skippedFrames} skipped, ` +
+                `${width} x ${height}, ${stats.rays} rays`);
         }
         function renderAnimation() {
             if (!context || !active) {
@@ -5867,6 +6711,7 @@ var Juggler;
             if (!animationFrames.length) {
                 return;
             }
+            stopLiveRaytrace(true);
             pauseAnimation();
             const fps = readAnimationSettingsLenient().fps;
             playAnimationButton.disabled = true;
@@ -5993,11 +6838,16 @@ var Juggler;
             setStatus(`Exported JSON manifest (${formatBytes(blob.size)})`);
         }
         function abortWork() {
+            stopLiveRaytrace(true);
+            abortRenderOnly();
+            clearPlaybackOnly();
+            updateAnimationButtons(false);
+        }
+        function abortRenderOnly() {
             abortToken += 1;
             cleanupRenderWorker();
-            clearPlaybackOnly();
             renderButton.disabled = false;
-            updateAnimationButtons(false);
+            livePlayback.renderInProgress = false;
         }
         function renderStillInWorker(token, width, height, motionSettings, renderOptions, profile, displayConstraint) {
             const worker = createRenderWorker();
@@ -6029,6 +6879,7 @@ var Juggler;
                 const seconds = message.renderMs / 1000;
                 setStatus(`Done in ${seconds.toFixed(2)}s worker, ${profile.label}, ${active.world.spheres.length} spheres, ` +
                     `${Juggler.Display.labelFor(displayConstraint)} display, ${Juggler.Renderer.qualityLabelFor(renderOptions.qualityId ?? "legacy")}, ` +
+                    `${Juggler.Experience.effectsSummary(renderOptions.modernEffects ?? Juggler.Experience.disabledModernEffects())}, ` +
                     `${Juggler.Motion.motionSummary(active.parsed, motionSettings)}, ` +
                     `${message.stats.rays} rays, ${message.stats.sphereTests ?? 0} sphere tests`);
             };
@@ -6200,6 +7051,7 @@ var Juggler;
                 ["Display", Juggler.Display.labelFor(readDisplayConstraint())],
                 ["Quality", Juggler.Renderer.qualityLabelFor(readRenderQuality())],
                 ["Anti-alias", Juggler.Renderer.antiAliasLabelFor(readEffectiveAntiAliasMode())],
+                ["Modern effects", Juggler.Experience.effectsSummary(readModernEffects())],
                 ["Min clearance", diagnostics ? diagnostics.minBodyClearance.toFixed(2) : "n/a"],
                 ["Min ball spacing", diagnostics ? diagnostics.minBallClearance.toFixed(2) : "n/a"],
                 ["WebM", pickVideoMimeType("webm") ? "available" : "unavailable"],
@@ -6302,6 +7154,7 @@ var Juggler;
                 displayConstraintId: readDisplayConstraint(),
                 qualityId,
                 antiAliasMode: readEffectiveAntiAliasMode(),
+                modernEffects: readModernEffects(),
                 acceleration: "bvh",
                 tileSize: qualityId === "interactive" ? 16 : 12
             };
@@ -6346,6 +7199,10 @@ var Juggler;
             aaNode.className = "mode-tag mode-tag-neutral";
             aaNode.textContent = `AA ${Juggler.Renderer.antiAliasLabelFor(readEffectiveAntiAliasMode())}`;
             profileIndicators.appendChild(aaNode);
+            const effectsNode = document.createElement("span");
+            effectsNode.className = "mode-tag mode-tag-neutral";
+            effectsNode.textContent = `FX ${Juggler.Experience.effectsSummary(readModernEffects())}`;
+            profileIndicators.appendChild(effectsNode);
         }
         function copyAnimationSettings(settings) {
             return {
@@ -6457,10 +7314,6 @@ var Juggler;
                 heightOffset: Number(orbitHeightInput.value) || 0
             };
         }
-        function readMouseTool() {
-            const requested = mouseToolSelect.value;
-            return requested === "orbit-camera" || requested === "free-camera" || requested === "move-group" || requested === "none" ? requested : "orbit-camera";
-        }
         function readRowsPerTick() {
             return Math.max(1, Math.min(32, Number(rowsPerTickInput.value) || 4));
         }
@@ -6538,6 +7391,23 @@ var Juggler;
         function previewModeLabel(modeId) {
             return Juggler.Preview.MODES.find((mode) => mode.id === modeId)?.label ?? modeId;
         }
+        function updateCanvasHint() {
+            if (sceneEditModeInput.checked) {
+                canvasHintElement.textContent = pointerDrag?.mode === "scene-edit"
+                    ? "Scene Edit: drag moves selection, Shift-drag moves through depth"
+                    : "Scene Edit: click a sphere group, drag move, Shift-drag depth";
+                return;
+            }
+            if (pointerDrag?.mode === "pan") {
+                canvasHintElement.textContent = "Canvas: panning camera";
+                return;
+            }
+            if (pointerDrag?.mode === "orbit") {
+                canvasHintElement.textContent = "Canvas: orbiting camera";
+                return;
+            }
+            canvasHintElement.textContent = "Canvas: drag orbit, Shift/right drag pan, wheel dolly";
+        }
         function setStatus(text) {
             statusElement.textContent = text;
         }
@@ -6554,30 +7424,6 @@ window.addEventListener("DOMContentLoaded", () => Juggler.App.start());
         win.setAttribute('data-collapsed', isCollapsed ? 'false' : 'true');
       });
     });
-
-    // CRT emulation mode cycle
-    var scanBtn = document.getElementById('scanlineToggle');
-    if (scanBtn) {
-      var crtModes = [
-        { id: 'off', label: 'CRT OFF', active: 'false' },
-        { id: 'scanlines', label: 'CRT SCAN', active: 'true' },
-        { id: 'slot-mask', label: 'CRT SLOT', active: 'true' },
-        { id: 'soft-glow', label: 'CRT SOFT', active: 'true' }
-      ];
-      var crtModeIndex = 1;
-      function applyCrtMode() {
-        var mode = crtModes[crtModeIndex];
-        document.body.setAttribute('data-crt-mode', mode.id);
-        scanBtn.textContent = mode.label;
-        scanBtn.setAttribute('data-active', mode.active);
-        scanBtn.setAttribute('title', 'CRT mode: ' + mode.label);
-      }
-      applyCrtMode();
-      scanBtn.addEventListener('click', function() {
-        crtModeIndex = (crtModeIndex + 1) % crtModes.length;
-        applyCrtMode();
-      });
-    }
   </script>
 </body>
 </html>

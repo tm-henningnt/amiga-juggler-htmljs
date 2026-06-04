@@ -20,6 +20,10 @@
 - Modern quality mode now provides opt-in ordered and adaptive 2x anti-aliasing while Legacy remains AA-off.
 - Live Raytrace view and Free camera mode now support session-only free movement with adaptive interactive rendering.
 - CRT emulation now cycles between off, scanline, slot-mask, and soft-glow modes.
+- Classic Source and Modern Studio experience presets now switch the main render/view/profile/camera/CRT/effects defaults while preserving advanced Custom overrides.
+- Modern Studio exposes opt-in deterministic soft shadows, contact ambient occlusion, depth of field, and live motion-blur accumulation as explicitly non-source render modes.
+- Canvas controls now use standard viewport behavior: drag orbit, Shift/right-drag pan, wheel dolly, plus explicit Scene Edit selection and depth movement.
+- Live Raytrace playback now advances reconstructed source frames at the selected FPS and skips stale frames when rendering falls behind.
 - Tests now cover physical cascade anchors, animated body pose, planted feet, body clearance, ball spacing, hand contact, motion metadata, JSON manifests, frame-range rendering, presets, phase labels, and unsupported-scene fallback.
 
 ## Historical Accuracy
@@ -35,7 +39,7 @@
 
 - Continue validating camera setup, sphere hierarchy, material IDs, lighting, and reflections against known original frames.
 - Continue improving measured frame latency and deeper render telemetry.
-- Add optional higher-quality shadows, area lights, depth of field, and motion blur as non-source modes.
+- Continue tuning non-source soft shadows, contact AO, depth of field, and motion blur against browser performance budgets.
 - Investigate a WASM or direct C-port path for stricter renderer parity.
 
 ## Animation

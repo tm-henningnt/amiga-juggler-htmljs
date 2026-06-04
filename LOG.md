@@ -737,3 +737,26 @@ Browser smoke verification opened the generated `index.html` directly from disk 
 - Editing the camera pose switched camera facts to free mode and redrew a nonblank live raytrace.
 - Free-camera wheel dolly redrew a nonblank live raytrace.
 - No runtime errors appeared in the console; the only warning came from verification-time canvas readbacks.
+
+## 2026-06-04: Modern Studio, Viewport Controls, And Live Playback
+
+This pass turned the growing set of render controls into an opt-in experience model while keeping the Workbench shell and Classic Source path intact.
+
+Implemented changes:
+
+- Added Classic Source and Modern Studio presets, with Custom selected automatically after manual advanced edits.
+- Moved the primary flow into a compact command strip for Experience, View, Live playback, Render Still, and Abort.
+- Reorganized dense controls into collapsible Workbench windows for Scene, Camera, Render Details, Modern Effects, Animation, and Diagnostics.
+- Replaced the old mouse-tool selector with normal viewport controls: drag orbit, Shift/right-drag pan, wheel dolly, and explicit Scene Edit mode for group movement/depth movement.
+- Added deterministic non-source render effects: soft shadows, contact ambient occlusion, depth of field, and live motion-blur accumulation.
+- Added Live Raytrace source-frame playback that targets the selected animation FPS and skips stale frames while a render is still active.
+- Recorded modern effect settings in rendered frames and JSON manifests.
+
+Verification:
+
+```bash
+npm test
+npm run build:single
+```
+
+Browser smoke verification was attempted against the generated standalone `index.html`, but browser automation was unavailable in this execution environment. No workaround browser path was used.

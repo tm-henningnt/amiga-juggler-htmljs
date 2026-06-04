@@ -44,6 +44,8 @@ At a high level it supports:
 - Worker-backed still rendering with main-thread fallback.
 - Source-like HAM output and modern RGB output paths.
 - Opt-in modern quality anti-aliasing.
+- Deterministic non-source soft shadows, contact ambient occlusion, and depth of field through `ModernEffectsSettings`.
+- Live motion-blur accumulation for source-frame playback.
 - Optional RGB, OCS 12-bit, Extra Half-Brite-style, and approximate HAM6 display constraints.
 - Render profiles that make historically relevant quirks explicit.
 - Fast wireframe and solid previews for interactive scene inspection.
@@ -58,11 +60,16 @@ Animation resolves two things for each frame:
 
 Camera motion can use static, orbit, dolly, arc, or custom keyframe paths. Scene motion for the juggler is reconstructed from source-frame phase data, ballistic ball arcs, Meatfighter-style body motion, and limb posing.
 
-Rendered animation frames retain metadata for inspection and export, including source-frame labels, camera pose, render profile, ball positions, wrist positions, clearances, timing, and render statistics.
+Rendered animation frames retain metadata for inspection and export, including source-frame labels, camera pose, render profile, modern effects, ball positions, wrist positions, clearances, timing, and render statistics.
+
+Live Raytrace playback is separate from buffered animation playback. It advances reconstructed source frames at the selected FPS and starts a new interactive-quality raytrace only when the previous live render is no longer active. If the clock falls behind, stale source frames are skipped and counted in diagnostics instead of queued.
+
+Modern effects are explicit non-source metadata. Classic Source applies disabled effect settings; Modern Studio enables conservative soft shadow and contact AO defaults while keeping DOF and motion blur available as advanced opt-ins.
 
 ## Module Layout
 
 - `src/types.ts` defines shared scene, render, camera, animation, and motion contracts.
+- `src/experience.ts` defines Classic Source, Modern Studio, and modern effect defaults.
 - `src/parser.ts` parses the original text `.dat` scene format.
 - `src/scenes.ts` expands parsed scenes into renderable worlds and creates observers.
 - `src/renderer.ts` implements the CPU raytracer.
@@ -71,6 +78,8 @@ Rendered animation frames retain metadata for inspection and export, including s
 - `src/display.ts` applies post-render and preview display constraints.
 - `src/preview.ts` projects scene spheres into fast wireframe and solid canvas previews.
 - `src/transforms.ts` applies session-only group offsets for preview and render inspection.
+- `src/viewport.ts` contains testable orbit, pan, dolly, and scene-edit drag math.
+- `src/live-playback.ts` contains source-frame advancement and stale-frame skipping logic for live playback.
 - `src/animation.ts` resolves camera paths, queues frame rendering, and builds animation manifests.
 - `src/motion-data.ts` stores reconstruction constants and reference-derived screen anchors.
 - `src/motion.ts` resolves reconstructed juggler ball, body, limb, and diagnostic motion.
@@ -118,4 +127,6 @@ Manual browser checks should use the standalone `index.html` loaded from disk. T
 - Check that exported frame numbers and source-frame labels match the requested range.
 - Export a JSON animation manifest and inspect its frame metadata.
 - Switch render profiles, display constraints, preview modes, quality modes, and CRT display modes.
-- In preview modes, test mouse orbit, free camera movement, wheel dolly/zoom, group picking, and temporary group transforms.
+- Apply Classic Source and Modern Studio presets and confirm the Diagnostics window reports the expected profile/display/quality/AA/effect state.
+- In canvas modes, test drag orbit, Shift/right-drag pan, wheel dolly, Scene Edit group picking, view-plane movement, depth movement, and reset camera.
+- Start Live playback in Live Raytrace mode and confirm source frames advance, stale-frame count remains visible, and frames stay nonblank.

@@ -326,16 +326,44 @@ namespace Juggler.Renderer {
     ];
 
     for (const lamp of world.lamps) {
-      const lampVector = Math3.sub(lamp.position, patch.position);
+      const direct = directLampBrightness(patch, lamp, world, options, stats, sphereIndex);
+      for (let channel = 0; channel < 3; channel += 1) {
+        brightness[channel] += direct[channel];
+      }
+    }
+
+    const ao = ambientOcclusion(patch, world, options);
+    return ao > 0 ? Math3.mul(brightness, 1 - ao) : brightness;
+  }
+
+  function directLampBrightness(
+    patch: HitPatch,
+    lamp: Lamp,
+    world: World,
+    options: RenderOptions,
+    stats: RenderStats,
+    sphereIndex: SphereIndex | null
+  ): Vec3 {
+    const effects = options.modernEffects;
+    const shadow = effects?.softShadows;
+    const usingSoftShadow = !!shadow?.enabled;
+    const samples = usingSoftShadow ? Math.max(1, Math.min(16, Math.round(shadow.samples))) : 1;
+    const total: Vec3 = [0, 0, 0];
+
+    for (let sample = 0; sample < samples; sample += 1) {
+      const lampPosition = sampledLampPosition(patch.position, lamp, sample, samples, shadow?.enabled ? shadow.radius : 0);
+      const lampVector = Math3.sub(lampPosition, patch.position);
       const cosi = Math3.dot(lampVector, patch.normal);
       if (cosi <= 0) {
         continue;
       }
-
       const shadowRay: Ray = { origin: patch.position, direction: lampVector };
       const shadowed = sphereIndex
         ? sphereIndex.anyHit(shadowRay, options.epsilon, stats, patch.sphere)
         : anySphereHit(shadowRay, world.spheres, options.epsilon, stats, patch.sphere);
+      if (usingSoftShadow) {
+        incrementStat(stats, "modernEffectSamples");
+      }
       if (shadowed) {
         continue;
       }
@@ -343,11 +371,100 @@ namespace Juggler.Renderer {
       const r = Math.sqrt(Math3.dot(lampVector, lampVector));
       const direct = cosi / (r * r * r);
       for (let channel = 0; channel < 3; channel += 1) {
-        brightness[channel] += direct * patch.color[channel] * lamp.color[channel];
+        total[channel] += direct * patch.color[channel] * lamp.color[channel];
       }
     }
 
-    return brightness;
+    return Math3.mul(total, 1 / samples);
+  }
+
+  function lampVisibility(
+    patch: HitPatch,
+    lamp: Lamp,
+    world: World,
+    options: RenderOptions,
+    stats: RenderStats,
+    sphereIndex: SphereIndex | null
+  ): number {
+    const effects = options.modernEffects;
+    const shadow = effects?.softShadows;
+    const usingSoftShadow = !!shadow?.enabled;
+    const samples = usingSoftShadow ? Math.max(1, Math.min(16, Math.round(shadow.samples))) : 1;
+    let visible = 0;
+    for (let sample = 0; sample < samples; sample += 1) {
+      const lampPosition = sampledLampPosition(patch.position, lamp, sample, samples, shadow?.enabled ? shadow.radius : 0);
+      const lampVector = Math3.sub(lampPosition, patch.position);
+      const cosi = Math3.dot(lampVector, patch.normal);
+      if (cosi <= 0) {
+        continue;
+      }
+      const shadowRay: Ray = { origin: patch.position, direction: lampVector };
+      const shadowed = sphereIndex
+        ? sphereIndex.anyHit(shadowRay, options.epsilon, stats, patch.sphere)
+        : anySphereHit(shadowRay, world.spheres, options.epsilon, stats, patch.sphere);
+      if (usingSoftShadow) {
+        incrementStat(stats, "modernEffectSamples");
+      }
+      if (!shadowed) {
+        visible += 1;
+      }
+    }
+    return visible / samples;
+  }
+
+  function sampledLampPosition(patchPosition: Vec3, lamp: Lamp, sample: number, samples: number, radius = 0): Vec3 {
+    if (radius <= 0 || samples <= 1) {
+      return lamp.position;
+    }
+    const toLamp = Math3.normalize(Math3.sub(lamp.position, patchPosition));
+    const fallback: Vec3 = Math.abs(toLamp[2]) > 0.9 ? [0, 1, 0] : [0, 0, 1];
+    const basisU = Math3.normalize(Math3.cross(toLamp, fallback));
+    const basisV = Math3.normalize(Math3.cross(toLamp, basisU));
+    const angle = (sample * 2.399963229728653) % (Math.PI * 2);
+    const ring = (sample + 0.5) / samples;
+    const distance = Math.sqrt(ring) * radius;
+    return Math3.add(
+      lamp.position,
+      Math3.add(
+        Math3.mul(basisU, Math.cos(angle) * distance),
+        Math3.mul(basisV, Math.sin(angle) * distance)
+      )
+    );
+  }
+
+  function ambientOcclusion(patch: HitPatch, world: World, options: RenderOptions): number {
+    const settings = options.modernEffects?.ambientOcclusion;
+    if (!settings?.enabled || settings.strength <= 0 || settings.radius <= 0) {
+      return 0;
+    }
+
+    let occlusion = 0;
+    if (patch.sphere) {
+      const groundGap = Math.max(0, patch.sphere.position[2] - patch.sphere.radius);
+      const bottomFacing = Math.max(0, -patch.normal[2]);
+      occlusion += Math.max(0, 1 - groundGap / settings.radius) * bottomFacing;
+      for (const sphere of world.spheres) {
+        if (sphere === patch.sphere) {
+          continue;
+        }
+        const centerGap = Math3.length(Math3.sub(sphere.position, patch.sphere.position)) - sphere.radius - patch.sphere.radius;
+        if (centerGap > settings.radius) {
+          continue;
+        }
+        const towardSphere = Math3.normalize(Math3.sub(sphere.position, patch.position));
+        const facing = Math.max(0, Math3.dot(patch.normal, towardSphere));
+        occlusion += Math.max(0, 1 - Math.max(0, centerGap) / settings.radius) * facing * 0.35;
+      }
+    } else {
+      for (const sphere of world.spheres) {
+        const planar = Math.hypot(sphere.position[0] - patch.position[0], sphere.position[1] - patch.position[1]);
+        const height = Math.max(0, sphere.position[2] - sphere.radius);
+        const contact = planar + height * 0.6;
+        occlusion += Math.max(0, 1 - contact / Math.max(0.001, sphere.radius * settings.radius)) * 0.7;
+      }
+    }
+
+    return Math.max(0, Math.min(0.65, occlusion * settings.strength));
   }
 
   function glint(
@@ -368,11 +485,7 @@ namespace Juggler.Renderer {
         continue;
       }
 
-      const shadowRay: Ray = { origin: patch.position, direction: lampVector };
-      const shadowed = sphereIndex
-        ? sphereIndex.anyHit(shadowRay, options.epsilon, stats, patch.sphere)
-        : anySphereHit(shadowRay, world.spheres, options.epsilon, stats, patch.sphere);
-      if (shadowed) {
+      if (lampVisibility(patch, lamp, world, options, stats, sphereIndex) <= 0.5) {
         continue;
       }
 
@@ -484,30 +597,75 @@ namespace Juggler.Renderer {
   ): Vec3 {
     const antiAliasMode = options.antiAliasMode ?? "off";
     if (antiAliasMode === "off") {
-      return trace(pixelRay(observer, x, y), world, options, stats, 0, sphereIndex);
+      return traceCameraSample(observer, x, y, 0, 0, world, options, stats, sphereIndex);
     }
 
     if (antiAliasMode === "ordered-2x") {
       return averageBrightness([
-        trace(pixelRaySample(observer, x, y, 0.25, 0.25), world, options, stats, 0, sphereIndex),
-        trace(pixelRaySample(observer, x, y, 0.75, 0.25), world, options, stats, 0, sphereIndex),
-        trace(pixelRaySample(observer, x, y, 0.25, 0.75), world, options, stats, 0, sphereIndex),
-        trace(pixelRaySample(observer, x, y, 0.75, 0.75), world, options, stats, 0, sphereIndex)
+        traceCameraSample(observer, x, y, 0.25, 0.25, world, options, stats, sphereIndex),
+        traceCameraSample(observer, x, y, 0.75, 0.25, world, options, stats, sphereIndex),
+        traceCameraSample(observer, x, y, 0.25, 0.75, world, options, stats, sphereIndex),
+        traceCameraSample(observer, x, y, 0.75, 0.75, world, options, stats, sphereIndex)
       ]);
     }
 
-    const center = trace(pixelRay(observer, x, y), world, options, stats, 0, sphereIndex);
-    const a = trace(pixelRaySample(observer, x, y, 0.25, 0.25), world, options, stats, 0, sphereIndex);
-    const b = trace(pixelRaySample(observer, x, y, 0.75, 0.75), world, options, stats, 0, sphereIndex);
+    const center = traceCameraSample(observer, x, y, 0, 0, world, options, stats, sphereIndex);
+    const a = traceCameraSample(observer, x, y, 0.25, 0.25, world, options, stats, sphereIndex);
+    const b = traceCameraSample(observer, x, y, 0.75, 0.75, world, options, stats, sphereIndex);
     if (colorDistance(center, a) + colorDistance(center, b) < 0.08) {
       return center;
     }
     return averageBrightness([
       a,
-      trace(pixelRaySample(observer, x, y, 0.75, 0.25), world, options, stats, 0, sphereIndex),
-      trace(pixelRaySample(observer, x, y, 0.25, 0.75), world, options, stats, 0, sphereIndex),
+      traceCameraSample(observer, x, y, 0.75, 0.25, world, options, stats, sphereIndex),
+      traceCameraSample(observer, x, y, 0.25, 0.75, world, options, stats, sphereIndex),
       b
     ]);
+  }
+
+  function traceCameraSample(
+    observer: Observer,
+    x: number,
+    y: number,
+    dx: number,
+    dy: number,
+    world: World,
+    options: RenderOptions,
+    stats: RenderStats,
+    sphereIndex: SphereIndex | null
+  ): Vec3 {
+    const settings = options.modernEffects?.depthOfField;
+    if (!settings?.enabled || settings.aperture <= 0 || settings.samples <= 1) {
+      return trace(pixelRaySample(observer, x, y, dx, dy), world, options, stats, 0, sphereIndex);
+    }
+
+    const samples = Math.max(2, Math.min(16, Math.round(settings.samples)));
+    const centerRay = pixelRaySample(observer, x, y, dx, dy);
+    const focusDistance = Math.max(0.1, settings.focusDistance);
+    const focusPoint = Math3.add(centerRay.origin, Math3.mul(Math3.normalize(centerRay.direction), focusDistance));
+    const total: Vec3 = [0, 0, 0];
+    for (let sample = 0; sample < samples; sample += 1) {
+      const lens = deterministicDiskSample(sample, samples, settings.aperture);
+      const origin = Math3.add(
+        observer.position,
+        Math3.add(Math3.mul(observer.uhat, lens[0]), Math3.mul(observer.vhat, lens[1]))
+      );
+      const brightness = trace({ origin, direction: Math3.sub(focusPoint, origin) }, world, options, stats, 0, sphereIndex);
+      total[0] += brightness[0];
+      total[1] += brightness[1];
+      total[2] += brightness[2];
+      incrementStat(stats, "modernEffectSamples");
+    }
+    return Math3.mul(total, 1 / samples);
+  }
+
+  function deterministicDiskSample(sample: number, samples: number, radius: number): [number, number] {
+    if (sample === 0) {
+      return [0, 0];
+    }
+    const angle = (sample * 2.399963229728653) % (Math.PI * 2);
+    const distance = Math.sqrt((sample + 0.5) / samples) * radius;
+    return [Math.cos(angle) * distance, Math.sin(angle) * distance];
   }
 
   function averageBrightness(samples: Vec3[]): Vec3 {
@@ -522,6 +680,25 @@ namespace Juggler.Renderer {
 
   function colorDistance(a: Vec3, b: Vec3): number {
     return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+  }
+
+  export function blendMotionSamples(
+    current: Uint8ClampedArray,
+    previous: Uint8ClampedArray | null,
+    settings: MotionBlurSettings | undefined
+  ): Uint8ClampedArray {
+    if (!previous || !settings?.enabled || settings.strength <= 0 || current.length !== previous.length) {
+      return current;
+    }
+    const strength = Math.max(0, Math.min(0.85, settings.strength));
+    const blended = new Uint8ClampedArray(current.length);
+    for (let i = 0; i < current.length; i += 4) {
+      blended[i] = Math3.clampByte(current[i] * (1 - strength) + previous[i] * strength);
+      blended[i + 1] = Math3.clampByte(current[i + 1] * (1 - strength) + previous[i + 1] * strength);
+      blended[i + 2] = Math3.clampByte(current[i + 2] * (1 - strength) + previous[i + 2] * strength);
+      blended[i + 3] = 255;
+    }
+    return blended;
   }
 
   export function qualityLabelFor(id: RenderQualityId): string {
@@ -705,7 +882,10 @@ namespace Juggler.Renderer {
     return true;
   }
 
-  function incrementStat(stats: RenderStats, key: keyof Pick<RenderStats, "sphereTests" | "bvhNodeTests" | "pixels" | "tiles">): void {
+  function incrementStat(
+    stats: RenderStats,
+    key: keyof Pick<RenderStats, "sphereTests" | "bvhNodeTests" | "pixels" | "tiles" | "modernEffectSamples">
+  ): void {
     stats[key] = (stats[key] ?? 0) + 1;
   }
 

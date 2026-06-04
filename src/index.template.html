@@ -32,6 +32,21 @@
           <div class="canvas-frame">
             <canvas id="frame" width="320" height="200"></canvas>
           </div>
+          <div class="command-strip" aria-label="Primary render commands">
+            <label>
+              Experience
+              <select id="experiencePreset"></select>
+            </label>
+            <label>
+              View
+              <select id="previewMode"></select>
+            </label>
+            <button id="playLive">Play Live</button>
+            <button id="pauseLive" disabled>Pause</button>
+            <button id="render">Render Still</button>
+            <button id="abort">Abort</button>
+          </div>
+          <div id="canvasHint" class="canvas-hint">Canvas: drag orbit, Shift/right drag pan, wheel dolly</div>
           <div class="status-strip">
             <span id="status">Ready</span>
             <progress id="progress" max="1" value="0"></progress>
@@ -65,14 +80,13 @@
             Source frame
             <input id="motionFrame" type="range" min="0" max="0" value="0">
           </label>
-          <dl id="sceneFacts" class="facts"></dl>
         </div>
       </section>
 
-      <section class="wb-window" data-collapsed="false" aria-labelledby="title-render">
+      <section class="wb-window" data-collapsed="true" aria-labelledby="title-render">
         <div class="wb-titlebar">
           <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
-          <span class="wb-title-text" id="title-render">Render</span>
+          <span class="wb-title-text" id="title-render">Render Details</span>
           <span class="wb-gadget wb-gadget-depth" aria-hidden="true"></span>
         </div>
         <div class="wb-body">
@@ -84,10 +98,6 @@
               <option value="640x400">640 x 400 doubled</option>
               <option value="800x600">800 x 600</option>
             </select>
-          </label>
-          <label>
-            View
-            <select id="previewMode"></select>
           </label>
           <label>
             Profile
@@ -105,7 +115,6 @@
             Anti-alias
             <select id="antiAlias"></select>
           </label>
-          <div id="profileIndicators" class="mode-indicators" aria-live="polite"></div>
           <label>
             Rows per tick
             <input id="rowsPerTick" type="range" min="1" max="32" value="4">
@@ -114,10 +123,6 @@
             Mirror depth
             <input id="maxDepth" type="number" min="1" max="8" value="4">
           </label>
-          <div class="button-row">
-            <button id="render">Render Still</button>
-            <button id="abort">Abort</button>
-          </div>
         </div>
       </section>
 
@@ -176,20 +181,9 @@
             <button id="writeCameraPose">Use Pose</button>
             <button id="resetCameraPose">Reset Camera</button>
           </div>
-          <dl id="cameraFacts" class="facts"></dl>
-        </div>
-      </section>
-
-      <section class="wb-window" data-collapsed="true" aria-labelledby="title-interactive">
-        <div class="wb-titlebar">
-          <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
-          <span class="wb-title-text" id="title-interactive">Interactive</span>
-          <span class="wb-gadget wb-gadget-depth" aria-hidden="true"></span>
-        </div>
-        <div class="wb-body">
-          <label>
-            Mouse tool
-            <select id="mouseTool"></select>
+          <label class="check-row">
+            <input id="sceneEditMode" type="checkbox">
+            Scene Edit
           </label>
           <dl id="selectionFacts" class="facts"></dl>
           <div class="split-row">
@@ -209,6 +203,76 @@
           <div class="button-row">
             <button id="resetGroupTransform">Reset Group</button>
             <button id="resetAllTransforms">Reset All</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="wb-window" data-collapsed="true" aria-labelledby="title-effects">
+        <div class="wb-titlebar">
+          <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
+          <span class="wb-title-text" id="title-effects">Modern Effects</span>
+          <span class="wb-gadget wb-gadget-depth" aria-hidden="true"></span>
+        </div>
+        <div class="wb-body">
+          <label class="check-row">
+            <input id="softShadowsEnabled" type="checkbox">
+            Soft shadows
+          </label>
+          <div class="split-row">
+            <label>
+              Shadow samples
+              <input id="softShadowSamples" type="number" min="1" max="16" step="1" value="1">
+            </label>
+            <label>
+              Shadow radius
+              <input id="softShadowRadius" type="number" min="0" max="3" step="0.05" value="0">
+            </label>
+          </div>
+          <label class="check-row">
+            <input id="ambientOcclusionEnabled" type="checkbox">
+            Contact AO
+          </label>
+          <div class="split-row">
+            <label>
+              AO strength
+              <input id="ambientOcclusionStrength" type="number" min="0" max="1" step="0.01" value="0">
+            </label>
+            <label>
+              AO radius
+              <input id="ambientOcclusionRadius" type="number" min="0.1" max="4" step="0.05" value="1">
+            </label>
+          </div>
+          <label class="check-row">
+            <input id="depthOfFieldEnabled" type="checkbox">
+            Depth of field
+          </label>
+          <div class="split-row">
+            <label>
+              Lens samples
+              <input id="depthOfFieldSamples" type="number" min="1" max="16" step="1" value="1">
+            </label>
+            <label>
+              Aperture
+              <input id="depthOfFieldAperture" type="number" min="0" max="0.25" step="0.005" value="0">
+            </label>
+          </div>
+          <label>
+            Focus distance
+            <input id="depthOfFieldFocus" type="number" min="0.5" max="80" step="0.25" value="10">
+          </label>
+          <label class="check-row">
+            <input id="motionBlurEnabled" type="checkbox">
+            Motion blur
+          </label>
+          <div class="split-row">
+            <label>
+              Blur strength
+              <input id="motionBlurStrength" type="number" min="0" max="0.85" step="0.01" value="0">
+            </label>
+            <label>
+              Blur samples
+              <input id="motionBlurSamples" type="number" min="1" max="4" step="1" value="1">
+            </label>
           </div>
         </div>
       </section>
@@ -305,6 +369,20 @@
             <button id="exportPng" disabled>PNG</button>
             <button id="exportManifest" disabled>JSON</button>
           </div>
+        </div>
+      </section>
+
+      <section class="wb-window" data-collapsed="true" aria-labelledby="title-diagnostics">
+        <div class="wb-titlebar">
+          <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
+          <span class="wb-title-text" id="title-diagnostics">Diagnostics</span>
+          <span class="wb-gadget wb-gadget-depth" aria-hidden="true"></span>
+        </div>
+        <div class="wb-body">
+          <div id="profileIndicators" class="mode-indicators" aria-live="polite"></div>
+          <dl id="livePlaybackFacts" class="facts"></dl>
+          <dl id="sceneFacts" class="facts"></dl>
+          <dl id="cameraFacts" class="facts"></dl>
           <dl id="animationFacts" class="facts"></dl>
         </div>
       </section>
@@ -341,30 +419,6 @@
         win.setAttribute('data-collapsed', isCollapsed ? 'false' : 'true');
       });
     });
-
-    // CRT emulation mode cycle
-    var scanBtn = document.getElementById('scanlineToggle');
-    if (scanBtn) {
-      var crtModes = [
-        { id: 'off', label: 'CRT OFF', active: 'false' },
-        { id: 'scanlines', label: 'CRT SCAN', active: 'true' },
-        { id: 'slot-mask', label: 'CRT SLOT', active: 'true' },
-        { id: 'soft-glow', label: 'CRT SOFT', active: 'true' }
-      ];
-      var crtModeIndex = 1;
-      function applyCrtMode() {
-        var mode = crtModes[crtModeIndex];
-        document.body.setAttribute('data-crt-mode', mode.id);
-        scanBtn.textContent = mode.label;
-        scanBtn.setAttribute('data-active', mode.active);
-        scanBtn.setAttribute('title', 'CRT mode: ' + mode.label);
-      }
-      applyCrtMode();
-      scanBtn.addEventListener('click', function() {
-        crtModeIndex = (crtModeIndex + 1) % crtModes.length;
-        applyCrtMode();
-      });
-    }
   </script>
 </body>
 </html>

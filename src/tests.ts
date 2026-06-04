@@ -120,6 +120,32 @@ namespace Juggler.Tests {
     assert(stats.mirrorFallbacks === 1, "source quirk fallback counted");
   }
 
+  function testExperiencePresets(): void {
+    const classic = Experience.byId("classic-source");
+    assert(classic.previewMode === "raytrace", "classic uses still raytrace");
+    assert(classic.profileId === "reference", "classic uses reference profile");
+    assert(classic.displayConstraintId === "ham6-approx", "classic uses source-like display");
+    assert(classic.qualityId === "legacy", "classic uses legacy quality");
+    assert(classic.antiAliasMode === "off", "classic disables AA");
+    assert(classic.useSourceCamera, "classic uses source camera");
+    assert(classic.crtMode === "scanlines", "classic uses scanlines");
+    assert(!classic.modernEffects.softShadows.enabled, "classic disables soft shadows");
+    assert(!classic.modernEffects.ambientOcclusion.enabled, "classic disables AO");
+    assert(!classic.modernEffects.depthOfField.enabled, "classic disables DOF");
+    assert(!classic.modernEffects.motionBlur.enabled, "classic disables motion blur");
+
+    const modern = Experience.byId("modern-studio");
+    assert(modern.previewMode === "live-raytrace", "modern uses live raytrace");
+    assert(modern.profileId === "wright-rgb", "modern uses RGB profile");
+    assert(modern.displayConstraintId === "rgb", "modern uses RGB display");
+    assert(modern.qualityId === "modern-quality", "modern uses modern quality");
+    assert(modern.antiAliasMode === "adaptive-2x", "modern uses adaptive AA");
+    assert(!modern.useSourceCamera && modern.orbit.enabled, "modern uses editable orbit camera");
+    assert(modern.crtMode === "soft-glow", "modern uses soft CRT glow");
+    assert(modern.modernEffects.softShadows.enabled, "modern enables soft shadows");
+    assert(modern.modernEffects.ambientOcclusion.enabled, "modern enables AO");
+  }
+
   function testAnimationPaths(): void {
     const scene = parse("robot");
     const world = Scenes.buildWorld(scene);
@@ -475,6 +501,89 @@ namespace Juggler.Tests {
     assert(Renderer.antiAliasLabelFor("ordered-2x").includes("2x"), "AA label exposes sampling mode");
   }
 
+  function testModernEffectsDeterminism(): void {
+    const scene = parse("robot");
+    const world = Scenes.buildWorld(scene);
+    const observer = Scenes.createObserver(scene, world, 24, 15, { enabled: false, angleDeg: 0, radius: 10 });
+    const profile = Profiles.byId("wright-rgb");
+    const baseOptions: RenderOptions = {
+      profileId: profile.id,
+      outputMode: profile.outputMode,
+      reflectionMode: profile.reflectionMode,
+      epsilon: profile.epsilon,
+      maxDepth: 2,
+      displayConstraintId: "rgb",
+      qualityId: "modern-quality",
+      antiAliasMode: "off",
+      acceleration: "bvh"
+    };
+
+    const disabled = Experience.disabledModernEffects();
+    const cleanA = new Renderer.FrameRenderer(world, observer, { ...baseOptions, modernEffects: disabled });
+    const cleanB = new Renderer.FrameRenderer(world, observer, { ...baseOptions });
+    for (const renderer of [cleanA, cleanB]) {
+      while (!renderer.done()) {
+        renderer.renderRows(4);
+      }
+    }
+    assert(equalData(cleanA.data, cleanB.data), "disabled modern effects preserve classic render path");
+    assert((cleanA.stats.modernEffectSamples ?? 0) === 0, "disabled effects do not record modern samples");
+
+    const effects = Experience.modernStudioEffects();
+    effects.depthOfField.enabled = true;
+    effects.motionBlur.enabled = true;
+    const effectA = new Renderer.FrameRenderer(world, observer, { ...baseOptions, modernEffects: effects });
+    const effectB = new Renderer.FrameRenderer(world, observer, { ...baseOptions, modernEffects: Experience.copyModernEffects(effects) });
+    for (const renderer of [effectA, effectB]) {
+      while (!renderer.done()) {
+        renderer.renderRows(4);
+      }
+    }
+    assert(equalData(effectA.data, effectB.data), "modern effects are deterministic");
+    assert((effectA.stats.modernEffectSamples ?? 0) > 0, "modern effects record extra samples");
+
+    const current = new Uint8ClampedArray([100, 50, 0, 255, 0, 100, 50, 255]);
+    const previous = new Uint8ClampedArray([0, 50, 100, 255, 50, 0, 100, 255]);
+    const blurred = Renderer.blendMotionSamples(current, previous, { enabled: true, strength: 0.5, samples: 2 });
+    assert(blurred[0] === 50 && blurred[2] === 50, "motion blur blends red and blue");
+    assert(Renderer.blendMotionSamples(current, previous, { enabled: false, strength: 0.5, samples: 2 }) === current, "disabled motion blur returns current data");
+  }
+
+  function testViewportMath(): void {
+    const scene = parse("robot");
+    const world = Scenes.buildWorld(scene);
+    const pose = Scenes.staticCameraPose(scene);
+    const observer = Scenes.createObserverFromPose(pose, 320, 200);
+    const orbit = Viewport.orbitPoseFromDrag(pose, 40, 0);
+    close(Math3.length(Math3.sub(orbit.position, orbit.target)), Math3.length(Math3.sub(pose.position, pose.target)), 1e-9, "orbit preserves camera distance");
+    assert(Math3.length(Math3.sub(orbit.position, pose.position)) > 0.01, "orbit changes position");
+
+    const pan = Viewport.panPoseFromDrag(pose, observer, 20, -10, 0.05);
+    close(Math3.length(Math3.sub(pan.target, pan.position)), Math3.length(Math3.sub(pose.target, pose.position)), 1e-9, "pan preserves view distance");
+    assert(Math3.length(Math3.sub(pan.position, pose.position)) > 0.1, "pan moves camera");
+
+    const dolly = Viewport.dollyPose(pose, -100);
+    assert(Math3.length(Math3.sub(dolly.target, dolly.position)) > Math3.length(Math3.sub(pose.target, pose.position)), "negative wheel delta dollies away");
+
+    const editPlane = Viewport.sceneEditOffsetFromDrag([0, 0, 0], observer, 10, 0, false, 0.1);
+    assert(Math.abs(Math3.dot(editPlane, observer.uhat)) > 0.9, "scene edit plane drag follows camera right");
+    const editDepth = Viewport.sceneEditOffsetFromDrag([0, 0, 0], observer, 0, 10, true, 0.1);
+    assert(Math.abs(Math3.dot(editDepth, observer.viewDir)) > 0.9, "scene edit depth drag follows view direction");
+    assert(world.spheres.length > 0, "viewport test scene sanity");
+  }
+
+  function testLivePlaybackAdvancement(): void {
+    assert(LivePlayback.nextFrame(23, 24) === 0, "live playback wraps at source-frame count");
+    const idle = LivePlayback.advance(0, 24, 12, 1100, 1005, false);
+    assert(idle.frame === 0 && idle.skippedFrames === 0, "live playback waits until frame due");
+    const ready = LivePlayback.advance(0, 24, 10, 1000, 1210, false);
+    assert(ready.frame === 3, "live playback advances elapsed source frames");
+    assert(ready.skippedFrames === 2, "live playback reports stale frame skipped when overdue");
+    const busy = LivePlayback.advance(2, 24, 10, 1000, 1300, true);
+    assert(busy.frame === 6, "busy live playback advances past stale frames");
+    assert(busy.skippedFrames === 4, "busy live playback skips every due frame while rendering");
+  }
+
   function testRenderSmoke(): void {
     const scene = parse("robot");
     const world = Scenes.buildWorld(scene);
@@ -518,6 +627,7 @@ namespace Juggler.Tests {
     testSceneParserCoverage();
     testMathAndIntersections();
     testProfilesAndReflection();
+    testExperiencePresets();
     testAnimationPaths();
     testAnimationPresets();
     testPreviewProjection();
@@ -529,6 +639,9 @@ namespace Juggler.Tests {
     testDisplayConstraints();
     testAcceleratedRendererParity();
     testAntiAliasModes();
+    testModernEffectsDeterminism();
+    testViewportMath();
+    testLivePlaybackAdvancement();
     testRenderSmoke();
     console.log("All tests passed");
   }

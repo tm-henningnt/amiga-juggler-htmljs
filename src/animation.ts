@@ -191,7 +191,8 @@ namespace Juggler.Animation {
         profileId: first?.profileId ?? "reference",
         displayConstraintId: first?.displayConstraintId ?? "rgb",
         qualityId: first?.qualityId ?? "legacy",
-        antiAliasMode: first?.antiAliasMode ?? "off"
+        antiAliasMode: first?.antiAliasMode ?? "off",
+        modernEffects: Experience.copyModernEffects(first?.modernEffects)
       },
       animation: copyPathSettings(pathSettings),
       motion: { ...motionSettings },
@@ -205,6 +206,7 @@ namespace Juggler.Animation {
         renderMs: frame.renderMs,
         camera: copyCameraPose(frame.pose),
         stats: { ...frame.stats },
+        modernEffects: Experience.copyModernEffects(frame.modernEffects),
         motion: {
           id: frame.motionId,
           bodyClearance: frame.motionClearance,
@@ -284,7 +286,8 @@ namespace Juggler.Animation {
           profileId: this.renderOptions.profileId,
           displayConstraintId: this.renderOptions.displayConstraintId ?? "rgb",
           qualityId: this.renderOptions.qualityId ?? "legacy",
-          antiAliasMode: this.renderOptions.antiAliasMode ?? "off"
+          antiAliasMode: this.renderOptions.antiAliasMode ?? "off",
+          modernEffects: Experience.copyModernEffects(this.renderOptions.modernEffects)
         };
         this.frames.push(completedFrame);
         this.frameIndex += 1;

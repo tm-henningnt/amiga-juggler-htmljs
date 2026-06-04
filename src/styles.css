@@ -249,6 +249,43 @@ body[data-crt-mode="soft-glow"] .canvas-frame::after {
   font-variant-numeric: tabular-nums;
 }
 
+.command-strip {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.1fr) minmax(130px, 0.9fr) repeat(4, minmax(86px, auto));
+  align-items: end;
+  gap: 6px;
+  background: var(--wb-gray);
+  border-top: 2px solid var(--wb-hi);
+  border-left: 2px solid var(--wb-hi);
+  border-bottom: 2px solid var(--wb-lo);
+  border-right: 2px solid var(--wb-lo);
+  padding: 6px;
+}
+
+.command-strip label {
+  margin: 0;
+  min-width: 0;
+}
+
+.command-strip button {
+  width: 100%;
+  min-width: 0;
+}
+
+.canvas-hint {
+  min-height: 20px;
+  padding: 2px 6px;
+  color: var(--wb-white);
+  background: var(--wb-black);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  border-top: 1px solid var(--wb-lo);
+  border-left: 1px solid var(--wb-lo);
+  border-bottom: 1px solid var(--wb-hi);
+  border-right: 1px solid var(--wb-hi);
+}
+
 progress {
   width: 100%;
   height: 16px;
@@ -560,6 +597,10 @@ button:disabled {
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;
+  }
+
+  .command-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .render-stage {

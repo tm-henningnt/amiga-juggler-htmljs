@@ -9,7 +9,7 @@ namespace Juggler {
   export type RenderAccelerationMode = "none" | "bvh";
   export type PreviewMode = "raytrace" | "live-raytrace" | "wireframe" | "solid";
   export type DisplayConstraintId = "rgb" | "ocs-12bit" | "ehb-64" | "ham6-approx";
-  export type MouseTool = "none" | "orbit-camera" | "free-camera" | "move-group";
+  export type ExperiencePresetId = "classic-source" | "modern-studio" | "custom";
   export type GroupTransformState = Record<number, Vec3>;
   export type CameraPathId = "static" | "orbit-360" | "orbit-arc" | "dolly" | "custom-keyframes";
   export type CameraPresetId = "custom" | "source-camera" | "source-orbit" | "left-catch-arc" | "right-catch-arc" | "overhead-clearance" | "source-dolly";
@@ -173,6 +173,38 @@ namespace Juggler {
     radius: number;
   }
 
+  export interface SoftShadowSettings {
+    enabled: boolean;
+    samples: number;
+    radius: number;
+  }
+
+  export interface AmbientOcclusionSettings {
+    enabled: boolean;
+    strength: number;
+    radius: number;
+  }
+
+  export interface DepthOfFieldSettings {
+    enabled: boolean;
+    samples: number;
+    aperture: number;
+    focusDistance: number;
+  }
+
+  export interface MotionBlurSettings {
+    enabled: boolean;
+    strength: number;
+    samples: number;
+  }
+
+  export interface ModernEffectsSettings {
+    softShadows: SoftShadowSettings;
+    ambientOcclusion: AmbientOcclusionSettings;
+    depthOfField: DepthOfFieldSettings;
+    motionBlur: MotionBlurSettings;
+  }
+
   export interface RenderedFrame {
     index: number;
     width: number;
@@ -191,6 +223,7 @@ namespace Juggler {
     displayConstraintId: DisplayConstraintId;
     qualityId: RenderQualityId;
     antiAliasMode: AntiAliasModeId;
+    modernEffects: ModernEffectsSettings;
   }
 
   export interface AnimationManifestDiagnostics {
@@ -211,6 +244,7 @@ namespace Juggler {
     renderMs: number;
     camera: CameraPose;
     stats: RenderStats;
+    modernEffects: ModernEffectsSettings;
     motion: {
       id: SceneMotionId;
       bodyClearance: number | null;
@@ -237,6 +271,7 @@ namespace Juggler {
       displayConstraintId: DisplayConstraintId;
       qualityId: RenderQualityId;
       antiAliasMode: AntiAliasModeId;
+      modernEffects: ModernEffectsSettings;
     };
     animation: CameraPathSettings;
     motion: SceneMotionSettings;
@@ -263,6 +298,7 @@ namespace Juggler {
     displayConstraintId?: DisplayConstraintId;
     qualityId?: RenderQualityId;
     antiAliasMode?: AntiAliasModeId;
+    modernEffects?: ModernEffectsSettings;
     acceleration?: RenderAccelerationMode;
     tileSize?: number;
   }
@@ -274,6 +310,7 @@ namespace Juggler {
     bvhNodeTests?: number;
     pixels?: number;
     tiles?: number;
+    modernEffectSamples?: number;
   }
 
   export interface RenderWorkerRequest {

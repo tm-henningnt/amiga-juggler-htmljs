@@ -6,7 +6,7 @@ namespace Juggler.App {
   }
 
   interface PointerDrag {
-    tool: MouseTool;
+    mode: "orbit" | "pan" | "scene-edit";
     startX: number;
     startY: number;
     startAngle: number;
@@ -17,6 +17,27 @@ namespace Juggler.App {
     observer: Observer | null;
   }
 
+  interface LivePlaybackState {
+    playing: boolean;
+    rafId: number;
+    dueAtMs: number;
+    sourceFrame: number;
+    skippedFrames: number;
+    lastRenderMs: number;
+    renderInProgress: boolean;
+    previousData: Uint8ClampedArray | null;
+    previousWidth: number;
+    previousHeight: number;
+  }
+
+  const CRT_MODES = [
+    { id: "off", label: "CRT OFF", active: "false" },
+    { id: "scanlines", label: "CRT SCAN", active: "true" },
+    { id: "slot-mask", label: "CRT SLOT", active: "true" },
+    { id: "soft-glow", label: "CRT SOFT", active: "true" }
+  ] as const;
+
+  const experienceSelect = document.getElementById("experiencePreset") as HTMLSelectElement;
   const sceneSelect = document.getElementById("scene") as HTMLSelectElement;
   const fileInput = document.getElementById("file") as HTMLInputElement;
   const sceneMotionSelect = document.getElementById("sceneMotion") as HTMLSelectElement;
@@ -42,17 +63,35 @@ namespace Juggler.App {
   const cameraTargetZInput = document.getElementById("cameraTargetZ") as HTMLInputElement;
   const writeCameraPoseButton = document.getElementById("writeCameraPose") as HTMLButtonElement;
   const resetCameraPoseButton = document.getElementById("resetCameraPose") as HTMLButtonElement;
-  const mouseToolSelect = document.getElementById("mouseTool") as HTMLSelectElement;
+  const sceneEditModeInput = document.getElementById("sceneEditMode") as HTMLInputElement;
   const selectionFacts = document.getElementById("selectionFacts") as HTMLElement;
   const transformXInput = document.getElementById("transformX") as HTMLInputElement;
   const transformYInput = document.getElementById("transformY") as HTMLInputElement;
   const transformZInput = document.getElementById("transformZ") as HTMLInputElement;
   const resetGroupTransformButton = document.getElementById("resetGroupTransform") as HTMLButtonElement;
   const resetAllTransformsButton = document.getElementById("resetAllTransforms") as HTMLButtonElement;
+  const playLiveButton = document.getElementById("playLive") as HTMLButtonElement;
+  const pauseLiveButton = document.getElementById("pauseLive") as HTMLButtonElement;
   const renderButton = document.getElementById("render") as HTMLButtonElement;
   const abortButton = document.getElementById("abort") as HTMLButtonElement;
   const statusElement = document.getElementById("status") as HTMLSpanElement;
   const progressElement = document.getElementById("progress") as HTMLProgressElement;
+  const canvasHintElement = document.getElementById("canvasHint") as HTMLElement;
+  const crtToggleButton = document.getElementById("scanlineToggle") as HTMLButtonElement | null;
+  const livePlaybackFacts = document.getElementById("livePlaybackFacts") as HTMLElement;
+  const softShadowsEnabledInput = document.getElementById("softShadowsEnabled") as HTMLInputElement;
+  const softShadowSamplesInput = document.getElementById("softShadowSamples") as HTMLInputElement;
+  const softShadowRadiusInput = document.getElementById("softShadowRadius") as HTMLInputElement;
+  const ambientOcclusionEnabledInput = document.getElementById("ambientOcclusionEnabled") as HTMLInputElement;
+  const ambientOcclusionStrengthInput = document.getElementById("ambientOcclusionStrength") as HTMLInputElement;
+  const ambientOcclusionRadiusInput = document.getElementById("ambientOcclusionRadius") as HTMLInputElement;
+  const depthOfFieldEnabledInput = document.getElementById("depthOfFieldEnabled") as HTMLInputElement;
+  const depthOfFieldSamplesInput = document.getElementById("depthOfFieldSamples") as HTMLInputElement;
+  const depthOfFieldApertureInput = document.getElementById("depthOfFieldAperture") as HTMLInputElement;
+  const depthOfFieldFocusInput = document.getElementById("depthOfFieldFocus") as HTMLInputElement;
+  const motionBlurEnabledInput = document.getElementById("motionBlurEnabled") as HTMLInputElement;
+  const motionBlurStrengthInput = document.getElementById("motionBlurStrength") as HTMLInputElement;
+  const motionBlurSamplesInput = document.getElementById("motionBlurSamples") as HTMLInputElement;
   const sceneFacts = document.getElementById("sceneFacts") as HTMLElement;
   const cameraFacts = document.getElementById("cameraFacts") as HTMLElement;
   const animationFacts = document.getElementById("animationFacts") as HTMLElement;
@@ -97,11 +136,36 @@ namespace Juggler.App {
   let activeWorkerUrl: string | null = null;
   let playbackTimer = 0;
   let playbackIndex = 0;
+  let applyingExperiencePreset = false;
+  let crtModeIndex = 1;
+  let livePlayback: LivePlaybackState = {
+    playing: false,
+    rafId: 0,
+    dueAtMs: 0,
+    sourceFrame: 0,
+    skippedFrames: 0,
+    lastRenderMs: 0,
+    renderInProgress: false,
+    previousData: null,
+    previousWidth: 0,
+    previousHeight: 0
+  };
 
   export function start(): void {
     if (!context) {
       throw new Error("Canvas 2D context is unavailable");
     }
+
+    for (const preset of Experience.PRESETS) {
+      const option = document.createElement("option");
+      option.value = preset.id;
+      option.textContent = preset.label;
+      experienceSelect.appendChild(option);
+    }
+    const customOption = document.createElement("option");
+    customOption.value = "custom";
+    customOption.textContent = "Custom";
+    experienceSelect.appendChild(customOption);
 
     for (const source of sources) {
       const option = document.createElement("option");
@@ -139,17 +203,6 @@ namespace Juggler.App {
       option.textContent = mode.label;
       antiAliasSelect.appendChild(option);
     }
-    for (const tool of [
-      { id: "orbit-camera" as MouseTool, label: "Orbit camera" },
-      { id: "free-camera" as MouseTool, label: "Free camera" },
-      { id: "move-group" as MouseTool, label: "Move group" },
-      { id: "none" as MouseTool, label: "None" }
-    ]) {
-      const option = document.createElement("option");
-      option.value = tool.id;
-      option.textContent = tool.label;
-      mouseToolSelect.appendChild(option);
-    }
     for (const path of Animation.PATHS) {
       const option = document.createElement("option");
       option.value = path.id;
@@ -172,6 +225,12 @@ namespace Juggler.App {
     animationCameraPresetSelect.value = "custom";
     animationCyclePresetSelect.value = "full-cycle";
 
+    experienceSelect.addEventListener("change", () => {
+      const presetId = experienceSelect.value as ExperiencePresetId;
+      if (presetId !== "custom") {
+        applyExperiencePreset(presetId);
+      }
+    });
     sceneSelect.addEventListener("change", () => {
       const source = sources.find((candidate) => candidate.id === sceneSelect.value) ?? sources[0];
       setActiveSource(source);
@@ -190,31 +249,38 @@ namespace Juggler.App {
       refreshAnimationFacts();
       refreshActiveView();
     });
+    playLiveButton.addEventListener("click", playLiveRaytrace);
+    pauseLiveButton.addEventListener("click", pauseLiveRaytrace);
     renderButton.addEventListener("click", () => renderStill());
     abortButton.addEventListener("click", abortWork);
     previewModeSelect.addEventListener("change", () => {
       abortWork();
+      markExperienceCustom();
       refreshActiveView();
     });
     profileSelect.addEventListener("change", () => {
       resetAnimationBuffer();
+      markExperienceCustom();
       refreshProfileIndicators();
     });
     profileSelect.addEventListener("input", refreshProfileIndicators);
     displayConstraintSelect.addEventListener("change", () => {
       resetAnimationBuffer();
+      markExperienceCustom();
       refreshProfileIndicators();
       refreshAnimationFacts();
       refreshActiveView();
     });
     renderQualitySelect.addEventListener("change", () => {
       resetAnimationBuffer();
+      markExperienceCustom();
       refreshProfileIndicators();
       refreshAnimationFacts();
       refreshActiveView();
     });
     antiAliasSelect.addEventListener("change", () => {
       resetAnimationBuffer();
+      markExperienceCustom();
       refreshProfileIndicators();
       refreshAnimationFacts();
       refreshActiveView();
@@ -234,13 +300,20 @@ namespace Juggler.App {
     });
     animationCameraPresetSelect.addEventListener("change", applyAnimationCameraPreset);
     animationCyclePresetSelect.addEventListener("change", applyAnimationCyclePreset);
-    mouseToolSelect.value = "orbit-camera";
     canvas.addEventListener("pointerdown", handleCanvasPointerDown);
     canvas.addEventListener("pointermove", handleCanvasPointerMove);
     canvas.addEventListener("pointerup", handleCanvasPointerUp);
     canvas.addEventListener("pointerleave", handleCanvasPointerUp);
     canvas.addEventListener("wheel", handleCanvasWheel, { passive: false });
+    canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+    sceneEditModeInput.addEventListener("change", () => {
+      markExperienceCustom();
+      updateCanvasHint();
+      refreshSelectionFacts();
+    });
     for (const control of [transformXInput, transformYInput, transformZInput]) {
+      control.addEventListener("change", markExperienceCustom);
+      control.addEventListener("input", markExperienceCustom);
       control.addEventListener("change", writeSelectedTransformFromInputs);
       control.addEventListener("input", writeSelectedTransformFromInputs);
     }
@@ -256,14 +329,45 @@ namespace Juggler.App {
       cameraTargetYInput,
       cameraTargetZInput
     ]) {
+      control.addEventListener("change", markExperienceCustom);
       control.addEventListener("change", writeFreeCameraPoseFromInputs);
     }
 
     for (const control of [orbitEnabledInput, orbitAngleInput, orbitRadiusInput, orbitHeightInput, resolutionSelect]) {
+      control.addEventListener("change", markExperienceCustom);
+      control.addEventListener("input", markExperienceCustom);
       control.addEventListener("change", refreshCameraFacts);
       control.addEventListener("input", refreshCameraFacts);
       control.addEventListener("change", refreshActiveView);
       control.addEventListener("input", refreshActiveView);
+    }
+    for (const control of [
+      rowsPerTickInput,
+      maxDepthInput,
+      softShadowsEnabledInput,
+      softShadowSamplesInput,
+      softShadowRadiusInput,
+      ambientOcclusionEnabledInput,
+      ambientOcclusionStrengthInput,
+      ambientOcclusionRadiusInput,
+      depthOfFieldEnabledInput,
+      depthOfFieldSamplesInput,
+      depthOfFieldApertureInput,
+      depthOfFieldFocusInput,
+      motionBlurEnabledInput,
+      motionBlurStrengthInput,
+      motionBlurSamplesInput
+    ]) {
+      control.addEventListener("change", () => {
+        markExperienceCustom();
+        refreshProfileIndicators();
+        refreshAnimationFacts();
+        refreshActiveView();
+      });
+      control.addEventListener("input", () => {
+        markExperienceCustom();
+        refreshProfileIndicators();
+      });
     }
     for (const control of [
       animationPathSelect,
@@ -287,9 +391,126 @@ namespace Juggler.App {
       control.addEventListener("input", refreshAnimationFacts);
     }
 
+    setupCrtToggle();
     setActiveSource(sources[0]);
+    applyExperiencePreset("classic-source", false);
+    updateCanvasHint();
+    refreshLivePlaybackFacts();
     refreshProfileIndicators();
     renderStill();
+  }
+
+  function applyExperiencePreset(presetId: Exclude<ExperiencePresetId, "custom">, shouldRender = true): void {
+    const preset = Experience.byId(presetId);
+    applyingExperiencePreset = true;
+    experienceSelect.value = preset.id;
+    previewModeSelect.value = preset.previewMode;
+    profileSelect.value = preset.profileId;
+    displayConstraintSelect.value = preset.displayConstraintId;
+    renderQualitySelect.value = preset.qualityId;
+    antiAliasSelect.value = preset.antiAliasMode;
+    maxDepthInput.value = String(preset.maxDepth);
+    rowsPerTickInput.value = String(preset.rowsPerTick);
+    orbitEnabledInput.checked = preset.orbit.enabled;
+    orbitAngleInput.value = String(preset.orbit.angleDeg);
+    orbitRadiusInput.value = String(preset.orbit.radius);
+    orbitHeightInput.value = String(preset.orbit.heightOffset ?? 0);
+    if (preset.useSourceCamera) {
+      freeCameraPose = null;
+    }
+    if (preset.id === "modern-studio" && active && Motion.supportsMotion(active.parsed, "juggler-reconstructed")) {
+      sceneMotionSelect.value = "juggler-reconstructed";
+      refreshMotionFrameBounds();
+    }
+    sceneEditModeInput.checked = false;
+    writeModernEffects(preset.modernEffects);
+    setCrtMode(preset.crtMode);
+    applyingExperiencePreset = false;
+
+    resetAnimationBuffer();
+    refreshProfileIndicators();
+    refreshCameraFacts();
+    renderFacts();
+    refreshAnimationFacts();
+    refreshSelectionFacts();
+    updateCanvasHint();
+    setStatus(`${preset.label} preset applied.`);
+    if (shouldRender) {
+      if (preset.previewMode === "raytrace") {
+        renderStill();
+      } else {
+        refreshActiveView();
+      }
+    }
+  }
+
+  function setupCrtToggle(): void {
+    setCrtMode("scanlines");
+    crtToggleButton?.addEventListener("click", () => {
+      crtModeIndex = (crtModeIndex + 1) % CRT_MODES.length;
+      setCrtMode(CRT_MODES[crtModeIndex].id);
+      markExperienceCustom();
+    });
+  }
+
+  function setCrtMode(modeId: (typeof CRT_MODES)[number]["id"]): void {
+    const index = CRT_MODES.findIndex((mode) => mode.id === modeId);
+    crtModeIndex = index >= 0 ? index : 0;
+    const mode = CRT_MODES[crtModeIndex];
+    document.body.setAttribute("data-crt-mode", mode.id);
+    if (crtToggleButton) {
+      crtToggleButton.textContent = mode.label;
+      crtToggleButton.setAttribute("data-active", mode.active);
+      crtToggleButton.setAttribute("title", `CRT mode: ${mode.label}`);
+    }
+  }
+
+  function markExperienceCustom(): void {
+    if (!applyingExperiencePreset && experienceSelect.value !== "custom") {
+      experienceSelect.value = "custom";
+    }
+  }
+
+  function readModernEffects(): ModernEffectsSettings {
+    return {
+      softShadows: {
+        enabled: softShadowsEnabledInput.checked,
+        samples: clampInt(Number(softShadowSamplesInput.value), 1, 16, 1),
+        radius: clampNumber(Number(softShadowRadiusInput.value), 0, 3, 0)
+      },
+      ambientOcclusion: {
+        enabled: ambientOcclusionEnabledInput.checked,
+        strength: clampNumber(Number(ambientOcclusionStrengthInput.value), 0, 1, 0),
+        radius: clampNumber(Number(ambientOcclusionRadiusInput.value), 0.1, 4, 1)
+      },
+      depthOfField: {
+        enabled: depthOfFieldEnabledInput.checked,
+        samples: clampInt(Number(depthOfFieldSamplesInput.value), 1, 16, 1),
+        aperture: clampNumber(Number(depthOfFieldApertureInput.value), 0, 0.25, 0),
+        focusDistance: clampNumber(Number(depthOfFieldFocusInput.value), 0.5, 80, 10)
+      },
+      motionBlur: {
+        enabled: motionBlurEnabledInput.checked,
+        strength: clampNumber(Number(motionBlurStrengthInput.value), 0, 0.85, 0),
+        samples: clampInt(Number(motionBlurSamplesInput.value), 1, 4, 1)
+      }
+    };
+  }
+
+  function writeModernEffects(settings: ModernEffectsSettings): void {
+    softShadowsEnabledInput.checked = settings.softShadows.enabled;
+    softShadowSamplesInput.value = String(settings.softShadows.samples);
+    softShadowRadiusInput.value = String(settings.softShadows.radius);
+    ambientOcclusionEnabledInput.checked = settings.ambientOcclusion.enabled;
+    ambientOcclusionStrengthInput.value = String(settings.ambientOcclusion.strength);
+    ambientOcclusionRadiusInput.value = String(settings.ambientOcclusion.radius);
+    depthOfFieldEnabledInput.checked = settings.depthOfField.enabled;
+    depthOfFieldSamplesInput.value = String(settings.depthOfField.samples);
+    depthOfFieldApertureInput.value = String(settings.depthOfField.aperture);
+    depthOfFieldFocusInput.value = String(settings.depthOfField.focusDistance);
+    motionBlurEnabledInput.checked = settings.motionBlur.enabled;
+    motionBlurStrengthInput.value = String(settings.motionBlur.strength);
+    motionBlurSamplesInput.value = String(settings.motionBlur.samples);
   }
 
   function setActiveSource(source: SceneSource): void {
@@ -308,6 +529,8 @@ namespace Juggler.App {
       refreshCameraFacts();
       refreshAnimationFacts();
       refreshSelectionFacts();
+      refreshLivePlaybackFacts();
+      updateCanvasHint();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     }
@@ -335,11 +558,6 @@ namespace Juggler.App {
     if (!context || !active) {
       return;
     }
-    if (readPreviewMode() !== "raytrace") {
-      refreshActiveView();
-      return;
-    }
-
     abortWork();
     const token = abortToken;
     const [width, height] = parseResolution();
@@ -358,7 +576,8 @@ namespace Juggler.App {
     setStatus(
       `Rendering ${active.source.name}, ${Motion.labelFor(motionSettings.motionId)} ` +
       `(${Motion.motionSummary(active.parsed, motionSettings)}) at ${width} x ${height} with ` +
-      `${profile.label}, ${Display.labelFor(displayConstraint)} display, ${Renderer.qualityLabelFor(quality)}`
+      `${profile.label}, ${Display.labelFor(displayConstraint)} display, ${Renderer.qualityLabelFor(quality)}, ` +
+      `${Experience.effectsSummary(renderOptions.modernEffects ?? Experience.disabledModernEffects())}`
     );
 
     if (renderStillInWorker(token, width, height, motionSettings, renderOptions, profile, displayConstraint)) {
@@ -390,6 +609,7 @@ namespace Juggler.App {
       setStatus(
         `Done in ${seconds.toFixed(2)}s, ${profile.label}, ${active.world.spheres.length} spheres, ` +
         `${Display.labelFor(displayConstraint)} display, ${Renderer.qualityLabelFor(quality)}, ` +
+        `${Experience.effectsSummary(renderOptions.modernEffects ?? Experience.disabledModernEffects())}, ` +
         `${Motion.motionSummary(active.parsed, motionSettings)}, ` +
         `${renderer.stats.rays} rays, ${renderer.stats.mirrorFallbacks} source-reflection fallbacks`
       );
@@ -425,6 +645,7 @@ namespace Juggler.App {
 
   function refreshActiveView(): void {
     const mode = readPreviewMode();
+    updateCanvasHint();
     if (mode === "live-raytrace") {
       renderLiveRaytrace();
       return;
@@ -435,13 +656,20 @@ namespace Juggler.App {
   }
 
   function renderLiveRaytrace(): void {
+    renderLiveRaytraceFrame(readSceneMotionSettings().sourceFrame, false);
+  }
+
+  function renderLiveRaytraceFrame(sourceFrame: number, playbackFrame: boolean): void {
     if (!context || !active) {
       return;
     }
-    abortWork();
+    abortRenderOnly();
     const token = abortToken;
     const [width, height] = liveResolution();
-    const motionSettings = readSceneMotionSettings();
+    const motionSettings = {
+      ...readSceneMotionSettings(),
+      sourceFrame
+    };
     const renderWorld = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
     const observer = createDisplayObserver(width, height);
     const profile = Profiles.byId(profileSelect.value);
@@ -459,11 +687,18 @@ namespace Juggler.App {
     canvas.height = height;
     context.imageSmoothingEnabled = false;
     progressElement.value = 0;
+    if (playbackFrame) {
+      livePlayback.renderInProgress = true;
+    }
     setStatus(`Live raytrace ${active.source.name}, ${Motion.motionSummary(active.parsed, motionSettings)}`);
 
     const started = performance.now();
     const tick = (): void => {
       if (token !== abortToken) {
+        if (playbackFrame) {
+          livePlayback.renderInProgress = false;
+          refreshLivePlaybackFacts();
+        }
         return;
       }
       renderer.renderBudget(10);
@@ -474,9 +709,24 @@ namespace Juggler.App {
         return;
       }
       const seconds = (performance.now() - started) / 1000;
+      let data = renderer.data;
+      if (playbackFrame) {
+        data = Renderer.blendMotionSamples(renderer.data, livePlayback.previousData, options.modernEffects?.motionBlur);
+        if (data !== renderer.data) {
+          drawImageData(data, width, height);
+        }
+        livePlayback.previousData = new Uint8ClampedArray(data);
+        livePlayback.previousWidth = width;
+        livePlayback.previousHeight = height;
+        livePlayback.lastRenderMs = performance.now() - started;
+        livePlayback.renderInProgress = false;
+      }
+      refreshLivePlaybackFacts();
       setStatus(
-        `Live raytrace ready in ${seconds.toFixed(2)}s, ${width} x ${height}, ` +
-        `${renderer.stats.rays} rays, ${renderer.stats.sphereTests ?? 0} sphere tests`
+        livePlayback.playing
+          ? livePlaybackStatus(sourceFrame, width, height, renderer.stats)
+          : `Live raytrace ready in ${seconds.toFixed(2)}s, ${width} x ${height}, ` +
+            `${renderer.stats.rays} rays, ${renderer.stats.sphereTests ?? 0} sphere tests`
       );
     };
     window.requestAnimationFrame(tick);
@@ -490,33 +740,18 @@ namespace Juggler.App {
   }
 
   function handleCanvasPointerDown(event: PointerEvent): void {
-    if (!active || readPreviewMode() === "raytrace") {
+    if (!active) {
       return;
     }
+    event.preventDefault();
     const point = canvasPoint(event);
-    const tool = readMouseTool();
-    if (tool === "orbit-camera") {
-      orbitEnabledInput.checked = true;
-      freeCameraPose = null;
-      pointerDrag = {
-        tool,
-        startX: point[0],
-        startY: point[1],
-        startAngle: readNumber(orbitAngleInput.value, 0),
-        startHeight: readNumber(orbitHeightInput.value, 0),
-        startOffset: [0, 0, 0],
-        startPosition: [0, 0, 0],
-        startTarget: [0, 0, 0],
-        observer: null
-      };
-      canvas.setPointerCapture(event.pointerId);
-      return;
-    }
+    const observer = createDisplayObserver(canvas.width || parseResolution()[0], canvas.height || parseResolution()[1]);
 
-    if (tool === "free-camera") {
+    if (!sceneEditModeInput.checked) {
       const pose = ensureFreeCameraPose();
+      const panMode = event.button === 2 || event.shiftKey;
       pointerDrag = {
-        tool,
+        mode: panMode ? "pan" : "orbit",
         startX: point[0],
         startY: point[1],
         startAngle: 0,
@@ -524,96 +759,74 @@ namespace Juggler.App {
         startOffset: [0, 0, 0],
         startPosition: [...pose.position],
         startTarget: [...pose.target],
-        observer: createDisplayObserver(canvas.width, canvas.height)
+        observer
       };
-      orbitEnabledInput.checked = false;
       refreshCameraFacts();
+      updateCanvasHint();
       canvas.setPointerCapture(event.pointerId);
       return;
     }
 
-    if (tool === "move-group") {
-      const preview = previewWorldAndObserver();
-      const groupIndex = Preview.pickGroup(preview.world, preview.observer, point[0], point[1]);
-      if (groupIndex === null) {
-        setStatus("No group under pointer.");
-        return;
-      }
-      selectedGroupIndex = groupIndex;
-      const startOffset = Transforms.offsetFor(groupTransforms, groupIndex);
-      pointerDrag = {
-        tool,
-        startX: point[0],
-        startY: point[1],
-        startAngle: 0,
-        startHeight: 0,
-        startOffset,
-        startPosition: [0, 0, 0],
-        startTarget: [0, 0, 0],
-        observer: preview.observer
-      };
-      updateTransformInputs(startOffset);
-      refreshSelectionFacts();
-      refreshActiveView();
-      canvas.setPointerCapture(event.pointerId);
+    const preview = previewWorldAndObserver();
+    const groupIndex = Preview.pickGroup(preview.world, preview.observer, point[0], point[1]);
+    if (groupIndex === null) {
+      setStatus("No group under pointer.");
+      return;
     }
+    selectedGroupIndex = groupIndex;
+    const startOffset = Transforms.offsetFor(groupTransforms, groupIndex);
+    pointerDrag = {
+      mode: "scene-edit",
+      startX: point[0],
+      startY: point[1],
+      startAngle: 0,
+      startHeight: 0,
+      startOffset,
+      startPosition: [0, 0, 0],
+      startTarget: [0, 0, 0],
+      observer: preview.observer
+    };
+    updateTransformInputs(startOffset);
+    refreshSelectionFacts();
+    updateCanvasHint();
+    refreshActiveView();
+    canvas.setPointerCapture(event.pointerId);
   }
 
   function handleCanvasPointerMove(event: PointerEvent): void {
-    if (!pointerDrag || readPreviewMode() === "raytrace") {
+    if (!pointerDrag) {
       return;
     }
+    event.preventDefault();
     const point = canvasPoint(event);
     const dx = point[0] - pointerDrag.startX;
     const dy = point[1] - pointerDrag.startY;
 
-    if (pointerDrag.tool === "orbit-camera") {
-      orbitEnabledInput.checked = true;
-      orbitAngleInput.value = String(normalizeAngle(pointerDrag.startAngle + dx * 0.5));
-      if (event.shiftKey) {
-        orbitHeightInput.value = String(clampNumber(pointerDrag.startHeight - dy * 0.04, -80, 80, 0).toFixed(2));
-      }
-      refreshCameraFacts();
-      refreshActiveView();
-      return;
-    }
-
-    if (pointerDrag.tool === "free-camera" && pointerDrag.observer) {
-      if (event.shiftKey) {
-        const scale = Math.max(0.01, Math3.length(Math3.sub(pointerDrag.startTarget, pointerDrag.startPosition)) / 320);
-        const move = Math3.add(
-          Math3.mul(pointerDrag.observer.uhat, dx * scale),
-          Math3.mul(pointerDrag.observer.vhat, -dy * scale)
-        );
-        setFreeCameraPose({
-          position: Math3.add(pointerDrag.startPosition, move),
-          target: Math3.add(pointerDrag.startTarget, move),
-          focalLength: active.parsed.focalLength
-        });
-        return;
-      }
-
-      const startDirection = Math3.normalize(Math3.sub(pointerDrag.startTarget, pointerDrag.startPosition));
-      const distance = Math.max(0.1, Math3.length(Math3.sub(pointerDrag.startTarget, pointerDrag.startPosition)));
-      const yawed = rotateAroundAxis(startDirection, [0, 0, 1], -dx * 0.01);
-      const pitched = rotateAroundAxis(yawed, pointerDrag.observer.uhat, dy * 0.01);
-      const direction = Math3.normalize(pitched);
-      setFreeCameraPose({
-        position: [...pointerDrag.startPosition],
-        target: Math3.add(pointerDrag.startPosition, Math3.mul(direction, distance)),
+    if (pointerDrag.mode === "orbit") {
+      markExperienceCustom();
+      setFreeCameraPose(Viewport.orbitPoseFromDrag({
+        position: pointerDrag.startPosition,
+        target: pointerDrag.startTarget,
         focalLength: active.parsed.focalLength
-      });
+      }, dx, dy));
       return;
     }
 
-    if (pointerDrag.tool === "move-group" && selectedGroupIndex !== null && pointerDrag.observer) {
-      const scale = Math.max(0.01, readNumber(orbitRadiusInput.value, 10) / 320);
-      const planeMove = Math3.add(
-        Math3.mul(pointerDrag.observer.uhat, dx * scale),
-        Math3.mul(pointerDrag.observer.vhat, -dy * scale)
-      );
-      const nextOffset = Math3.add(pointerDrag.startOffset, planeMove);
-      setSelectedTransform(nextOffset);
+    if (pointerDrag.mode === "pan" && pointerDrag.observer) {
+      markExperienceCustom();
+      setFreeCameraPose(Viewport.panPoseFromDrag({
+        position: pointerDrag.startPosition,
+        target: pointerDrag.startTarget,
+        focalLength: active.parsed.focalLength
+      }, pointerDrag.observer, dx, dy));
+      return;
+    }
+
+    if (pointerDrag.mode === "scene-edit" && selectedGroupIndex !== null && pointerDrag.observer) {
+      markExperienceCustom();
+      const distance = Math.max(0.1, Math3.length(Math3.sub(pointerDrag.observer.position, Scenes.sceneTarget(active.world))));
+      const scale = Math.max(0.01, distance / 320);
+      setSelectedTransform(Viewport.sceneEditOffsetFromDrag(pointerDrag.startOffset, pointerDrag.observer, dx, dy, event.shiftKey, scale));
     }
   }
 
@@ -630,40 +843,22 @@ namespace Juggler.App {
     if (hadDrag && readPreviewMode() === "live-raytrace") {
       refreshActiveView();
     }
+    updateCanvasHint();
   }
 
   function handleCanvasWheel(event: WheelEvent): void {
-    if (readPreviewMode() === "raytrace") {
-      return;
-    }
-    if (readMouseTool() === "free-camera") {
-      event.preventDefault();
-      const pose = ensureFreeCameraPose();
-      const direction = Math3.normalize(Math3.sub(pose.target, pose.position));
-      const step = Math.sign(event.deltaY) * -0.5;
-      const move = Math3.mul(direction, step);
-      setFreeCameraPose({
-        position: Math3.add(pose.position, move),
-        target: Math3.add(pose.target, move),
-        focalLength: pose.focalLength
-      });
-      return;
-    }
-    if (readMouseTool() !== "orbit-camera") {
+    if (!active) {
       return;
     }
     event.preventDefault();
-    orbitEnabledInput.checked = true;
-    freeCameraPose = null;
-    const current = readNumber(orbitRadiusInput.value, 10);
-    const next = clampNumber(current + Math.sign(event.deltaY) * 0.5, 1, 120, 10);
-    orbitRadiusInput.value = String(next);
-    refreshCameraFacts();
-    refreshActiveView();
+    markExperienceCustom();
+    setFreeCameraPose(Viewport.dollyPose(ensureFreeCameraPose(), event.deltaY));
   }
 
   function previewWorldAndObserver(): { world: World; observer: Observer } {
-    const [width, height] = parseResolution();
+    const fallback = parseResolution();
+    const width = canvas.width || fallback[0];
+    const height = canvas.height || fallback[1];
     const motionSettings = readSceneMotionSettings();
     const world = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
     const observer = createDisplayObserver(width, height);
@@ -731,6 +926,7 @@ namespace Juggler.App {
     transformZInput.disabled = !hasSelection;
     resetGroupTransformButton.disabled = !hasSelection;
     setFacts(selectionFacts, [
+      ["Edit mode", sceneEditModeInput.checked ? "on" : "off"],
       ["Selected", hasSelection ? `Group ${selectedGroupIndex}` : "none"],
       ["Offset", Math3.formatVec(offset, 2)],
       ["Transforms", String(Object.keys(groupTransforms).length)]
@@ -800,6 +996,115 @@ namespace Juggler.App {
     resetAnimationBuffer();
     refreshCameraFacts();
     refreshActiveView();
+  }
+
+  function playLiveRaytrace(): void {
+    if (!active) {
+      return;
+    }
+    clearPlaybackOnly();
+    updateAnimationButtons(false);
+    if (readPreviewMode() !== "live-raytrace") {
+      previewModeSelect.value = "live-raytrace";
+      markExperienceCustom();
+    }
+    const motionSettings = readSceneMotionSettings();
+    livePlayback = {
+      playing: true,
+      rafId: 0,
+      dueAtMs: performance.now() + 1000 / readAnimationSettingsLenient().fps,
+      sourceFrame: motionSettings.sourceFrame,
+      skippedFrames: 0,
+      lastRenderMs: 0,
+      renderInProgress: false,
+      previousData: null,
+      previousWidth: 0,
+      previousHeight: 0
+    };
+    updateLivePlaybackButtons();
+    refreshLivePlaybackFacts();
+    renderLiveRaytraceFrame(livePlayback.sourceFrame, true);
+    livePlayback.rafId = window.requestAnimationFrame(livePlaybackTick);
+  }
+
+  function pauseLiveRaytrace(): void {
+    stopLiveRaytrace(false);
+    abortRenderOnly();
+    setStatus("Live playback paused.");
+  }
+
+  function stopLiveRaytrace(resetFrame: boolean): void {
+    if (livePlayback.rafId) {
+      window.cancelAnimationFrame(livePlayback.rafId);
+    }
+    livePlayback.playing = false;
+    livePlayback.rafId = 0;
+    livePlayback.renderInProgress = false;
+    if (resetFrame) {
+      livePlayback.sourceFrame = readSceneMotionSettings().sourceFrame;
+      livePlayback.skippedFrames = 0;
+      livePlayback.previousData = null;
+    }
+    updateLivePlaybackButtons();
+    refreshLivePlaybackFacts();
+  }
+
+  function livePlaybackTick(nowMs: number): void {
+    if (!livePlayback.playing) {
+      return;
+    }
+    const fps = readAnimationSettingsLenient().fps;
+    const frameCount = Motion.sourceFrameCount(readSceneMotionSettings().motionId);
+    const advanced = LivePlayback.advance(
+      livePlayback.sourceFrame,
+      frameCount,
+      fps,
+      livePlayback.dueAtMs,
+      nowMs,
+      livePlayback.renderInProgress
+    );
+    const hadDueFrame = advanced.dueAtMs !== livePlayback.dueAtMs;
+    if (hadDueFrame) {
+      livePlayback.sourceFrame = advanced.frame;
+      livePlayback.skippedFrames += advanced.skippedFrames;
+      livePlayback.dueAtMs = advanced.dueAtMs;
+      motionFrameInput.value = String(livePlayback.sourceFrame);
+      renderFacts();
+      refreshAnimationFacts();
+      if (!livePlayback.renderInProgress) {
+        renderLiveRaytraceFrame(livePlayback.sourceFrame, true);
+      }
+    }
+    refreshLivePlaybackFacts();
+    livePlayback.rafId = window.requestAnimationFrame(livePlaybackTick);
+  }
+
+  function updateLivePlaybackButtons(): void {
+    playLiveButton.disabled = livePlayback.playing;
+    pauseLiveButton.disabled = !livePlayback.playing;
+  }
+
+  function refreshLivePlaybackFacts(): void {
+    const fps = active ? readAnimationSettingsLenient().fps : 0;
+    const motionSettings = active ? readSceneMotionSettings() : { motionId: "static" as SceneMotionId, sourceFrame: 0 };
+    setFacts(livePlaybackFacts, [
+      ["Live playback", livePlayback.playing ? "playing" : "paused"],
+      ["Source frame", active && motionSettings.motionId !== "static" ? Motion.sourceFrameLabel(livePlayback.sourceFrame) : "static"],
+      ["FPS target", fps ? String(fps) : "n/a"],
+      ["Last render", livePlayback.lastRenderMs ? `${livePlayback.lastRenderMs.toFixed(0)} ms` : "n/a"],
+      ["Skipped", String(livePlayback.skippedFrames)]
+    ]);
+    updateLivePlaybackButtons();
+  }
+
+  function livePlaybackStatus(sourceFrame: number, width: number, height: number, stats: RenderStats): string {
+    const motionSettings = readSceneMotionSettings();
+    const frameLabel = motionSettings.motionId === "static" ? "static" : Motion.sourceFrameLabel(sourceFrame);
+    return (
+      `Live ${frameLabel}, ${readAnimationSettingsLenient().fps} fps target, ` +
+      `${livePlayback.lastRenderMs.toFixed(0)} ms render, ${livePlayback.skippedFrames} skipped, ` +
+      `${width} x ${height}, ${stats.rays} rays`
+    );
   }
 
   function renderAnimation(): void {
@@ -895,6 +1200,7 @@ namespace Juggler.App {
     if (!animationFrames.length) {
       return;
     }
+    stopLiveRaytrace(true);
     pauseAnimation();
     const fps = readAnimationSettingsLenient().fps;
     playAnimationButton.disabled = true;
@@ -1041,11 +1347,17 @@ namespace Juggler.App {
   }
 
   function abortWork(): void {
+    stopLiveRaytrace(true);
+    abortRenderOnly();
+    clearPlaybackOnly();
+    updateAnimationButtons(false);
+  }
+
+  function abortRenderOnly(): void {
     abortToken += 1;
     cleanupRenderWorker();
-    clearPlaybackOnly();
     renderButton.disabled = false;
-    updateAnimationButtons(false);
+    livePlayback.renderInProgress = false;
   }
 
   function renderStillInWorker(
@@ -1093,6 +1405,7 @@ namespace Juggler.App {
       setStatus(
         `Done in ${seconds.toFixed(2)}s worker, ${profile.label}, ${active.world.spheres.length} spheres, ` +
         `${Display.labelFor(displayConstraint)} display, ${Renderer.qualityLabelFor(renderOptions.qualityId ?? "legacy")}, ` +
+        `${Experience.effectsSummary(renderOptions.modernEffects ?? Experience.disabledModernEffects())}, ` +
         `${Motion.motionSummary(active.parsed, motionSettings)}, ` +
         `${message.stats.rays} rays, ${message.stats.sphereTests ?? 0} sphere tests`
       );
@@ -1276,6 +1589,7 @@ namespace Juggler.App {
       ["Display", Display.labelFor(readDisplayConstraint())],
       ["Quality", Renderer.qualityLabelFor(readRenderQuality())],
       ["Anti-alias", Renderer.antiAliasLabelFor(readEffectiveAntiAliasMode())],
+      ["Modern effects", Experience.effectsSummary(readModernEffects())],
       ["Min clearance", diagnostics ? diagnostics.minBodyClearance.toFixed(2) : "n/a"],
       ["Min ball spacing", diagnostics ? diagnostics.minBallClearance.toFixed(2) : "n/a"],
       ["WebM", pickVideoMimeType("webm") ? "available" : "unavailable"],
@@ -1387,6 +1701,7 @@ namespace Juggler.App {
       displayConstraintId: readDisplayConstraint(),
       qualityId,
       antiAliasMode: readEffectiveAntiAliasMode(),
+      modernEffects: readModernEffects(),
       acceleration: "bvh",
       tileSize: qualityId === "interactive" ? 16 : 12
     };
@@ -1434,6 +1749,10 @@ namespace Juggler.App {
     aaNode.className = "mode-tag mode-tag-neutral";
     aaNode.textContent = `AA ${Renderer.antiAliasLabelFor(readEffectiveAntiAliasMode())}`;
     profileIndicators.appendChild(aaNode);
+    const effectsNode = document.createElement("span");
+    effectsNode.className = "mode-tag mode-tag-neutral";
+    effectsNode.textContent = `FX ${Experience.effectsSummary(readModernEffects())}`;
+    profileIndicators.appendChild(effectsNode);
   }
 
   function copyAnimationSettings(settings: CameraPathSettings): CameraPathSettings {
@@ -1561,11 +1880,6 @@ namespace Juggler.App {
     };
   }
 
-  function readMouseTool(): MouseTool {
-    const requested = mouseToolSelect.value as MouseTool;
-    return requested === "orbit-camera" || requested === "free-camera" || requested === "move-group" || requested === "none" ? requested : "orbit-camera";
-  }
-
   function readRowsPerTick(): number {
     return Math.max(1, Math.min(32, Number(rowsPerTickInput.value) || 4));
   }
@@ -1659,6 +1973,24 @@ namespace Juggler.App {
 
   function previewModeLabel(modeId: PreviewMode): string {
     return Preview.MODES.find((mode) => mode.id === modeId)?.label ?? modeId;
+  }
+
+  function updateCanvasHint(): void {
+    if (sceneEditModeInput.checked) {
+      canvasHintElement.textContent = pointerDrag?.mode === "scene-edit"
+        ? "Scene Edit: drag moves selection, Shift-drag moves through depth"
+        : "Scene Edit: click a sphere group, drag move, Shift-drag depth";
+      return;
+    }
+    if (pointerDrag?.mode === "pan") {
+      canvasHintElement.textContent = "Canvas: panning camera";
+      return;
+    }
+    if (pointerDrag?.mode === "orbit") {
+      canvasHintElement.textContent = "Canvas: orbiting camera";
+      return;
+    }
+    canvasHintElement.textContent = "Canvas: drag orbit, Shift/right drag pan, wheel dolly";
   }
 
   function setStatus(text: string): void {
