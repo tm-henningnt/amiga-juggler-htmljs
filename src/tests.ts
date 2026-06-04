@@ -175,25 +175,28 @@ namespace Juggler.Tests {
     const frame0 = Motion.resolveWorld(robot, robotWorld, { motionId: "juggler-reconstructed", sourceFrame: 0 }, 0);
     assert(frame0 !== robotWorld, "juggler motion resolves a new world");
     assert(frame0.spheres.length === robotWorld.spheres.length, "juggler motion keeps robot sphere count");
-    // Balls at source frame 0: group0 offset=0 → path[0], group1 offset=8 → path[8], group2 offset=16 → path[16].
-    // The rendered path is corrected along the same source-screen rays so it clears the body in 3D.
-    close(frame0.spheres[0].position[0], -1.5646, 1e-4, "first ball corrected source x");
-    close(frame0.spheres[0].position[2], 6.93735, 1e-4, "first ball corrected source z (apex)");
-    close(frame0.spheres[1].position[2], 3.6555, 1e-4, "second ball corrected source z (left hand)");
-    close(frame0.spheres[2].position[2], 3.5552, 1e-4, "third ball corrected source z (right throw)");
+    // Balls at source frame 0 follow a Meatfighter-style cascade: one apex ball,
+    // one left-hand ball on the low arc, and one right-hand ball on the high arc.
+    close(frame0.spheres[0].position[0], -2, 1e-9, "first ball cascade plane x");
+    close(frame0.spheres[0].position[1], 0, 1e-9, "first ball apex y");
+    close(frame0.spheres[0].position[2], 7, 1e-9, "first ball apex z");
+    close(frame0.spheres[1].position[1], 1.45, 1e-9, "second ball left hand y");
+    close(frame0.spheres[1].position[2], 4.05, 1e-9, "second ball left hand z");
+    close(frame0.spheres[2].position[1], -1.45, 1e-9, "third ball right hand y");
+    close(frame0.spheres[2].position[2], 4.05, 1e-9, "third ball right hand z");
 
-    const frame6 = Motion.resolveWorld(robot, robotWorld, { motionId: "juggler-reconstructed", sourceFrame: 0 }, 6);
-    assert(Math.abs(frame6.spheres[0].position[2] - frame0.spheres[0].position[2]) > 1.0, "first ball descends across 6 frames");
+    const frame20 = Motion.resolveWorld(robot, robotWorld, { motionId: "juggler-reconstructed", sourceFrame: 0 }, 20);
+    assert(Math.abs(frame20.spheres[0].position[2] - frame0.spheres[0].position[2]) > 1.0, "first ball descends across ballistic arc");
 
-    const rawPixel = Motion.projectToSourcePixel(robot, Motion.rawSourcePathPoint(0));
-    const correctedPixel = Motion.projectToSourcePixel(robot, Motion.sourcePathPoint(0));
-    close(correctedPixel[0], rawPixel[0], 1e-9, "depth correction preserves source x projection");
-    close(correctedPixel[1], rawPixel[1], 1e-9, "depth correction preserves source y projection");
+    const rawPoint = Motion.rawSourcePathPoint(0);
+    const renderedPoint = Motion.sourcePathPoint(0);
+    assert(Math3.length(Math3.sub(rawPoint, renderedPoint)) > 1.0, "rendered physical path is distinct from raw screen anchor");
 
     const diagnostics = Motion.diagnostics(robot, robotWorld, { motionId: "juggler-reconstructed", sourceFrame: 0 });
     assert(diagnostics !== null, "juggler diagnostics available");
     const motionDiagnostics = diagnostics!;
-    assert(motionDiagnostics.minBodyClearance > 0.35, `juggler balls clear body/head, min ${motionDiagnostics.minBodyClearance}`);
+    assert(motionDiagnostics.minBodyClearance > 0.45, `juggler balls clear body/head, min ${motionDiagnostics.minBodyClearance}`);
+    assert(motionDiagnostics.minBallClearance > 0.2, `juggler balls clear each other, min ${motionDiagnostics.minBallClearance}`);
     assert(motionDiagnostics.maxHandContactError < 0.15, `juggler hands meet balls, max ${motionDiagnostics.maxHandContactError}`);
 
     const elephant = parse("ele");
@@ -260,6 +263,7 @@ namespace Juggler.Tests {
     assert(renderer.frames.every((frame) => frame.motionId === "juggler-reconstructed"), "animation frames record motion mode");
     assert(renderer.frames.every((frame) => frame.profileId === "reference"), "animation frames record render profile");
     assert(renderer.frames.every((frame) => frame.motionClearance !== null), "animation frames record motion clearance");
+    assert(renderer.frames.every((frame) => frame.motionBallClearance !== null), "animation frames record ball spacing");
     assert(renderer.frames[1].sceneFrame > renderer.frames[0].sceneFrame, "animation frames advance scene source frame");
 
     const rangeSettings = Animation.defaultSettings();

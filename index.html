@@ -1440,13 +1440,15 @@ var Juggler;
 (function (Juggler) {
     var MotionData;
     (function (MotionData) {
-        MotionData.DEPTH_CORRECTION_SCALE = 0.85;
-        MotionData.SOURCE_CAMERA_POSITION = [-10, -4, 5.5];
+        MotionData.BALL_PLANE_X = -2.0;
+        MotionData.LEFT_HAND_BALL_CENTER = [MotionData.BALL_PLANE_X, 1.45, 4.05];
+        MotionData.RIGHT_HAND_BALL_CENTER = [MotionData.BALL_PLANE_X, -1.45, 4.05];
+        MotionData.HIGH_ARC_APEX_Z = 7.0;
+        MotionData.LOW_ARC_APEX_Z = 4.85;
         // These points came from the 24 manually labeled historical movie frames.
-        // They are screen-ray anchors, not final physical positions: each point
-        // reprojects to the right source-frame pixel, but the original fixed-depth
-        // back-projection put the path through the robot. Motion.ts applies a
-        // source-ray depth correction before rendering.
+        // They are kept as source-screen evidence. The rendered motion now uses the
+        // ballistic cascade constants above because the fixed-depth screen fit caused
+        // physical ball/body and ball/ball intersections.
         MotionData.RAW_BALL_PATH = [
             [-0.076, 0.641, 7.191],
             [-0.148, 0.757, 7.033],
@@ -1485,9 +1487,9 @@ var Juggler;
             { id: "juggler-reconstructed", label: "Reconstructed 24-frame juggling" }
         ];
         const BALL_GROUPS = [
-            { groupIndex: 0, offset: 0 },
-            { groupIndex: 1, offset: 8 },
-            { groupIndex: 2, offset: 16 }
+            { groupIndex: 0, arc: "high", offset: Motion.SOURCE_FRAME_COUNT },
+            { groupIndex: 1, arc: "low", offset: 0 },
+            { groupIndex: 2, arc: "high", offset: 0 }
         ];
         const LEFT_ARM_GROUP = 12;
         const RIGHT_ARM_GROUP = 11;
@@ -1545,7 +1547,7 @@ var Juggler;
                     continue;
                 }
                 group.controls = [{
-                        center: sampleBall(ball.offset + sourceFrame),
+                        center: sampleBall(ball.arc, ball.offset + sourceFrame),
                         radius: source.controls[0]?.radius ?? 0.6,
                         interpolationFromPrevious: null
                     }];
@@ -1556,7 +1558,14 @@ var Juggler;
         }
         Motion.resolveWorld = resolveWorld;
         function sourcePathPoint(pathIndex) {
-            return correctedDepth(rawSourcePathPoint(pathIndex));
+            const frame = mod(pathIndex, Motion.SOURCE_FRAME_COUNT);
+            if (frame < LEFT_CONTACT_INDEX) {
+                return Juggler.Math3.lerpVec([Juggler.MotionData.BALL_PLANE_X, 0, Juggler.MotionData.HIGH_ARC_APEX_Z], Juggler.MotionData.LEFT_HAND_BALL_CENTER, frame / LEFT_CONTACT_INDEX);
+            }
+            if (frame < RIGHT_CONTACT_INDEX) {
+                return parabolicArc(Juggler.MotionData.LEFT_HAND_BALL_CENTER, Juggler.MotionData.RIGHT_HAND_BALL_CENTER, Juggler.MotionData.LOW_ARC_APEX_Z, (frame - LEFT_CONTACT_INDEX) / (RIGHT_CONTACT_INDEX - LEFT_CONTACT_INDEX));
+            }
+            return Juggler.Math3.lerpVec(Juggler.MotionData.RIGHT_HAND_BALL_CENTER, [Juggler.MotionData.BALL_PLANE_X, 0, Juggler.MotionData.HIGH_ARC_APEX_Z], (frame - RIGHT_CONTACT_INDEX) / (Motion.SOURCE_FRAME_COUNT - RIGHT_CONTACT_INDEX));
         }
         Motion.sourcePathPoint = sourcePathPoint;
         function rawSourcePathPoint(pathIndex) {
@@ -1596,6 +1605,21 @@ var Juggler;
             return minClearance;
         }
         Motion.frameBodyClearance = frameBodyClearance;
+        function frameBallClearance(world) {
+            const balls = world.spheres.filter((sphere) => BALL_GROUPS.some((ball) => ball.groupIndex === sphere.groupIndex));
+            if (balls.length < 2) {
+                return null;
+            }
+            let minClearance = Juggler.BIG;
+            for (let i = 0; i < balls.length; i += 1) {
+                for (let j = i + 1; j < balls.length; j += 1) {
+                    const distance = Juggler.Math3.length(Juggler.Math3.sub(balls[i].position, balls[j].position));
+                    minClearance = Math.min(minClearance, distance - balls[i].radius - balls[j].radius);
+                }
+            }
+            return minClearance;
+        }
+        Motion.frameBallClearance = frameBallClearance;
         function diagnostics(scene, baseWorld, settings) {
             if (settings.motionId !== "juggler-reconstructed" || !supportsJugglerMotion(scene)) {
                 return null;
@@ -1603,9 +1627,16 @@ var Juggler;
             let minBodyClearance = Juggler.BIG;
             let minBodyClearanceFrame = 0;
             let minBodyClearanceBallGroup = -1;
+            let minBallClearance = Juggler.BIG;
+            let minBallClearanceFrame = 0;
             let maxHandContactError = 0;
             for (let frame = 0; frame < Motion.SOURCE_FRAME_COUNT; frame += 1) {
                 const world = resolveWorld(scene, baseWorld, settings, frame + settings.sourceFrame);
+                const ballClearance = frameBallClearance(world);
+                if (ballClearance !== null && ballClearance < minBallClearance) {
+                    minBallClearance = ballClearance;
+                    minBallClearanceFrame = frame;
+                }
                 const body = world.spheres.filter((sphere) => BODY_COLLISION_GROUPS.includes(sphere.groupIndex));
                 for (const ball of BALL_GROUPS) {
                     const sphere = world.spheres.find((candidate) => candidate.groupIndex === ball.groupIndex);
@@ -1631,6 +1662,8 @@ var Juggler;
                 minBodyClearance,
                 minBodyClearanceFrame,
                 minBodyClearanceBallGroup,
+                minBallClearance,
+                minBallClearanceFrame,
                 maxHandContactError
             };
         }
@@ -1669,15 +1702,16 @@ var Juggler;
                 return group?.type === Juggler.MIRROR && group.controls.length === 1 && Math.abs(group.controls[0].radius - 0.6) < 0.01;
             });
         }
-        function sampleBall(sampleFrame) {
-            return samplePath(correctedBallPath(), sampleFrame);
+        function sampleBall(arc, sampleFrame) {
+            return arc === "high" ? sampleHighArc(sampleFrame) : sampleLowArc(sampleFrame);
         }
         function armControls(side, sourceFrame) {
-            const pulse = Math.max(throwPulse(sourceFrame, 0), throwPulse(sourceFrame, 8), throwPulse(sourceFrame, 16));
-            const leftContact = wristTarget(sourcePathPoint(LEFT_CONTACT_INDEX), 1);
-            const rightContact = wristTarget(sourcePathPoint(RIGHT_CONTACT_INDEX), -1);
+            const handCenter = side > 0 ? Juggler.MotionData.LEFT_HAND_BALL_CENTER : Juggler.MotionData.RIGHT_HAND_BALL_CENTER;
+            const contactBall = nearestBallToHand(sourceFrame, handCenter);
+            const pulse = handProximityPulse(contactBall, handCenter);
+            const contact = wristTarget(contactBall, side);
             if (side > 0) {
-                const wrist = Juggler.Math3.lerpVec([-1.35, 1.7, 4.05], leftContact, pulse);
+                const wrist = Juggler.Math3.lerpVec([-1.35, 1.7, 4.05], contact, pulse);
                 const elbow = Juggler.Math3.lerpVec([0, 0.7, 5.1], wrist, 0.55);
                 return [
                     { center: [0, 0.7, 5.1], radius: 0.2, interpolationFromPrevious: null },
@@ -1686,7 +1720,7 @@ var Juggler;
                 ];
             }
             else {
-                const wrist = Juggler.Math3.lerpVec([-1.2, -1.55, 4.0], rightContact, pulse);
+                const wrist = Juggler.Math3.lerpVec([-1.2, -1.55, 4.0], contact, pulse);
                 const elbow = Juggler.Math3.lerpVec([0, -0.7, 5.1], wrist, 0.55);
                 return [
                     { center: [0, -0.7, 5.1], radius: 0.2, interpolationFromPrevious: null },
@@ -1695,14 +1729,41 @@ var Juggler;
                 ];
             }
         }
-        function correctedBallPath() {
-            return Juggler.MotionData.RAW_BALL_PATH.map(correctedDepth);
+        function sampleHighArc(sampleFrame) {
+            const t = mod(sampleFrame, Motion.SOURCE_FRAME_COUNT * 2) / (Motion.SOURCE_FRAME_COUNT * 2);
+            return parabolicArc(Juggler.MotionData.RIGHT_HAND_BALL_CENTER, Juggler.MotionData.LEFT_HAND_BALL_CENTER, Juggler.MotionData.HIGH_ARC_APEX_Z, t);
         }
-        function correctedDepth(rawPoint) {
-            return Juggler.Math3.add(Juggler.MotionData.SOURCE_CAMERA_POSITION, Juggler.Math3.mul(Juggler.Math3.sub(rawPoint, Juggler.MotionData.SOURCE_CAMERA_POSITION), Juggler.MotionData.DEPTH_CORRECTION_SCALE));
+        function sampleLowArc(sampleFrame) {
+            const t = mod(sampleFrame, Motion.SOURCE_FRAME_COUNT) / Motion.SOURCE_FRAME_COUNT;
+            return parabolicArc(Juggler.MotionData.LEFT_HAND_BALL_CENTER, Juggler.MotionData.RIGHT_HAND_BALL_CENTER, Juggler.MotionData.LOW_ARC_APEX_Z, t);
+        }
+        function parabolicArc(start, end, apexZ, t) {
+            const clamped = Math.max(0, Math.min(1, t));
+            const center = Juggler.Math3.lerpVec(start, end, clamped);
+            const baseZ = Juggler.Math3.lerp(start[2], end[2], clamped);
+            center[2] = baseZ + 4 * (apexZ - baseZ) * clamped * (1 - clamped);
+            return center;
         }
         function wristTarget(ballCenter, side) {
             return [ballCenter[0] + 0.08, ballCenter[1] + side * 0.16, ballCenter[2] - 0.56];
+        }
+        function nearestBallToHand(sourceFrame, handCenter) {
+            let best = sampleBall(BALL_GROUPS[0].arc, BALL_GROUPS[0].offset + sourceFrame);
+            let bestDistance = Juggler.Math3.length(Juggler.Math3.sub(best, handCenter));
+            for (let i = 1; i < BALL_GROUPS.length; i += 1) {
+                const candidate = sampleBall(BALL_GROUPS[i].arc, BALL_GROUPS[i].offset + sourceFrame);
+                const distance = Juggler.Math3.length(Juggler.Math3.sub(candidate, handCenter));
+                if (distance < bestDistance) {
+                    best = candidate;
+                    bestDistance = distance;
+                }
+            }
+            return best;
+        }
+        function handProximityPulse(ballCenter, handCenter) {
+            const distance = Juggler.Math3.length(Juggler.Math3.sub(ballCenter, handCenter));
+            const normalized = Math.max(0, 1 - distance / 1.35);
+            return normalized * normalized;
         }
         function handContactError(world, armGroup) {
             const wrist = lastSphereForGroup(world, armGroup);
@@ -1729,27 +1790,8 @@ var Juggler;
             }
             return match;
         }
-        function throwPulse(sourceFrame, centerFrame) {
-            const distance = circularDistance(sourceFrame, centerFrame, Motion.SOURCE_FRAME_COUNT);
-            const normalized = Math.max(0, 1 - distance / 4);
-            return normalized * normalized;
-        }
         function contactPulse(sourceFrame) {
-            return Math.max(throwPulse(sourceFrame, 0), throwPulse(sourceFrame, 8), throwPulse(sourceFrame, 16));
-        }
-        function samplePath(path, sampleFrame) {
-            const wrapped = mod(sampleFrame, path.length);
-            const leftIndex = Math.floor(wrapped);
-            const rightIndex = (leftIndex + 1) % path.length;
-            const t = wrapped - leftIndex;
-            return Juggler.Math3.lerpVec(path[leftIndex], path[rightIndex], smoothstep(t));
-        }
-        function circularDistance(frame, center, cycle) {
-            const delta = Math.abs(mod(frame - center, cycle));
-            return Math.min(delta, cycle - delta);
-        }
-        function smoothstep(t) {
-            return t * t * (3 - 2 * t);
+            return Math.max(handProximityPulse(nearestBallToHand(sourceFrame, Juggler.MotionData.LEFT_HAND_BALL_CENTER), Juggler.MotionData.LEFT_HAND_BALL_CENTER), handProximityPulse(nearestBallToHand(sourceFrame, Juggler.MotionData.RIGHT_HAND_BALL_CENTER), Juggler.MotionData.RIGHT_HAND_BALL_CENTER));
         }
         function cloneScene(scene) {
             return {
@@ -2321,6 +2363,7 @@ var Juggler;
                 this.frameStarted = 0;
                 this.currentPose = null;
                 this.currentClearance = null;
+                this.currentBallClearance = null;
                 this.frameIndex = rangeStart(pathSettings);
             }
             step(rowsPerTick) {
@@ -2334,6 +2377,7 @@ var Juggler;
                     const frameWorld = Juggler.Motion.resolveWorld(this.scene, this.world, this.motionSettings, sourceFrame);
                     this.currentPose = evaluateCameraPath(this.scene, this.world, this.pathSettings, this.frameIndex);
                     this.currentClearance = Juggler.Motion.frameBodyClearance(frameWorld);
+                    this.currentBallClearance = Juggler.Motion.frameBallClearance(frameWorld);
                     const observer = Juggler.Scenes.createObserverFromPose(this.currentPose, this.width, this.height);
                     this.frameRenderer = new Juggler.Renderer.FrameRenderer(frameWorld, observer, this.renderOptions);
                     this.frameStarted = now();
@@ -2352,6 +2396,7 @@ var Juggler;
                         sceneFrame: Juggler.Motion.animationSampleFrame(this.motionSettings, this.frameIndex, totalFrameCount(this.pathSettings)),
                         motionId: this.motionSettings.motionId,
                         motionClearance: this.currentClearance,
+                        motionBallClearance: this.currentBallClearance,
                         profileId: this.renderOptions.profileId
                     };
                     this.frames.push(completedFrame);
@@ -2360,6 +2405,7 @@ var Juggler;
                     this.frameRenderer = null;
                     this.currentPose = null;
                     this.currentClearance = null;
+                    this.currentBallClearance = null;
                 }
                 return this.progress(completedFrame, this.renderedIndex >= outputFrameCount);
             }
@@ -2771,7 +2817,8 @@ var Juggler;
                 ? `, source ${Juggler.Motion.sourceFrameLabel(frame.sceneFrame)}`
                 : "";
             const clearance = frame.motionClearance === null ? "" : `, clearance ${frame.motionClearance.toFixed(2)}`;
-            setStatus(`Frame ${safeIndex + 1}/${animationFrames.length}, output ${frame.index + 1}${sourceFrame}${clearance} at ${fps} fps`);
+            const ballSpacing = frame.motionBallClearance === null ? "" : `, ball spacing ${frame.motionBallClearance.toFixed(2)}`;
+            setStatus(`Frame ${safeIndex + 1}/${animationFrames.length}, output ${frame.index + 1}${sourceFrame}${clearance}${ballSpacing} at ${fps} fps`);
         }
         function clearAnimationFrames() {
             abortWork();
@@ -2912,6 +2959,7 @@ var Juggler;
                 ["Scene motion", Juggler.Motion.labelFor(motionSettings.motionId)],
                 ["Motion source", Juggler.Motion.motionSummary(active.parsed, motionSettings)],
                 ["Ball clearance", diagnostics ? diagnostics.minBodyClearance.toFixed(2) : "n/a"],
+                ["Ball spacing", diagnostics ? diagnostics.minBallClearance.toFixed(2) : "n/a"],
                 ["Hand contact", diagnostics ? diagnostics.maxHandContactError.toFixed(2) : "n/a"],
                 ["Lamp exposure", active.world.lampExposure.toFixed(2)]
             ]);
@@ -2948,6 +2996,7 @@ var Juggler;
                 ["Scene motion", Juggler.Motion.labelFor(motionSettings.motionId)],
                 ["Motion offset", Juggler.Motion.motionSummary(active.parsed, motionSettings)],
                 ["Min clearance", diagnostics ? diagnostics.minBodyClearance.toFixed(2) : "n/a"],
+                ["Min ball spacing", diagnostics ? diagnostics.minBallClearance.toFixed(2) : "n/a"],
                 ["WebM", pickVideoMimeType("webm") ? "available" : "unavailable"],
                 ["MP4", pickVideoMimeType("mp4") ? "available" : "unavailable"]
             ]);

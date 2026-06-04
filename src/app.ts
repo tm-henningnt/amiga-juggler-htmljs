@@ -381,7 +381,8 @@ namespace Juggler.App {
       ? `, source ${Motion.sourceFrameLabel(frame.sceneFrame)}`
       : "";
     const clearance = frame.motionClearance === null ? "" : `, clearance ${frame.motionClearance.toFixed(2)}`;
-    setStatus(`Frame ${safeIndex + 1}/${animationFrames.length}, output ${frame.index + 1}${sourceFrame}${clearance} at ${fps} fps`);
+    const ballSpacing = frame.motionBallClearance === null ? "" : `, ball spacing ${frame.motionBallClearance.toFixed(2)}`;
+    setStatus(`Frame ${safeIndex + 1}/${animationFrames.length}, output ${frame.index + 1}${sourceFrame}${clearance}${ballSpacing} at ${fps} fps`);
   }
 
   function clearAnimationFrames(): void {
@@ -535,6 +536,7 @@ namespace Juggler.App {
       ["Scene motion", Motion.labelFor(motionSettings.motionId)],
       ["Motion source", Motion.motionSummary(active.parsed, motionSettings)],
       ["Ball clearance", diagnostics ? diagnostics.minBodyClearance.toFixed(2) : "n/a"],
+      ["Ball spacing", diagnostics ? diagnostics.minBallClearance.toFixed(2) : "n/a"],
       ["Hand contact", diagnostics ? diagnostics.maxHandContactError.toFixed(2) : "n/a"],
       ["Lamp exposure", active.world.lampExposure.toFixed(2)]
     ]);
@@ -573,6 +575,7 @@ namespace Juggler.App {
       ["Scene motion", Motion.labelFor(motionSettings.motionId)],
       ["Motion offset", Motion.motionSummary(active.parsed, motionSettings)],
       ["Min clearance", diagnostics ? diagnostics.minBodyClearance.toFixed(2) : "n/a"],
+      ["Min ball spacing", diagnostics ? diagnostics.minBallClearance.toFixed(2) : "n/a"],
       ["WebM", pickVideoMimeType("webm") ? "available" : "unavailable"],
       ["MP4", pickVideoMimeType("mp4") ? "available" : "unavailable"]
     ]);

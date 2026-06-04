@@ -173,6 +173,7 @@ namespace Juggler.Animation {
     private frameStarted = 0;
     private currentPose: CameraPose | null = null;
     private currentClearance: number | null = null;
+    private currentBallClearance: number | null = null;
 
     constructor(
       private readonly scene: ParsedScene,
@@ -198,6 +199,7 @@ namespace Juggler.Animation {
         const frameWorld = Motion.resolveWorld(this.scene, this.world, this.motionSettings, sourceFrame);
         this.currentPose = evaluateCameraPath(this.scene, this.world, this.pathSettings, this.frameIndex);
         this.currentClearance = Motion.frameBodyClearance(frameWorld);
+        this.currentBallClearance = Motion.frameBallClearance(frameWorld);
         const observer = Scenes.createObserverFromPose(this.currentPose, this.width, this.height);
         this.frameRenderer = new Renderer.FrameRenderer(frameWorld, observer, this.renderOptions);
         this.frameStarted = now();
@@ -217,6 +219,7 @@ namespace Juggler.Animation {
           sceneFrame: Motion.animationSampleFrame(this.motionSettings, this.frameIndex, totalFrameCount(this.pathSettings)),
           motionId: this.motionSettings.motionId,
           motionClearance: this.currentClearance,
+          motionBallClearance: this.currentBallClearance,
           profileId: this.renderOptions.profileId
         };
         this.frames.push(completedFrame);
@@ -225,6 +228,7 @@ namespace Juggler.Animation {
         this.frameRenderer = null;
         this.currentPose = null;
         this.currentClearance = null;
+        this.currentBallClearance = null;
       }
 
       return this.progress(completedFrame, this.renderedIndex >= outputFrameCount);

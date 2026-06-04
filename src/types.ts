@@ -160,6 +160,7 @@ namespace Juggler {
     sceneFrame: number;
     motionId: SceneMotionId;
     motionClearance: number | null;
+    motionBallClearance: number | null;
     profileId: RenderProfileId;
   }
 

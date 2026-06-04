@@ -366,6 +366,31 @@ npm run build:single
 
 Browser smoke verification opened the generated `index.html` from disk and confirmed the screen-bar button cycles through `scanlines`, `slot-mask`, `soft-glow`, `off`, then back to `scanlines`, with matching button labels and active states.
 
+## 2026-06-04: Ballistic Cascade And Ball Spacing
+
+A visual review showed that the previous screen-ray fitted ball path still produced physically impossible motion: balls could overlap the juggler in projection and, more concretely, the three mirrored balls passed through each other. The minimum measured ball/ball surface clearance in that model was negative.
+
+The Meatfighter Juggler writeup and final Java source were used as the model for this correction. That implementation controls the balls with two parabolic arcs: a high hand-to-hand arc and a lower crossing arc, with the three balls placed at fixed phase offsets.
+
+Implemented changes:
+
+- Kept the manually labeled historical screen anchors as evidence in `src/motion-data.ts`.
+- Added explicit physical cascade constants: hand ball centers, shared ball plane, high apex, and low crossing apex.
+- Replaced rendered ball placement with a two-arc ballistic cascade inspired by Meatfighter's `JUGGLE_*` constants.
+- Added `Motion.frameBallClearance()` and `minBallClearance` diagnostics.
+- Added ball spacing metadata to rendered animation frames and exposed it in the UI facts/status text.
+- Changed arm targeting to follow the nearest ball to each hand instead of pulsing against fixed source-frame indices.
+
+Verification:
+
+```bash
+npm test
+```
+
+The tests now assert source frame 1 has one apex ball, one left-hand ball, and one right-hand ball; they also require positive body/head clearance and positive ball/ball spacing across the reconstructed cycle.
+
+Browser smoke verification opened the generated `index.html` from disk. The scene facts reported `Ball clearance 0.62` and `Ball spacing 0.25`. A 160 x 100 source-camera render of frames 1-3 produced nonblank frames; scrubbing reported positive per-frame clearance and ball spacing for each frame.
+
 The test suite now includes a regression that renders frames 3-5 of an 8-frame sequence and verifies the returned frames keep absolute indices 3-5 and sample the correct absolute source frame.
 
 Browser smoke verification opened the generated `index.html` directly from disk, rendered an 8-frame static-camera animation range of frames 3-5 at 160 x 100, and confirmed:

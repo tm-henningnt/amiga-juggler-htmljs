@@ -12,7 +12,7 @@ The goal is preservation first: keep the source scene data, HAM-style output pat
 - Includes render profiles and visible mode indicators for source-like HAM output, modern RGB output, and the original reflection quirk study path.
 - Supports static renders, orbit/dolly/custom camera paths, named camera presets, animation rendering, playback, timeline scrubbing, PNG frame export, and browser-supported WebM/MP4 export.
 - Supports selected animation frame ranges, source-cycle presets, and phase-labeled source frames while preserving absolute frame, source-frame, profile, render-time, camera-pose, and motion metadata.
-- Reconstructs a 24-frame juggling motion cycle for the robot scene. The original `.dat` files do not contain animation tracks; the motion is fitted from historical rendered output, depth-corrected along the source camera rays, and kept explicit in `src/motion-data.ts` / `src/motion.ts`.
+- Reconstructs a 24-frame juggling motion cycle for the robot scene. The original `.dat` files do not contain animation tracks; the motion is fitted from historical rendered output, then reconciled with a ballistic cascade model so the balls remain solid and clear the juggler.
 - Produces a single-file `index.html` bundle with no backend and no local server requirement.
 - Includes browser-side CRT emulation modes: off, scanlines, slot mask, and soft glow.
 
@@ -70,8 +70,8 @@ Generated `dist/` and `dist-test/` files are ignored. The standalone `index.html
 - `src/renderer.ts` implements the CPU raytracer.
 - `src/ham.ts` implements the source-like HAM pixel encoding path.
 - `src/animation.ts` resolves camera paths and queues frame rendering.
-- `src/motion-data.ts` stores reference-derived source-ray motion anchors.
-- `src/motion.ts` resolves corrected source-frame scene motion and diagnostics for the juggler.
+- `src/motion-data.ts` stores the physical cascade constants and reference-derived screen anchors.
+- `src/motion.ts` resolves reconstructed source-frame scene motion and diagnostics for the juggler.
 - `src/app.ts` wires the browser UI, rendering loop, playback, and export tools.
 - `scripts/build-single.mjs` inlines compiled JS/CSS into `index.html`.
 

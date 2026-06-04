@@ -2,15 +2,15 @@
 
 ## Completed Foundations
 
-- Source-ray motion anchors are committed in `src/motion-data.ts`.
-- Reconstructed ball positions now preserve source-frame projection while clearing the robot body/head in 3D.
-- Motion diagnostics now report ball/body clearance and hand-contact error.
+- Reference screen anchors and physical cascade constants are committed in `src/motion-data.ts`.
+- Reconstructed ball positions now use a Meatfighter-inspired ballistic cascade so the balls clear the body/head and each other in 3D.
+- Motion diagnostics now report ball/body clearance, ball/ball spacing, and hand-contact error.
 - Frame-range rendering/export is implemented with absolute output-frame metadata.
 - Named camera and source-cycle presets are available for inspecting historical motion phases.
 - Source-frame labels now identify major cycle phases such as apex, left catch, and right catch.
 - Render profiles now expose source-like, modern, and source-quirk mode indicators in the UI.
 - CRT emulation now cycles between off, scanline, slot-mask, and soft-glow modes.
-- Tests now cover projection preservation, body clearance, hand contact, motion metadata, frame-range rendering, presets, phase labels, and unsupported-scene fallback.
+- Tests now cover physical cascade anchors, body clearance, ball spacing, hand contact, motion metadata, frame-range rendering, presets, phase labels, and unsupported-scene fallback.
 
 ## Historical Accuracy
 

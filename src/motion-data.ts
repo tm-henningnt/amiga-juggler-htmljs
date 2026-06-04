@@ -1,12 +1,14 @@
 namespace Juggler.MotionData {
-  export const DEPTH_CORRECTION_SCALE = 0.85;
-  export const SOURCE_CAMERA_POSITION: Vec3 = [-10, -4, 5.5];
+  export const BALL_PLANE_X = -2.0;
+  export const LEFT_HAND_BALL_CENTER: Vec3 = [BALL_PLANE_X, 1.45, 4.05];
+  export const RIGHT_HAND_BALL_CENTER: Vec3 = [BALL_PLANE_X, -1.45, 4.05];
+  export const HIGH_ARC_APEX_Z = 7.0;
+  export const LOW_ARC_APEX_Z = 4.85;
 
   // These points came from the 24 manually labeled historical movie frames.
-  // They are screen-ray anchors, not final physical positions: each point
-  // reprojects to the right source-frame pixel, but the original fixed-depth
-  // back-projection put the path through the robot. Motion.ts applies a
-  // source-ray depth correction before rendering.
+  // They are kept as source-screen evidence. The rendered motion now uses the
+  // ballistic cascade constants above because the fixed-depth screen fit caused
+  // physical ball/body and ball/ball intersections.
   export const RAW_BALL_PATH: Vec3[] = [
     [-0.076, 0.641, 7.191],
     [-0.148, 0.757, 7.033],
