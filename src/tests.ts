@@ -100,6 +100,9 @@ namespace Juggler.Tests {
     const source = Profiles.byId("source-quirk");
     assert(source.reflectionMode === "source-quirk", "source profile keeps source reflection path");
     close(source.epsilon, SOURCE_EPSILON, 0, "source epsilon");
+    assert(Profiles.modeTags(reference).some((tag) => tag.label === "HAM source output" && tag.kind === "source"), "reference profile advertises source output");
+    assert(Profiles.modeTags(wright).some((tag) => tag.label === "RGB modern output" && tag.kind === "modern"), "wright profile advertises modern output");
+    assert(Profiles.modeTags(source).some((tag) => tag.kind === "quirk"), "source quirk profile advertises quirk mode");
 
     const standard = Renderer.reflectVector([1, -1, 0], [0, 1, 0], "standard");
     close(standard[0], 1, 1e-9, "standard reflection x");

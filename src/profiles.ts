@@ -26,4 +26,16 @@ namespace Juggler.Profiles {
   export function byId(id: string): RenderProfile {
     return ALL.find((profile) => profile.id === id) ?? ALL[0];
   }
+
+  export function modeTags(profile: RenderProfile): RenderProfileTag[] {
+    return [
+      profile.outputMode === "source-ham"
+        ? { label: "HAM source output", kind: "source" }
+        : { label: "RGB modern output", kind: "modern" },
+      profile.reflectionMode === "source-quirk"
+        ? { label: "Source reflection quirk", kind: "quirk" }
+        : { label: "Standard reflections", kind: "neutral" },
+      { label: `epsilon ${profile.epsilon}`, kind: "neutral" }
+    ];
+  }
 }

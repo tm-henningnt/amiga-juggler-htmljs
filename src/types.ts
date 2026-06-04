@@ -24,6 +24,11 @@ namespace Juggler {
     epsilon: number;
   }
 
+  export interface RenderProfileTag {
+    label: string;
+    kind: "source" | "modern" | "quirk" | "neutral";
+  }
+
   export interface SceneSource {
     id: string;
     name: string;

@@ -306,6 +306,39 @@ input[type="checkbox"] {
   cursor: pointer;
 }
 
+.mode-indicators {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: -2px 0 8px;
+}
+
+.mode-tag {
+  padding: 1px 5px;
+  color: var(--wb-black);
+  background: var(--wb-gray);
+  font-size: 14px;
+  line-height: 1.2;
+  border-top: 1px solid var(--wb-hi);
+  border-left: 1px solid var(--wb-hi);
+  border-bottom: 1px solid var(--wb-lo);
+  border-right: 1px solid var(--wb-lo);
+}
+
+.mode-tag-source {
+  background: var(--wb-orange);
+}
+
+.mode-tag-modern {
+  color: var(--wb-white);
+  background: var(--wb-blue);
+}
+
+.mode-tag-quirk {
+  color: var(--wb-white);
+  background: var(--wb-black);
+}
+
 /* ─── Buttons ───────────────────────────────────────── */
 .button-row {
   display: grid;

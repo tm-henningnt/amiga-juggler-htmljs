@@ -397,3 +397,29 @@ npm run build:single
 The test suite now checks camera preset application, cycle preset ranges, source-frame labels, and source-range label formatting.
 
 Browser smoke verification opened the generated `index.html` from disk, applied the overhead clearance camera preset and apex-to-left source-cycle preset, then rendered a shortened 1-3 range at 160 x 100. Scrubbing confirmed source labels advanced from `1/24 apex` to `2/24 falling to left catch` and `3/24 falling to left catch`, each frame was nonblank, and adjacent frames differed by more than 7,800 pixels.
+
+## 2026-06-04: Render Profile Mode Indicators
+
+The render panel now makes the selected profile's historical/modern behavior visible without requiring the user to remember what each profile means.
+
+Implemented changes:
+
+- Added `Profiles.modeTags()` to expose profile semantics as structured tags.
+- Added Workbench-style profile indicators under the render profile selector.
+- Tags distinguish HAM source output, RGB modern output, standard reflections, and source reflection quirk mode.
+- Changing render profile refreshes the tags and clears stale animation frames, since buffered frames are profile-specific.
+
+Verification:
+
+```bash
+npm test
+npm run build:single
+```
+
+The test suite now checks that each profile advertises the expected mode tags.
+
+Browser smoke verification switched all three render profiles in the generated `index.html` and confirmed the visible tags update as expected:
+
+- `reference`: HAM source output, standard reflections, epsilon `0.00001`
+- `wright-rgb`: RGB modern output, standard reflections, epsilon `0.00001`
+- `source-quirk`: HAM source output, source reflection quirk, epsilon `0.001`

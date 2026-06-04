@@ -316,6 +316,39 @@ input[type="checkbox"] {
   cursor: pointer;
 }
 
+.mode-indicators {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: -2px 0 8px;
+}
+
+.mode-tag {
+  padding: 1px 5px;
+  color: var(--wb-black);
+  background: var(--wb-gray);
+  font-size: 14px;
+  line-height: 1.2;
+  border-top: 1px solid var(--wb-hi);
+  border-left: 1px solid var(--wb-hi);
+  border-bottom: 1px solid var(--wb-lo);
+  border-right: 1px solid var(--wb-lo);
+}
+
+.mode-tag-source {
+  background: var(--wb-orange);
+}
+
+.mode-tag-modern {
+  color: var(--wb-white);
+  background: var(--wb-blue);
+}
+
+.mode-tag-quirk {
+  color: var(--wb-white);
+  background: var(--wb-black);
+}
+
 /* ─── Buttons ───────────────────────────────────────── */
 .button-row {
   display: grid;
@@ -582,6 +615,7 @@ button:disabled {
             Profile
             <select id="renderProfile"></select>
           </label>
+          <div id="profileIndicators" class="mode-indicators" aria-live="polite"></div>
           <label>
             Rows per tick
             <input id="rowsPerTick" type="range" min="1" max="32" value="4">
@@ -843,6 +877,18 @@ var Juggler;
             return Profiles.ALL.find((profile) => profile.id === id) ?? Profiles.ALL[0];
         }
         Profiles.byId = byId;
+        function modeTags(profile) {
+            return [
+                profile.outputMode === "source-ham"
+                    ? { label: "HAM source output", kind: "source" }
+                    : { label: "RGB modern output", kind: "modern" },
+                profile.reflectionMode === "source-quirk"
+                    ? { label: "Source reflection quirk", kind: "quirk" }
+                    : { label: "Standard reflections", kind: "neutral" },
+                { label: `epsilon ${profile.epsilon}`, kind: "neutral" }
+            ];
+        }
+        Profiles.modeTags = modeTags;
     })(Profiles = Juggler.Profiles || (Juggler.Profiles = {}));
 })(Juggler || (Juggler = {}));
 var Juggler;
@@ -2356,6 +2402,7 @@ var Juggler;
         const motionFrameInput = document.getElementById("motionFrame");
         const resolutionSelect = document.getElementById("resolution");
         const profileSelect = document.getElementById("renderProfile");
+        const profileIndicators = document.getElementById("profileIndicators");
         const rowsPerTickInput = document.getElementById("rowsPerTick");
         const maxDepthInput = document.getElementById("maxDepth");
         const orbitEnabledInput = document.getElementById("orbitEnabled");
@@ -2454,6 +2501,11 @@ var Juggler;
             });
             renderButton.addEventListener("click", () => renderStill());
             abortButton.addEventListener("click", abortWork);
+            profileSelect.addEventListener("change", () => {
+                resetAnimationBuffer();
+                refreshProfileIndicators();
+            });
+            profileSelect.addEventListener("input", refreshProfileIndicators);
             renderAnimationButton.addEventListener("click", () => renderAnimation());
             clearAnimationButton.addEventListener("click", clearAnimationFrames);
             playAnimationButton.addEventListener("click", playAnimation);
@@ -2494,6 +2546,7 @@ var Juggler;
                 control.addEventListener("input", refreshAnimationFacts);
             }
             setActiveSource(sources[0]);
+            refreshProfileIndicators();
             renderStill();
         }
         App.start = start;
@@ -2963,6 +3016,15 @@ var Juggler;
             timelineInput.value = "0";
             progressElement.value = 0;
             updateAnimationButtons(false);
+        }
+        function refreshProfileIndicators() {
+            profileIndicators.innerHTML = "";
+            for (const tag of Juggler.Profiles.modeTags(Juggler.Profiles.byId(profileSelect.value))) {
+                const node = document.createElement("span");
+                node.className = `mode-tag mode-tag-${tag.kind}`;
+                node.textContent = tag.label;
+                profileIndicators.appendChild(node);
+            }
         }
         function drawImageData(data, width, height) {
             if (!context) {

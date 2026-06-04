@@ -8,6 +8,7 @@
 - Frame-range rendering/export is implemented with absolute output-frame metadata.
 - Named camera and source-cycle presets are available for inspecting historical motion phases.
 - Source-frame labels now identify major cycle phases such as apex, left catch, and right catch.
+- Render profiles now expose source-like, modern, and source-quirk mode indicators in the UI.
 - Tests now cover projection preservation, body clearance, hand contact, motion metadata, frame-range rendering, presets, phase labels, and unsupported-scene fallback.
 
 ## Historical Accuracy
@@ -44,7 +45,6 @@
 
 - Add material and lighting inspection controls without making source-like defaults ambiguous.
 - Add camera position/target editing for exact pose work.
-- Add small visual indicators for source-like versus modern render modes.
 - Improve progress reporting for long animation renders.
 - Keep the standalone file-load workflow intact.
 
@@ -67,4 +67,6 @@
 
 ## Ideas
 - Realtime preview / wireframe / solid rendering modes.
--
+- Mouse controlled camera placement / scene rotation
+- Mouse controlled object placement
+- Interactive mode with real-time rendering and free form movement

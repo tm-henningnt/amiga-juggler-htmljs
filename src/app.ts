@@ -11,6 +11,7 @@ namespace Juggler.App {
   const motionFrameInput = document.getElementById("motionFrame") as HTMLInputElement;
   const resolutionSelect = document.getElementById("resolution") as HTMLSelectElement;
   const profileSelect = document.getElementById("renderProfile") as HTMLSelectElement;
+  const profileIndicators = document.getElementById("profileIndicators") as HTMLElement;
   const rowsPerTickInput = document.getElementById("rowsPerTick") as HTMLInputElement;
   const maxDepthInput = document.getElementById("maxDepth") as HTMLInputElement;
   const orbitEnabledInput = document.getElementById("orbitEnabled") as HTMLInputElement;
@@ -113,6 +114,11 @@ namespace Juggler.App {
     });
     renderButton.addEventListener("click", () => renderStill());
     abortButton.addEventListener("click", abortWork);
+    profileSelect.addEventListener("change", () => {
+      resetAnimationBuffer();
+      refreshProfileIndicators();
+    });
+    profileSelect.addEventListener("input", refreshProfileIndicators);
     renderAnimationButton.addEventListener("click", () => renderAnimation());
     clearAnimationButton.addEventListener("click", clearAnimationFrames);
     playAnimationButton.addEventListener("click", playAnimation);
@@ -155,6 +161,7 @@ namespace Juggler.App {
     }
 
     setActiveSource(sources[0]);
+    refreshProfileIndicators();
     renderStill();
   }
 
@@ -688,6 +695,16 @@ namespace Juggler.App {
     timelineInput.value = "0";
     progressElement.value = 0;
     updateAnimationButtons(false);
+  }
+
+  function refreshProfileIndicators(): void {
+    profileIndicators.innerHTML = "";
+    for (const tag of Profiles.modeTags(Profiles.byId(profileSelect.value))) {
+      const node = document.createElement("span");
+      node.className = `mode-tag mode-tag-${tag.kind}`;
+      node.textContent = tag.label;
+      profileIndicators.appendChild(node);
+    }
   }
 
   function drawImageData(data: Uint8ClampedArray, width: number, height: number): void {
