@@ -43,6 +43,7 @@ At a high level it supports:
 - Tile and time-budget rendering for line-order-safe modes.
 - Worker-backed still rendering with main-thread fallback.
 - Source-like HAM output and modern RGB output paths.
+- Opt-in modern quality anti-aliasing.
 - Optional RGB, OCS 12-bit, Extra Half-Brite-style, and approximate HAM6 display constraints.
 - Render profiles that make historically relevant quirks explicit.
 - Fast wireframe and solid previews for interactive scene inspection.

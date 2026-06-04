@@ -670,6 +670,14 @@ button:disabled {
             Display
             <select id="displayConstraint"></select>
           </label>
+          <label>
+            Quality
+            <select id="renderQuality"></select>
+          </label>
+          <label>
+            Anti-alias
+            <select id="antiAlias"></select>
+          </label>
           <div id="profileIndicators" class="mode-indicators" aria-live="polite"></div>
           <label>
             Rows per tick
@@ -1971,6 +1979,16 @@ var Juggler;
 (function (Juggler) {
     var Renderer;
     (function (Renderer) {
+        Renderer.QUALITY_MODES = [
+            { id: "legacy", label: "Legacy" },
+            { id: "interactive", label: "Interactive fast" },
+            { id: "modern-quality", label: "Modern quality" }
+        ];
+        Renderer.ANTI_ALIAS_MODES = [
+            { id: "off", label: "Off" },
+            { id: "ordered-2x", label: "Ordered 2x" },
+            { id: "adaptive-2x", label: "Adaptive 2x" }
+        ];
         class FrameRenderer {
             constructor(world, observer, options) {
                 this.world = world;
@@ -2065,7 +2083,7 @@ var Juggler;
                 incrementStat(this.stats, "tiles");
             }
             renderPixel(x, y) {
-                const brightness = trace(pixelRay(this.observer, x, y), this.world, this.options, this.stats, 0, this.sphereIndex);
+                const brightness = samplePixel(this.observer, x, y, this.world, this.options, this.stats, this.sphereIndex);
                 const rgb = this.options.outputMode === "source-ham"
                     ? this.hamEncoder.encodePixel(x, brightness)
                     : modernRgb(brightness);
@@ -2086,12 +2104,17 @@ var Juggler;
         }
         Renderer.FrameRenderer = FrameRenderer;
         function pixelRay(observer, i, j) {
-            const y = (0.5 * observer.ny - j) * observer.py;
-            const x = (i - 0.5 * observer.nx) * observer.px;
-            const target = Juggler.Math3.add(Juggler.Math3.add(Juggler.Math3.add(Juggler.Math3.mul(observer.viewDir, observer.focalLength), Juggler.Math3.mul(observer.vhat, y)), Juggler.Math3.mul(observer.uhat, x)), observer.position);
-            return { origin: observer.position, direction: Juggler.Math3.sub(target, observer.position) };
+            return pixelRaySample(observer, i, j, 0, 0);
         }
         Renderer.pixelRay = pixelRay;
+        function pixelRaySample(observer, i, j, dx, dy) {
+            const y = (0.5 * observer.ny - j) * observer.py;
+            const x = (i + dx - 0.5 * observer.nx) * observer.px;
+            const sampleY = y - dy * observer.py;
+            const target = Juggler.Math3.add(Juggler.Math3.add(Juggler.Math3.add(Juggler.Math3.mul(observer.viewDir, observer.focalLength), Juggler.Math3.mul(observer.vhat, sampleY)), Juggler.Math3.mul(observer.uhat, x)), observer.position);
+            return { origin: observer.position, direction: Juggler.Math3.sub(target, observer.position) };
+        }
+        Renderer.pixelRaySample = pixelRaySample;
         function trace(ray, world, options, stats, depth, sphereIndex = null) {
             stats.rays += 1;
             const nearest = sphereIndex
@@ -2314,6 +2337,52 @@ var Juggler;
                 Juggler.Math3.clampByte(Math.pow(Math.max(0, brightness[2]), 0.82) * 255)
             ];
         }
+        function samplePixel(observer, x, y, world, options, stats, sphereIndex) {
+            const antiAliasMode = options.antiAliasMode ?? "off";
+            if (antiAliasMode === "off") {
+                return trace(pixelRay(observer, x, y), world, options, stats, 0, sphereIndex);
+            }
+            if (antiAliasMode === "ordered-2x") {
+                return averageBrightness([
+                    trace(pixelRaySample(observer, x, y, 0.25, 0.25), world, options, stats, 0, sphereIndex),
+                    trace(pixelRaySample(observer, x, y, 0.75, 0.25), world, options, stats, 0, sphereIndex),
+                    trace(pixelRaySample(observer, x, y, 0.25, 0.75), world, options, stats, 0, sphereIndex),
+                    trace(pixelRaySample(observer, x, y, 0.75, 0.75), world, options, stats, 0, sphereIndex)
+                ]);
+            }
+            const center = trace(pixelRay(observer, x, y), world, options, stats, 0, sphereIndex);
+            const a = trace(pixelRaySample(observer, x, y, 0.25, 0.25), world, options, stats, 0, sphereIndex);
+            const b = trace(pixelRaySample(observer, x, y, 0.75, 0.75), world, options, stats, 0, sphereIndex);
+            if (colorDistance(center, a) + colorDistance(center, b) < 0.08) {
+                return center;
+            }
+            return averageBrightness([
+                a,
+                trace(pixelRaySample(observer, x, y, 0.75, 0.25), world, options, stats, 0, sphereIndex),
+                trace(pixelRaySample(observer, x, y, 0.25, 0.75), world, options, stats, 0, sphereIndex),
+                b
+            ]);
+        }
+        function averageBrightness(samples) {
+            const total = [0, 0, 0];
+            for (const sample of samples) {
+                total[0] += sample[0];
+                total[1] += sample[1];
+                total[2] += sample[2];
+            }
+            return Juggler.Math3.mul(total, 1 / samples.length);
+        }
+        function colorDistance(a, b) {
+            return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+        }
+        function qualityLabelFor(id) {
+            return Renderer.QUALITY_MODES.find((mode) => mode.id === id)?.label ?? id;
+        }
+        Renderer.qualityLabelFor = qualityLabelFor;
+        function antiAliasLabelFor(id) {
+            return Renderer.ANTI_ALIAS_MODES.find((mode) => mode.id === id)?.label ?? id;
+        }
+        Renderer.antiAliasLabelFor = antiAliasLabelFor;
         class SphereIndex {
             constructor(spheres) {
                 this.root = spheres.length ? buildNode(spheres) : null;
@@ -3886,6 +3955,16 @@ var Juggler;
 (function (Juggler) {
     var Renderer;
     (function (Renderer) {
+        Renderer.QUALITY_MODES = [
+            { id: "legacy", label: "Legacy" },
+            { id: "interactive", label: "Interactive fast" },
+            { id: "modern-quality", label: "Modern quality" }
+        ];
+        Renderer.ANTI_ALIAS_MODES = [
+            { id: "off", label: "Off" },
+            { id: "ordered-2x", label: "Ordered 2x" },
+            { id: "adaptive-2x", label: "Adaptive 2x" }
+        ];
         class FrameRenderer {
             constructor(world, observer, options) {
                 this.world = world;
@@ -3980,7 +4059,7 @@ var Juggler;
                 incrementStat(this.stats, "tiles");
             }
             renderPixel(x, y) {
-                const brightness = trace(pixelRay(this.observer, x, y), this.world, this.options, this.stats, 0, this.sphereIndex);
+                const brightness = samplePixel(this.observer, x, y, this.world, this.options, this.stats, this.sphereIndex);
                 const rgb = this.options.outputMode === "source-ham"
                     ? this.hamEncoder.encodePixel(x, brightness)
                     : modernRgb(brightness);
@@ -4001,12 +4080,17 @@ var Juggler;
         }
         Renderer.FrameRenderer = FrameRenderer;
         function pixelRay(observer, i, j) {
-            const y = (0.5 * observer.ny - j) * observer.py;
-            const x = (i - 0.5 * observer.nx) * observer.px;
-            const target = Juggler.Math3.add(Juggler.Math3.add(Juggler.Math3.add(Juggler.Math3.mul(observer.viewDir, observer.focalLength), Juggler.Math3.mul(observer.vhat, y)), Juggler.Math3.mul(observer.uhat, x)), observer.position);
-            return { origin: observer.position, direction: Juggler.Math3.sub(target, observer.position) };
+            return pixelRaySample(observer, i, j, 0, 0);
         }
         Renderer.pixelRay = pixelRay;
+        function pixelRaySample(observer, i, j, dx, dy) {
+            const y = (0.5 * observer.ny - j) * observer.py;
+            const x = (i + dx - 0.5 * observer.nx) * observer.px;
+            const sampleY = y - dy * observer.py;
+            const target = Juggler.Math3.add(Juggler.Math3.add(Juggler.Math3.add(Juggler.Math3.mul(observer.viewDir, observer.focalLength), Juggler.Math3.mul(observer.vhat, sampleY)), Juggler.Math3.mul(observer.uhat, x)), observer.position);
+            return { origin: observer.position, direction: Juggler.Math3.sub(target, observer.position) };
+        }
+        Renderer.pixelRaySample = pixelRaySample;
         function trace(ray, world, options, stats, depth, sphereIndex = null) {
             stats.rays += 1;
             const nearest = sphereIndex
@@ -4229,6 +4313,52 @@ var Juggler;
                 Juggler.Math3.clampByte(Math.pow(Math.max(0, brightness[2]), 0.82) * 255)
             ];
         }
+        function samplePixel(observer, x, y, world, options, stats, sphereIndex) {
+            const antiAliasMode = options.antiAliasMode ?? "off";
+            if (antiAliasMode === "off") {
+                return trace(pixelRay(observer, x, y), world, options, stats, 0, sphereIndex);
+            }
+            if (antiAliasMode === "ordered-2x") {
+                return averageBrightness([
+                    trace(pixelRaySample(observer, x, y, 0.25, 0.25), world, options, stats, 0, sphereIndex),
+                    trace(pixelRaySample(observer, x, y, 0.75, 0.25), world, options, stats, 0, sphereIndex),
+                    trace(pixelRaySample(observer, x, y, 0.25, 0.75), world, options, stats, 0, sphereIndex),
+                    trace(pixelRaySample(observer, x, y, 0.75, 0.75), world, options, stats, 0, sphereIndex)
+                ]);
+            }
+            const center = trace(pixelRay(observer, x, y), world, options, stats, 0, sphereIndex);
+            const a = trace(pixelRaySample(observer, x, y, 0.25, 0.25), world, options, stats, 0, sphereIndex);
+            const b = trace(pixelRaySample(observer, x, y, 0.75, 0.75), world, options, stats, 0, sphereIndex);
+            if (colorDistance(center, a) + colorDistance(center, b) < 0.08) {
+                return center;
+            }
+            return averageBrightness([
+                a,
+                trace(pixelRaySample(observer, x, y, 0.75, 0.25), world, options, stats, 0, sphereIndex),
+                trace(pixelRaySample(observer, x, y, 0.25, 0.75), world, options, stats, 0, sphereIndex),
+                b
+            ]);
+        }
+        function averageBrightness(samples) {
+            const total = [0, 0, 0];
+            for (const sample of samples) {
+                total[0] += sample[0];
+                total[1] += sample[1];
+                total[2] += sample[2];
+            }
+            return Juggler.Math3.mul(total, 1 / samples.length);
+        }
+        function colorDistance(a, b) {
+            return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+        }
+        function qualityLabelFor(id) {
+            return Renderer.QUALITY_MODES.find((mode) => mode.id === id)?.label ?? id;
+        }
+        Renderer.qualityLabelFor = qualityLabelFor;
+        function antiAliasLabelFor(id) {
+            return Renderer.ANTI_ALIAS_MODES.find((mode) => mode.id === id)?.label ?? id;
+        }
+        Renderer.antiAliasLabelFor = antiAliasLabelFor;
         class SphereIndex {
             constructor(spheres) {
                 this.root = spheres.length ? buildNode(spheres) : null;
@@ -4702,7 +4832,9 @@ var Juggler;
                     width: first?.width ?? 0,
                     height: first?.height ?? 0,
                     profileId: first?.profileId ?? "reference",
-                    displayConstraintId: first?.displayConstraintId ?? "rgb"
+                    displayConstraintId: first?.displayConstraintId ?? "rgb",
+                    qualityId: first?.qualityId ?? "legacy",
+                    antiAliasMode: first?.antiAliasMode ?? "off"
                 },
                 animation: copyPathSettings(pathSettings),
                 motion: { ...motionSettings },
@@ -4784,7 +4916,9 @@ var Juggler;
                         motionBalls: copyMotionSamples(this.currentBallSamples),
                         motionHands: copyMotionSamples(this.currentHandSamples),
                         profileId: this.renderOptions.profileId,
-                        displayConstraintId: this.renderOptions.displayConstraintId ?? "rgb"
+                        displayConstraintId: this.renderOptions.displayConstraintId ?? "rgb",
+                        qualityId: this.renderOptions.qualityId ?? "legacy",
+                        antiAliasMode: this.renderOptions.antiAliasMode ?? "off"
                     };
                     this.frames.push(completedFrame);
                     this.frameIndex += 1;
@@ -4908,6 +5042,8 @@ var Juggler;
         const previewModeSelect = document.getElementById("previewMode");
         const profileSelect = document.getElementById("renderProfile");
         const displayConstraintSelect = document.getElementById("displayConstraint");
+        const renderQualitySelect = document.getElementById("renderQuality");
+        const antiAliasSelect = document.getElementById("antiAlias");
         const profileIndicators = document.getElementById("profileIndicators");
         const rowsPerTickInput = document.getElementById("rowsPerTick");
         const maxDepthInput = document.getElementById("maxDepth");
@@ -4996,6 +5132,18 @@ var Juggler;
                 option.textContent = constraint.label;
                 displayConstraintSelect.appendChild(option);
             }
+            for (const quality of Juggler.Renderer.QUALITY_MODES) {
+                const option = document.createElement("option");
+                option.value = quality.id;
+                option.textContent = quality.label;
+                renderQualitySelect.appendChild(option);
+            }
+            for (const mode of Juggler.Renderer.ANTI_ALIAS_MODES) {
+                const option = document.createElement("option");
+                option.value = mode.id;
+                option.textContent = mode.label;
+                antiAliasSelect.appendChild(option);
+            }
             for (const tool of [
                 { id: "orbit-camera", label: "Orbit camera" },
                 { id: "move-group", label: "Move group" },
@@ -5057,6 +5205,18 @@ var Juggler;
             });
             profileSelect.addEventListener("input", refreshProfileIndicators);
             displayConstraintSelect.addEventListener("change", () => {
+                resetAnimationBuffer();
+                refreshProfileIndicators();
+                refreshAnimationFacts();
+                refreshActiveView();
+            });
+            renderQualitySelect.addEventListener("change", () => {
+                resetAnimationBuffer();
+                refreshProfileIndicators();
+                refreshAnimationFacts();
+                refreshActiveView();
+            });
+            antiAliasSelect.addEventListener("change", () => {
                 resetAnimationBuffer();
                 refreshProfileIndicators();
                 refreshAnimationFacts();
@@ -5172,6 +5332,7 @@ var Juggler;
             const motionSettings = readSceneMotionSettings();
             const profile = Juggler.Profiles.byId(profileSelect.value);
             const displayConstraint = readDisplayConstraint();
+            const quality = readRenderQuality();
             const renderOptions = readRenderOptions(profile);
             const rowsPerTick = readRowsPerTick();
             canvas.width = width;
@@ -5181,7 +5342,7 @@ var Juggler;
             progressElement.value = 0;
             setStatus(`Rendering ${active.source.name}, ${Juggler.Motion.labelFor(motionSettings.motionId)} ` +
                 `(${Juggler.Motion.motionSummary(active.parsed, motionSettings)}) at ${width} x ${height} with ` +
-                `${profile.label}, ${Juggler.Display.labelFor(displayConstraint)} display`);
+                `${profile.label}, ${Juggler.Display.labelFor(displayConstraint)} display, ${Juggler.Renderer.qualityLabelFor(quality)}`);
             if (renderStillInWorker(token, width, height, motionSettings, renderOptions, profile, displayConstraint)) {
                 return;
             }
@@ -5205,7 +5366,7 @@ var Juggler;
                 const seconds = (performance.now() - started) / 1000;
                 renderButton.disabled = false;
                 setStatus(`Done in ${seconds.toFixed(2)}s, ${profile.label}, ${active.world.spheres.length} spheres, ` +
-                    `${Juggler.Display.labelFor(displayConstraint)} display, ` +
+                    `${Juggler.Display.labelFor(displayConstraint)} display, ${Juggler.Renderer.qualityLabelFor(quality)}, ` +
                     `${Juggler.Motion.motionSummary(active.parsed, motionSettings)}, ` +
                     `${renderer.stats.rays} rays, ${renderer.stats.mirrorFallbacks} source-reflection fallbacks`);
             };
@@ -5635,7 +5796,8 @@ var Juggler;
                 renderButton.disabled = false;
                 const seconds = message.renderMs / 1000;
                 setStatus(`Done in ${seconds.toFixed(2)}s worker, ${profile.label}, ${active.world.spheres.length} spheres, ` +
-                    `${Juggler.Display.labelFor(displayConstraint)} display, ${Juggler.Motion.motionSummary(active.parsed, motionSettings)}, ` +
+                    `${Juggler.Display.labelFor(displayConstraint)} display, ${Juggler.Renderer.qualityLabelFor(renderOptions.qualityId ?? "legacy")}, ` +
+                    `${Juggler.Motion.motionSummary(active.parsed, motionSettings)}, ` +
                     `${message.stats.rays} rays, ${message.stats.sphereTests ?? 0} sphere tests`);
             };
             worker.onerror = (event) => {
@@ -5800,6 +5962,8 @@ var Juggler;
                 ["Scene motion", Juggler.Motion.labelFor(motionSettings.motionId)],
                 ["Motion offset", Juggler.Motion.motionSummary(active.parsed, motionSettings)],
                 ["Display", Juggler.Display.labelFor(readDisplayConstraint())],
+                ["Quality", Juggler.Renderer.qualityLabelFor(readRenderQuality())],
+                ["Anti-alias", Juggler.Renderer.antiAliasLabelFor(readEffectiveAntiAliasMode())],
                 ["Min clearance", diagnostics ? diagnostics.minBodyClearance.toFixed(2) : "n/a"],
                 ["Min ball spacing", diagnostics ? diagnostics.minBallClearance.toFixed(2) : "n/a"],
                 ["WebM", pickVideoMimeType("webm") ? "available" : "unavailable"],
@@ -5890,13 +6054,20 @@ var Juggler;
             };
         }
         function readRenderOptions(profile) {
+            const qualityId = readRenderQuality();
             return {
                 profileId: profile.id,
                 outputMode: profile.outputMode,
                 reflectionMode: profile.reflectionMode,
                 epsilon: profile.epsilon,
-                maxDepth: Math.max(1, Math.min(8, Number(maxDepthInput.value) || 4)),
-                displayConstraintId: readDisplayConstraint()
+                maxDepth: qualityId === "interactive"
+                    ? Math.min(2, Math.max(1, Math.min(8, Number(maxDepthInput.value) || 4)))
+                    : Math.max(1, Math.min(8, Number(maxDepthInput.value) || 4)),
+                displayConstraintId: readDisplayConstraint(),
+                qualityId,
+                antiAliasMode: readEffectiveAntiAliasMode(),
+                acceleration: "bvh",
+                tileSize: qualityId === "interactive" ? 16 : 12
             };
         }
         function writeDefaultCustomKeyframes() {
@@ -5920,6 +6091,7 @@ var Juggler;
         }
         function refreshProfileIndicators() {
             profileIndicators.innerHTML = "";
+            antiAliasSelect.disabled = readRenderQuality() !== "modern-quality";
             for (const tag of Juggler.Profiles.modeTags(Juggler.Profiles.byId(profileSelect.value))) {
                 const node = document.createElement("span");
                 node.className = `mode-tag mode-tag-${tag.kind}`;
@@ -5930,6 +6102,14 @@ var Juggler;
             displayNode.className = "mode-tag mode-tag-neutral";
             displayNode.textContent = `Display ${Juggler.Display.labelFor(readDisplayConstraint())}`;
             profileIndicators.appendChild(displayNode);
+            const qualityNode = document.createElement("span");
+            qualityNode.className = "mode-tag mode-tag-neutral";
+            qualityNode.textContent = `Quality ${Juggler.Renderer.qualityLabelFor(readRenderQuality())}`;
+            profileIndicators.appendChild(qualityNode);
+            const aaNode = document.createElement("span");
+            aaNode.className = "mode-tag mode-tag-neutral";
+            aaNode.textContent = `AA ${Juggler.Renderer.antiAliasLabelFor(readEffectiveAntiAliasMode())}`;
+            profileIndicators.appendChild(aaNode);
         }
         function copyAnimationSettings(settings) {
             return {
@@ -5976,6 +6156,17 @@ var Juggler;
         function readDisplayConstraint() {
             const requested = displayConstraintSelect.value;
             return Juggler.Display.CONSTRAINTS.some((constraint) => constraint.id === requested) ? requested : "rgb";
+        }
+        function readRenderQuality() {
+            const requested = renderQualitySelect.value;
+            return Juggler.Renderer.QUALITY_MODES.some((quality) => quality.id === requested) ? requested : "legacy";
+        }
+        function readAntiAliasMode() {
+            const requested = antiAliasSelect.value;
+            return Juggler.Renderer.ANTI_ALIAS_MODES.some((mode) => mode.id === requested) ? requested : "off";
+        }
+        function readEffectiveAntiAliasMode() {
+            return readRenderQuality() === "modern-quality" ? readAntiAliasMode() : "off";
         }
         function readOrbitSettings() {
             return {

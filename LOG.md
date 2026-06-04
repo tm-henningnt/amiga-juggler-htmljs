@@ -679,3 +679,32 @@ Browser smoke verification opened the generated `index.html` directly from disk,
 - The canvas was nonblank.
 - The inline worker source was embedded in the standalone file.
 - No runtime errors appeared in the console; the only warning came from verification-time canvas readbacks.
+
+## 2026-06-04: Modern Quality And Anti-Aliasing
+
+The third modern rendering pass added opt-in modern sampling while keeping the legacy/source-like render path unchanged by default.
+
+Implemented changes:
+
+- Added render quality modes: Legacy, Interactive fast, and Modern quality.
+- Added anti-aliasing modes: Off, Ordered 2x, and Adaptive 2x.
+- Kept Legacy and Interactive quality forced to AA Off so source-like defaults remain stable.
+- Enabled AA controls only when Modern quality is selected.
+- Added quality and AA provenance to animation frames and JSON manifests.
+- Added tests for AA ray-count behavior and manifest metadata.
+- Updated TODO and technical notes to mark optional modern anti-aliasing as completed.
+
+Verification:
+
+```bash
+npm test
+npm run build:single
+```
+
+Browser smoke verification opened the generated `index.html` directly from disk, selected Modern quality with Ordered 2x AA, rendered a 160 x 100 worker-backed still frame, and confirmed:
+
+- The render completed with nonblank output.
+- Profile indicators reported `Quality Modern quality` and `AA Ordered 2x`.
+- AA controls were enabled in Modern quality mode.
+- The render traced more rays than the non-AA baseline.
+- No runtime errors appeared in the console; the only warning came from verification-time canvas readbacks.

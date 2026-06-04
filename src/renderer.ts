@@ -20,6 +20,18 @@ namespace Juggler.Renderer {
     spheres: Sphere[];
   }
 
+  export const QUALITY_MODES: Array<{ id: RenderQualityId; label: string }> = [
+    { id: "legacy", label: "Legacy" },
+    { id: "interactive", label: "Interactive fast" },
+    { id: "modern-quality", label: "Modern quality" }
+  ];
+
+  export const ANTI_ALIAS_MODES: Array<{ id: AntiAliasModeId; label: string }> = [
+    { id: "off", label: "Off" },
+    { id: "ordered-2x", label: "Ordered 2x" },
+    { id: "adaptive-2x", label: "Adaptive 2x" }
+  ];
+
   export class FrameRenderer {
     readonly data: Uint8ClampedArray;
     readonly stats: RenderStats = { rays: 0, mirrorFallbacks: 0 };
@@ -131,7 +143,7 @@ namespace Juggler.Renderer {
     }
 
     private renderPixel(x: number, y: number): void {
-      const brightness = trace(pixelRay(this.observer, x, y), this.world, this.options, this.stats, 0, this.sphereIndex);
+      const brightness = samplePixel(this.observer, x, y, this.world, this.options, this.stats, this.sphereIndex);
       const rgb = this.options.outputMode === "source-ham"
         ? this.hamEncoder!.encodePixel(x, brightness)
         : modernRgb(brightness);
@@ -154,11 +166,16 @@ namespace Juggler.Renderer {
   }
 
   export function pixelRay(observer: Observer, i: number, j: number): Ray {
+    return pixelRaySample(observer, i, j, 0, 0);
+  }
+
+  export function pixelRaySample(observer: Observer, i: number, j: number, dx: number, dy: number): Ray {
     const y = (0.5 * observer.ny - j) * observer.py;
-    const x = (i - 0.5 * observer.nx) * observer.px;
+    const x = (i + dx - 0.5 * observer.nx) * observer.px;
+    const sampleY = y - dy * observer.py;
     const target = Math3.add(
       Math3.add(
-        Math3.add(Math3.mul(observer.viewDir, observer.focalLength), Math3.mul(observer.vhat, y)),
+        Math3.add(Math3.mul(observer.viewDir, observer.focalLength), Math3.mul(observer.vhat, sampleY)),
         Math3.mul(observer.uhat, x)
       ),
       observer.position
@@ -454,6 +471,65 @@ namespace Juggler.Renderer {
       Math3.clampByte(Math.pow(Math.max(0, brightness[1]), 0.82) * 255),
       Math3.clampByte(Math.pow(Math.max(0, brightness[2]), 0.82) * 255)
     ];
+  }
+
+  function samplePixel(
+    observer: Observer,
+    x: number,
+    y: number,
+    world: World,
+    options: RenderOptions,
+    stats: RenderStats,
+    sphereIndex: SphereIndex | null
+  ): Vec3 {
+    const antiAliasMode = options.antiAliasMode ?? "off";
+    if (antiAliasMode === "off") {
+      return trace(pixelRay(observer, x, y), world, options, stats, 0, sphereIndex);
+    }
+
+    if (antiAliasMode === "ordered-2x") {
+      return averageBrightness([
+        trace(pixelRaySample(observer, x, y, 0.25, 0.25), world, options, stats, 0, sphereIndex),
+        trace(pixelRaySample(observer, x, y, 0.75, 0.25), world, options, stats, 0, sphereIndex),
+        trace(pixelRaySample(observer, x, y, 0.25, 0.75), world, options, stats, 0, sphereIndex),
+        trace(pixelRaySample(observer, x, y, 0.75, 0.75), world, options, stats, 0, sphereIndex)
+      ]);
+    }
+
+    const center = trace(pixelRay(observer, x, y), world, options, stats, 0, sphereIndex);
+    const a = trace(pixelRaySample(observer, x, y, 0.25, 0.25), world, options, stats, 0, sphereIndex);
+    const b = trace(pixelRaySample(observer, x, y, 0.75, 0.75), world, options, stats, 0, sphereIndex);
+    if (colorDistance(center, a) + colorDistance(center, b) < 0.08) {
+      return center;
+    }
+    return averageBrightness([
+      a,
+      trace(pixelRaySample(observer, x, y, 0.75, 0.25), world, options, stats, 0, sphereIndex),
+      trace(pixelRaySample(observer, x, y, 0.25, 0.75), world, options, stats, 0, sphereIndex),
+      b
+    ]);
+  }
+
+  function averageBrightness(samples: Vec3[]): Vec3 {
+    const total: Vec3 = [0, 0, 0];
+    for (const sample of samples) {
+      total[0] += sample[0];
+      total[1] += sample[1];
+      total[2] += sample[2];
+    }
+    return Math3.mul(total, 1 / samples.length);
+  }
+
+  function colorDistance(a: Vec3, b: Vec3): number {
+    return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+  }
+
+  export function qualityLabelFor(id: RenderQualityId): string {
+    return QUALITY_MODES.find((mode) => mode.id === id)?.label ?? id;
+  }
+
+  export function antiAliasLabelFor(id: AntiAliasModeId): string {
+    return ANTI_ALIAS_MODES.find((mode) => mode.id === id)?.label ?? id;
   }
 
   export class SphereIndex {

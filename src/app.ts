@@ -23,6 +23,8 @@ namespace Juggler.App {
   const previewModeSelect = document.getElementById("previewMode") as HTMLSelectElement;
   const profileSelect = document.getElementById("renderProfile") as HTMLSelectElement;
   const displayConstraintSelect = document.getElementById("displayConstraint") as HTMLSelectElement;
+  const renderQualitySelect = document.getElementById("renderQuality") as HTMLSelectElement;
+  const antiAliasSelect = document.getElementById("antiAlias") as HTMLSelectElement;
   const profileIndicators = document.getElementById("profileIndicators") as HTMLElement;
   const rowsPerTickInput = document.getElementById("rowsPerTick") as HTMLInputElement;
   const maxDepthInput = document.getElementById("maxDepth") as HTMLInputElement;
@@ -114,6 +116,18 @@ namespace Juggler.App {
       option.textContent = constraint.label;
       displayConstraintSelect.appendChild(option);
     }
+    for (const quality of Renderer.QUALITY_MODES) {
+      const option = document.createElement("option");
+      option.value = quality.id;
+      option.textContent = quality.label;
+      renderQualitySelect.appendChild(option);
+    }
+    for (const mode of Renderer.ANTI_ALIAS_MODES) {
+      const option = document.createElement("option");
+      option.value = mode.id;
+      option.textContent = mode.label;
+      antiAliasSelect.appendChild(option);
+    }
     for (const tool of [
       { id: "orbit-camera" as MouseTool, label: "Orbit camera" },
       { id: "move-group" as MouseTool, label: "Move group" },
@@ -176,6 +190,18 @@ namespace Juggler.App {
     });
     profileSelect.addEventListener("input", refreshProfileIndicators);
     displayConstraintSelect.addEventListener("change", () => {
+      resetAnimationBuffer();
+      refreshProfileIndicators();
+      refreshAnimationFacts();
+      refreshActiveView();
+    });
+    renderQualitySelect.addEventListener("change", () => {
+      resetAnimationBuffer();
+      refreshProfileIndicators();
+      refreshAnimationFacts();
+      refreshActiveView();
+    });
+    antiAliasSelect.addEventListener("change", () => {
       resetAnimationBuffer();
       refreshProfileIndicators();
       refreshAnimationFacts();
@@ -295,6 +321,7 @@ namespace Juggler.App {
     const motionSettings = readSceneMotionSettings();
     const profile = Profiles.byId(profileSelect.value);
     const displayConstraint = readDisplayConstraint();
+    const quality = readRenderQuality();
     const renderOptions = readRenderOptions(profile);
     const rowsPerTick = readRowsPerTick();
 
@@ -306,7 +333,7 @@ namespace Juggler.App {
     setStatus(
       `Rendering ${active.source.name}, ${Motion.labelFor(motionSettings.motionId)} ` +
       `(${Motion.motionSummary(active.parsed, motionSettings)}) at ${width} x ${height} with ` +
-      `${profile.label}, ${Display.labelFor(displayConstraint)} display`
+      `${profile.label}, ${Display.labelFor(displayConstraint)} display, ${Renderer.qualityLabelFor(quality)}`
     );
 
     if (renderStillInWorker(token, width, height, motionSettings, renderOptions, profile, displayConstraint)) {
@@ -337,7 +364,7 @@ namespace Juggler.App {
       renderButton.disabled = false;
       setStatus(
         `Done in ${seconds.toFixed(2)}s, ${profile.label}, ${active.world.spheres.length} spheres, ` +
-        `${Display.labelFor(displayConstraint)} display, ` +
+        `${Display.labelFor(displayConstraint)} display, ${Renderer.qualityLabelFor(quality)}, ` +
         `${Motion.motionSummary(active.parsed, motionSettings)}, ` +
         `${renderer.stats.rays} rays, ${renderer.stats.mirrorFallbacks} source-reflection fallbacks`
       );
@@ -855,7 +882,8 @@ namespace Juggler.App {
       const seconds = message.renderMs / 1000;
       setStatus(
         `Done in ${seconds.toFixed(2)}s worker, ${profile.label}, ${active.world.spheres.length} spheres, ` +
-        `${Display.labelFor(displayConstraint)} display, ${Motion.motionSummary(active.parsed, motionSettings)}, ` +
+        `${Display.labelFor(displayConstraint)} display, ${Renderer.qualityLabelFor(renderOptions.qualityId ?? "legacy")}, ` +
+        `${Motion.motionSummary(active.parsed, motionSettings)}, ` +
         `${message.stats.rays} rays, ${message.stats.sphereTests ?? 0} sphere tests`
       );
     };
@@ -1032,6 +1060,8 @@ namespace Juggler.App {
       ["Scene motion", Motion.labelFor(motionSettings.motionId)],
       ["Motion offset", Motion.motionSummary(active.parsed, motionSettings)],
       ["Display", Display.labelFor(readDisplayConstraint())],
+      ["Quality", Renderer.qualityLabelFor(readRenderQuality())],
+      ["Anti-alias", Renderer.antiAliasLabelFor(readEffectiveAntiAliasMode())],
       ["Min clearance", diagnostics ? diagnostics.minBodyClearance.toFixed(2) : "n/a"],
       ["Min ball spacing", diagnostics ? diagnostics.minBallClearance.toFixed(2) : "n/a"],
       ["WebM", pickVideoMimeType("webm") ? "available" : "unavailable"],
@@ -1131,13 +1161,20 @@ namespace Juggler.App {
   }
 
   function readRenderOptions(profile: RenderProfile): RenderOptions {
+    const qualityId = readRenderQuality();
     return {
       profileId: profile.id,
       outputMode: profile.outputMode,
       reflectionMode: profile.reflectionMode,
       epsilon: profile.epsilon,
-      maxDepth: Math.max(1, Math.min(8, Number(maxDepthInput.value) || 4)),
-      displayConstraintId: readDisplayConstraint()
+      maxDepth: qualityId === "interactive"
+        ? Math.min(2, Math.max(1, Math.min(8, Number(maxDepthInput.value) || 4)))
+        : Math.max(1, Math.min(8, Number(maxDepthInput.value) || 4)),
+      displayConstraintId: readDisplayConstraint(),
+      qualityId,
+      antiAliasMode: readEffectiveAntiAliasMode(),
+      acceleration: "bvh",
+      tileSize: qualityId === "interactive" ? 16 : 12
     };
   }
 
@@ -1164,6 +1201,7 @@ namespace Juggler.App {
 
   function refreshProfileIndicators(): void {
     profileIndicators.innerHTML = "";
+    antiAliasSelect.disabled = readRenderQuality() !== "modern-quality";
     for (const tag of Profiles.modeTags(Profiles.byId(profileSelect.value))) {
       const node = document.createElement("span");
       node.className = `mode-tag mode-tag-${tag.kind}`;
@@ -1174,6 +1212,14 @@ namespace Juggler.App {
     displayNode.className = "mode-tag mode-tag-neutral";
     displayNode.textContent = `Display ${Display.labelFor(readDisplayConstraint())}`;
     profileIndicators.appendChild(displayNode);
+    const qualityNode = document.createElement("span");
+    qualityNode.className = "mode-tag mode-tag-neutral";
+    qualityNode.textContent = `Quality ${Renderer.qualityLabelFor(readRenderQuality())}`;
+    profileIndicators.appendChild(qualityNode);
+    const aaNode = document.createElement("span");
+    aaNode.className = "mode-tag mode-tag-neutral";
+    aaNode.textContent = `AA ${Renderer.antiAliasLabelFor(readEffectiveAntiAliasMode())}`;
+    profileIndicators.appendChild(aaNode);
   }
 
   function copyAnimationSettings(settings: CameraPathSettings): CameraPathSettings {
@@ -1226,6 +1272,20 @@ namespace Juggler.App {
   function readDisplayConstraint(): DisplayConstraintId {
     const requested = displayConstraintSelect.value as DisplayConstraintId;
     return Display.CONSTRAINTS.some((constraint) => constraint.id === requested) ? requested : "rgb";
+  }
+
+  function readRenderQuality(): RenderQualityId {
+    const requested = renderQualitySelect.value as RenderQualityId;
+    return Renderer.QUALITY_MODES.some((quality) => quality.id === requested) ? requested : "legacy";
+  }
+
+  function readAntiAliasMode(): AntiAliasModeId {
+    const requested = antiAliasSelect.value as AntiAliasModeId;
+    return Renderer.ANTI_ALIAS_MODES.some((mode) => mode.id === requested) ? requested : "off";
+  }
+
+  function readEffectiveAntiAliasMode(): AntiAliasModeId {
+    return readRenderQuality() === "modern-quality" ? readAntiAliasMode() : "off";
   }
 
   function readOrbitSettings(): OrbitSettings {

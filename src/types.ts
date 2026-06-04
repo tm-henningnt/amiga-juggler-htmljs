@@ -4,6 +4,8 @@ namespace Juggler {
   export type OutputMode = "source-ham" | "modern-rgb";
   export type ReflectionMode = "standard" | "source-quirk";
   export type RenderProfileId = "reference" | "wright-rgb" | "source-quirk";
+  export type RenderQualityId = "legacy" | "interactive" | "modern-quality";
+  export type AntiAliasModeId = "off" | "ordered-2x" | "adaptive-2x";
   export type RenderAccelerationMode = "none" | "bvh";
   export type PreviewMode = "raytrace" | "wireframe" | "solid";
   export type DisplayConstraintId = "rgb" | "ocs-12bit" | "ehb-64" | "ham6-approx";
@@ -187,6 +189,8 @@ namespace Juggler {
     motionHands: MotionObjectSample[];
     profileId: RenderProfileId;
     displayConstraintId: DisplayConstraintId;
+    qualityId: RenderQualityId;
+    antiAliasMode: AntiAliasModeId;
   }
 
   export interface AnimationManifestDiagnostics {
@@ -231,6 +235,8 @@ namespace Juggler {
       height: number;
       profileId: RenderProfileId;
       displayConstraintId: DisplayConstraintId;
+      qualityId: RenderQualityId;
+      antiAliasMode: AntiAliasModeId;
     };
     animation: CameraPathSettings;
     motion: SceneMotionSettings;
@@ -255,6 +261,8 @@ namespace Juggler {
     epsilon: number;
     maxDepth: number;
     displayConstraintId?: DisplayConstraintId;
+    qualityId?: RenderQualityId;
+    antiAliasMode?: AntiAliasModeId;
     acceleration?: RenderAccelerationMode;
     tileSize?: number;
   }

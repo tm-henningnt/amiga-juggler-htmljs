@@ -306,6 +306,8 @@ namespace Juggler.Tests {
     assert(renderer.frames.every((frame) => frame.motionId === "juggler-reconstructed"), "animation frames record motion mode");
     assert(renderer.frames.every((frame) => frame.profileId === "reference"), "animation frames record render profile");
     assert(renderer.frames.every((frame) => frame.displayConstraintId === "ehb-64"), "animation frames record display constraint");
+    assert(renderer.frames.every((frame) => frame.qualityId === "legacy"), "animation frames record render quality");
+    assert(renderer.frames.every((frame) => frame.antiAliasMode === "off"), "animation frames record anti-alias mode");
     assert(renderer.frames.every((frame) => frame.motionClearance !== null), "animation frames record motion clearance");
     assert(renderer.frames.every((frame) => frame.motionBallClearance !== null), "animation frames record ball spacing");
     assert(renderer.frames.every((frame) => frame.motionBalls.length === 3), "animation frames record ball samples");
@@ -332,6 +334,8 @@ namespace Juggler.Tests {
     assert(manifest.version === 1, "manifest version");
     assert(manifest.render.profileId === "reference", "manifest records render profile");
     assert(manifest.render.displayConstraintId === "ehb-64", "manifest records display constraint");
+    assert(manifest.render.qualityId === "legacy", "manifest records render quality");
+    assert(manifest.render.antiAliasMode === "off", "manifest records anti-alias mode");
     assert(manifest.frames.length === renderer.frames.length, "manifest frame count");
     assert(manifest.frames[0].sourceFrameLabel.includes("apex"), "manifest source frame label");
     assert(manifest.frames[0].motion.balls.length === 3, "manifest records ball samples");
@@ -440,6 +444,36 @@ namespace Juggler.Tests {
     assert(progress > 0 && progress < 1, "budget renderer advances at least one tile");
   }
 
+  function testAntiAliasModes(): void {
+    const scene = parse("robot");
+    const world = Scenes.buildWorld(scene);
+    const observer = Scenes.createObserver(scene, world, 24, 15, { enabled: false, angleDeg: 0, radius: 10 });
+    const profile = Profiles.byId("wright-rgb");
+    const baseOptions: RenderOptions = {
+      profileId: profile.id,
+      outputMode: profile.outputMode,
+      reflectionMode: profile.reflectionMode,
+      epsilon: profile.epsilon,
+      maxDepth: 2,
+      displayConstraintId: "rgb",
+      qualityId: "modern-quality",
+      acceleration: "bvh"
+    };
+
+    const plain = new Renderer.FrameRenderer(world, observer, { ...baseOptions, antiAliasMode: "off" });
+    const ordered = new Renderer.FrameRenderer(world, observer, { ...baseOptions, antiAliasMode: "ordered-2x" });
+    const adaptive = new Renderer.FrameRenderer(world, observer, { ...baseOptions, antiAliasMode: "adaptive-2x" });
+    for (const renderer of [plain, ordered, adaptive]) {
+      while (!renderer.done()) {
+        renderer.renderRows(5);
+      }
+    }
+
+    assert(ordered.stats.rays > plain.stats.rays * 2, "ordered AA traces more rays");
+    assert(adaptive.stats.rays > plain.stats.rays, "adaptive AA traces extra rays");
+    assert(Renderer.antiAliasLabelFor("ordered-2x").includes("2x"), "AA label exposes sampling mode");
+  }
+
   function testRenderSmoke(): void {
     const scene = parse("robot");
     const world = Scenes.buildWorld(scene);
@@ -493,6 +527,7 @@ namespace Juggler.Tests {
     testHamEncoder();
     testDisplayConstraints();
     testAcceleratedRendererParity();
+    testAntiAliasModes();
     testRenderSmoke();
     console.log("All tests passed");
   }
