@@ -666,6 +666,10 @@ button:disabled {
             Profile
             <select id="renderProfile"></select>
           </label>
+          <label>
+            Display
+            <select id="displayConstraint"></select>
+          </label>
           <div id="profileIndicators" class="mode-indicators" aria-live="polite"></div>
           <label>
             Rows per tick
@@ -2090,6 +2094,63 @@ var Juggler;
 })(Juggler || (Juggler = {}));
 var Juggler;
 (function (Juggler) {
+    var Display;
+    (function (Display) {
+        Display.CONSTRAINTS = [
+            { id: "rgb", label: "RGB" },
+            { id: "ocs-12bit", label: "OCS 12-bit" },
+            { id: "ehb-64", label: "EHB 64" },
+            { id: "ham6-approx", label: "HAM6 approx" }
+        ];
+        class ConstraintEncoder {
+            constructor(id) {
+                this.id = id;
+                this.hamEncoder = null;
+                if (id === "ham6-approx") {
+                    this.hamEncoder = new Juggler.Ham.HamEncoder();
+                }
+            }
+            beginLine() {
+                this.hamEncoder?.beginLine();
+            }
+            encodePixel(x, rgb) {
+                if (this.hamEncoder) {
+                    return this.hamEncoder.encodePixel(x, [rgb[0] / 255, rgb[1] / 255, rgb[2] / 255]);
+                }
+                return constrainRgb(this.id, rgb);
+            }
+        }
+        Display.ConstraintEncoder = ConstraintEncoder;
+        function constrainRgb(id, rgb) {
+            switch (id) {
+                case "rgb":
+                    return rgb;
+                case "ocs-12bit":
+                case "ham6-approx":
+                    return rgb.map((channel) => quantize4(channel));
+                case "ehb-64":
+                    return extraHalfBrite(rgb);
+            }
+        }
+        Display.constrainRgb = constrainRgb;
+        function labelFor(id) {
+            return Display.CONSTRAINTS.find((constraint) => constraint.id === id)?.label ?? id;
+        }
+        Display.labelFor = labelFor;
+        function quantize4(value) {
+            return Juggler.Math3.clampByte(Math.round(Juggler.Math3.clampByte(value) / 17) * 17);
+        }
+        function extraHalfBrite(rgb) {
+            const brightness = Math.max(rgb[0], rgb[1], rgb[2]);
+            if (brightness < 128) {
+                return constrainRgb("ocs-12bit", Juggler.Math3.mul(rgb, 2)).map((channel) => Juggler.Math3.clampByte(channel * 0.5));
+            }
+            return constrainRgb("ocs-12bit", rgb);
+        }
+    })(Display = Juggler.Display || (Juggler.Display = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
     var Renderer;
     (function (Renderer) {
         class FrameRenderer {
@@ -2101,6 +2162,7 @@ var Juggler;
                 this.row = 0;
                 this.data = new Uint8ClampedArray(observer.nx * observer.ny * 4);
                 this.hamEncoder = options.outputMode === "source-ham" ? new Juggler.Ham.HamEncoder() : null;
+                this.displayEncoder = new Juggler.Display.ConstraintEncoder(options.displayConstraintId ?? "rgb");
             }
             renderRows(count) {
                 const limit = Math.min(this.observer.ny, this.row + count);
@@ -2108,15 +2170,17 @@ var Juggler;
                     if (this.hamEncoder) {
                         this.hamEncoder.beginLine();
                     }
+                    this.displayEncoder.beginLine();
                     for (let x = 0; x < this.observer.nx; x += 1) {
                         const brightness = trace(pixelRay(this.observer, x, this.row), this.world, this.options, this.stats, 0);
                         const rgb = this.options.outputMode === "source-ham"
                             ? this.hamEncoder.encodePixel(x, brightness)
                             : modernRgb(brightness);
+                        const constrained = this.displayEncoder.encodePixel(x, rgb);
                         const offset = (this.row * this.observer.nx + x) * 4;
-                        this.data[offset] = Juggler.Math3.clampByte(rgb[0]);
-                        this.data[offset + 1] = Juggler.Math3.clampByte(rgb[1]);
-                        this.data[offset + 2] = Juggler.Math3.clampByte(rgb[2]);
+                        this.data[offset] = Juggler.Math3.clampByte(constrained[0]);
+                        this.data[offset + 1] = Juggler.Math3.clampByte(constrained[1]);
+                        this.data[offset + 2] = Juggler.Math3.clampByte(constrained[2]);
                         this.data[offset + 3] = 255;
                     }
                 }
@@ -2492,7 +2556,7 @@ var Juggler;
             return null;
         }
         Preview.pickGroup = pickGroup;
-        function draw(context, world, observer, mode, selectedGroupIndex = null) {
+        function draw(context, world, observer, mode, selectedGroupIndex = null, displayConstraintId = "rgb") {
             context.clearRect(0, 0, observer.nx, observer.ny);
             context.fillStyle = "#000000";
             context.fillRect(0, 0, observer.nx, observer.ny);
@@ -2500,7 +2564,7 @@ var Juggler;
                 return;
             }
             for (const item of projectedSpheres(world, observer)) {
-                const color = sphereColor(item.sphere, mode);
+                const color = sphereColor(item.sphere, mode, displayConstraintId);
                 context.beginPath();
                 context.ellipse(item.x, item.y, Math.max(0.5, item.rx), Math.max(0.5, item.ry), 0, 0, Math.PI * 2);
                 if (mode === "solid") {
@@ -2518,20 +2582,28 @@ var Juggler;
             }
         }
         Preview.draw = draw;
-        function sphereColor(sphere, mode) {
+        function sphereColor(sphere, mode, displayConstraintId) {
             if (sphere.type === Juggler.MIRROR) {
                 return mode === "wireframe"
-                    ? { fill: "rgb(230,230,230)", stroke: "rgb(255,255,255)" }
-                    : { fill: "rgb(210,220,230)", stroke: "rgb(255,255,255)" };
+                    ? colorPair([230, 230, 230], [255, 255, 255], displayConstraintId)
+                    : colorPair([210, 220, 230], [255, 255, 255], displayConstraintId);
             }
             if (sphere.type === Juggler.BRIGHT) {
-                return { fill: "rgb(255,245,150)", stroke: "rgb(255,255,255)" };
+                return colorPair([255, 245, 150], [255, 255, 255], displayConstraintId);
             }
             const rgb = sphere.color.map((channel) => Juggler.Math3.clampByte(channel * 255));
+            return colorPair(rgb, mode === "wireframe" ? [255, 136, 0] : [0, 0, 0], displayConstraintId);
+        }
+        function colorPair(fill, stroke, displayConstraintId) {
+            const constrainedFill = Juggler.Display.constrainRgb(displayConstraintId, fill);
+            const constrainedStroke = Juggler.Display.constrainRgb(displayConstraintId, stroke);
             return {
-                fill: `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`,
-                stroke: mode === "wireframe" ? "rgb(255,136,0)" : "rgb(0,0,0)"
+                fill: cssRgb(constrainedFill),
+                stroke: cssRgb(constrainedStroke)
             };
+        }
+        function cssRgb(rgb) {
+            return `rgb(${Juggler.Math3.clampByte(rgb[0])},${Juggler.Math3.clampByte(rgb[1])},${Juggler.Math3.clampByte(rgb[2])})`;
         }
     })(Preview = Juggler.Preview || (Juggler.Preview = {}));
 })(Juggler || (Juggler = {}));
@@ -2680,7 +2752,8 @@ var Juggler;
                 render: {
                     width: first?.width ?? 0,
                     height: first?.height ?? 0,
-                    profileId: first?.profileId ?? "reference"
+                    profileId: first?.profileId ?? "reference",
+                    displayConstraintId: first?.displayConstraintId ?? "rgb"
                 },
                 animation: copyPathSettings(pathSettings),
                 motion: { ...motionSettings },
@@ -2761,7 +2834,8 @@ var Juggler;
                         motionBallClearance: this.currentBallClearance,
                         motionBalls: copyMotionSamples(this.currentBallSamples),
                         motionHands: copyMotionSamples(this.currentHandSamples),
-                        profileId: this.renderOptions.profileId
+                        profileId: this.renderOptions.profileId,
+                        displayConstraintId: this.renderOptions.displayConstraintId ?? "rgb"
                     };
                     this.frames.push(completedFrame);
                     this.frameIndex += 1;
@@ -2884,6 +2958,7 @@ var Juggler;
         const resolutionSelect = document.getElementById("resolution");
         const previewModeSelect = document.getElementById("previewMode");
         const profileSelect = document.getElementById("renderProfile");
+        const displayConstraintSelect = document.getElementById("displayConstraint");
         const profileIndicators = document.getElementById("profileIndicators");
         const rowsPerTickInput = document.getElementById("rowsPerTick");
         const maxDepthInput = document.getElementById("maxDepth");
@@ -2964,6 +3039,12 @@ var Juggler;
                 option.textContent = mode.label;
                 previewModeSelect.appendChild(option);
             }
+            for (const constraint of Juggler.Display.CONSTRAINTS) {
+                const option = document.createElement("option");
+                option.value = constraint.id;
+                option.textContent = constraint.label;
+                displayConstraintSelect.appendChild(option);
+            }
             for (const tool of [
                 { id: "orbit-camera", label: "Orbit camera" },
                 { id: "move-group", label: "Move group" },
@@ -3024,6 +3105,12 @@ var Juggler;
                 refreshProfileIndicators();
             });
             profileSelect.addEventListener("input", refreshProfileIndicators);
+            displayConstraintSelect.addEventListener("change", () => {
+                resetAnimationBuffer();
+                refreshProfileIndicators();
+                refreshAnimationFacts();
+                refreshActiveView();
+            });
             renderAnimationButton.addEventListener("click", () => renderAnimation());
             clearAnimationButton.addEventListener("click", clearAnimationFrames);
             playAnimationButton.addEventListener("click", playAnimation);
@@ -3135,6 +3222,7 @@ var Juggler;
             const renderWorld = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
             const observer = Juggler.Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
             const profile = Juggler.Profiles.byId(profileSelect.value);
+            const displayConstraint = readDisplayConstraint();
             const renderer = new Juggler.Renderer.FrameRenderer(renderWorld, observer, readRenderOptions(profile));
             const rowsPerTick = readRowsPerTick();
             const image = new ImageData(renderer.data, width, height);
@@ -3144,7 +3232,8 @@ var Juggler;
             renderButton.disabled = true;
             progressElement.value = 0;
             setStatus(`Rendering ${active.source.name}, ${Juggler.Motion.labelFor(motionSettings.motionId)} ` +
-                `(${Juggler.Motion.motionSummary(active.parsed, motionSettings)}) at ${width} x ${height} with ${profile.label}`);
+                `(${Juggler.Motion.motionSummary(active.parsed, motionSettings)}) at ${width} x ${height} with ` +
+                `${profile.label}, ${Juggler.Display.labelFor(displayConstraint)} display`);
             const started = performance.now();
             const tick = () => {
                 if (token !== abortToken) {
@@ -3161,6 +3250,7 @@ var Juggler;
                 const seconds = (performance.now() - started) / 1000;
                 renderButton.disabled = false;
                 setStatus(`Done in ${seconds.toFixed(2)}s, ${profile.label}, ${active.world.spheres.length} spheres, ` +
+                    `${Juggler.Display.labelFor(displayConstraint)} display, ` +
                     `${Juggler.Motion.motionSummary(active.parsed, motionSettings)}, ` +
                     `${renderer.stats.rays} rays, ${renderer.stats.mirrorFallbacks} source-reflection fallbacks`);
             };
@@ -3182,7 +3272,7 @@ var Juggler;
             canvas.width = width;
             canvas.height = height;
             context.imageSmoothingEnabled = false;
-            Juggler.Preview.draw(context, renderWorld, observer, mode, selectedGroupIndex);
+            Juggler.Preview.draw(context, renderWorld, observer, mode, selectedGroupIndex, readDisplayConstraint());
             progressElement.value = 1;
             setStatus(`${previewModeLabel(mode)} preview: ${active.source.name}, ${Juggler.Motion.motionSummary(active.parsed, motionSettings)}, ` +
                 `${renderWorld.spheres.length} spheres`);
@@ -3657,6 +3747,7 @@ var Juggler;
                 ["Source range", Juggler.Motion.sourceRangeLabel(motionSettings, settings.rangeStartFrame, settings.rangeEndFrame, settings.frameCount)],
                 ["Scene motion", Juggler.Motion.labelFor(motionSettings.motionId)],
                 ["Motion offset", Juggler.Motion.motionSummary(active.parsed, motionSettings)],
+                ["Display", Juggler.Display.labelFor(readDisplayConstraint())],
                 ["Min clearance", diagnostics ? diagnostics.minBodyClearance.toFixed(2) : "n/a"],
                 ["Min ball spacing", diagnostics ? diagnostics.minBallClearance.toFixed(2) : "n/a"],
                 ["WebM", pickVideoMimeType("webm") ? "available" : "unavailable"],
@@ -3752,7 +3843,8 @@ var Juggler;
                 outputMode: profile.outputMode,
                 reflectionMode: profile.reflectionMode,
                 epsilon: profile.epsilon,
-                maxDepth: Math.max(1, Math.min(8, Number(maxDepthInput.value) || 4))
+                maxDepth: Math.max(1, Math.min(8, Number(maxDepthInput.value) || 4)),
+                displayConstraintId: readDisplayConstraint()
             };
         }
         function writeDefaultCustomKeyframes() {
@@ -3782,6 +3874,10 @@ var Juggler;
                 node.textContent = tag.label;
                 profileIndicators.appendChild(node);
             }
+            const displayNode = document.createElement("span");
+            displayNode.className = "mode-tag mode-tag-neutral";
+            displayNode.textContent = `Display ${Juggler.Display.labelFor(readDisplayConstraint())}`;
+            profileIndicators.appendChild(displayNode);
         }
         function copyAnimationSettings(settings) {
             return {
@@ -3824,6 +3920,10 @@ var Juggler;
         function readPreviewMode() {
             const requested = previewModeSelect.value;
             return Juggler.Preview.MODES.some((mode) => mode.id === requested) ? requested : "raytrace";
+        }
+        function readDisplayConstraint() {
+            const requested = displayConstraintSelect.value;
+            return Juggler.Display.CONSTRAINTS.some((constraint) => constraint.id === requested) ? requested : "rgb";
         }
         function readOrbitSettings() {
             return {

@@ -22,6 +22,7 @@ namespace Juggler.App {
   const resolutionSelect = document.getElementById("resolution") as HTMLSelectElement;
   const previewModeSelect = document.getElementById("previewMode") as HTMLSelectElement;
   const profileSelect = document.getElementById("renderProfile") as HTMLSelectElement;
+  const displayConstraintSelect = document.getElementById("displayConstraint") as HTMLSelectElement;
   const profileIndicators = document.getElementById("profileIndicators") as HTMLElement;
   const rowsPerTickInput = document.getElementById("rowsPerTick") as HTMLInputElement;
   const maxDepthInput = document.getElementById("maxDepth") as HTMLInputElement;
@@ -105,6 +106,12 @@ namespace Juggler.App {
       option.textContent = mode.label;
       previewModeSelect.appendChild(option);
     }
+    for (const constraint of Display.CONSTRAINTS) {
+      const option = document.createElement("option");
+      option.value = constraint.id;
+      option.textContent = constraint.label;
+      displayConstraintSelect.appendChild(option);
+    }
     for (const tool of [
       { id: "orbit-camera" as MouseTool, label: "Orbit camera" },
       { id: "move-group" as MouseTool, label: "Move group" },
@@ -166,6 +173,12 @@ namespace Juggler.App {
       refreshProfileIndicators();
     });
     profileSelect.addEventListener("input", refreshProfileIndicators);
+    displayConstraintSelect.addEventListener("change", () => {
+      resetAnimationBuffer();
+      refreshProfileIndicators();
+      refreshAnimationFacts();
+      refreshActiveView();
+    });
     renderAnimationButton.addEventListener("click", () => renderAnimation());
     clearAnimationButton.addEventListener("click", clearAnimationFrames);
     playAnimationButton.addEventListener("click", playAnimation);
@@ -281,6 +294,7 @@ namespace Juggler.App {
     const renderWorld = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
     const observer = Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
     const profile = Profiles.byId(profileSelect.value);
+    const displayConstraint = readDisplayConstraint();
     const renderer = new Renderer.FrameRenderer(renderWorld, observer, readRenderOptions(profile));
     const rowsPerTick = readRowsPerTick();
     const image = new ImageData(renderer.data as ImageDataArray, width, height);
@@ -292,7 +306,8 @@ namespace Juggler.App {
     progressElement.value = 0;
     setStatus(
       `Rendering ${active.source.name}, ${Motion.labelFor(motionSettings.motionId)} ` +
-      `(${Motion.motionSummary(active.parsed, motionSettings)}) at ${width} x ${height} with ${profile.label}`
+      `(${Motion.motionSummary(active.parsed, motionSettings)}) at ${width} x ${height} with ` +
+      `${profile.label}, ${Display.labelFor(displayConstraint)} display`
     );
 
     const started = performance.now();
@@ -315,6 +330,7 @@ namespace Juggler.App {
       renderButton.disabled = false;
       setStatus(
         `Done in ${seconds.toFixed(2)}s, ${profile.label}, ${active.world.spheres.length} spheres, ` +
+        `${Display.labelFor(displayConstraint)} display, ` +
         `${Motion.motionSummary(active.parsed, motionSettings)}, ` +
         `${renderer.stats.rays} rays, ${renderer.stats.mirrorFallbacks} source-reflection fallbacks`
       );
@@ -340,7 +356,7 @@ namespace Juggler.App {
     canvas.width = width;
     canvas.height = height;
     context.imageSmoothingEnabled = false;
-    Preview.draw(context, renderWorld, observer, mode, selectedGroupIndex);
+    Preview.draw(context, renderWorld, observer, mode, selectedGroupIndex, readDisplayConstraint());
     progressElement.value = 1;
     setStatus(
       `${previewModeLabel(mode)} preview: ${active.source.name}, ${Motion.motionSummary(active.parsed, motionSettings)}, ` +
@@ -890,6 +906,7 @@ namespace Juggler.App {
       ["Source range", Motion.sourceRangeLabel(motionSettings, settings.rangeStartFrame, settings.rangeEndFrame, settings.frameCount)],
       ["Scene motion", Motion.labelFor(motionSettings.motionId)],
       ["Motion offset", Motion.motionSummary(active.parsed, motionSettings)],
+      ["Display", Display.labelFor(readDisplayConstraint())],
       ["Min clearance", diagnostics ? diagnostics.minBodyClearance.toFixed(2) : "n/a"],
       ["Min ball spacing", diagnostics ? diagnostics.minBallClearance.toFixed(2) : "n/a"],
       ["WebM", pickVideoMimeType("webm") ? "available" : "unavailable"],
@@ -994,7 +1011,8 @@ namespace Juggler.App {
       outputMode: profile.outputMode,
       reflectionMode: profile.reflectionMode,
       epsilon: profile.epsilon,
-      maxDepth: Math.max(1, Math.min(8, Number(maxDepthInput.value) || 4))
+      maxDepth: Math.max(1, Math.min(8, Number(maxDepthInput.value) || 4)),
+      displayConstraintId: readDisplayConstraint()
     };
   }
 
@@ -1027,6 +1045,10 @@ namespace Juggler.App {
       node.textContent = tag.label;
       profileIndicators.appendChild(node);
     }
+    const displayNode = document.createElement("span");
+    displayNode.className = "mode-tag mode-tag-neutral";
+    displayNode.textContent = `Display ${Display.labelFor(readDisplayConstraint())}`;
+    profileIndicators.appendChild(displayNode);
   }
 
   function copyAnimationSettings(settings: CameraPathSettings): CameraPathSettings {
@@ -1074,6 +1096,11 @@ namespace Juggler.App {
   function readPreviewMode(): PreviewMode {
     const requested = previewModeSelect.value as PreviewMode;
     return Preview.MODES.some((mode) => mode.id === requested) ? requested : "raytrace";
+  }
+
+  function readDisplayConstraint(): DisplayConstraintId {
+    const requested = displayConstraintSelect.value as DisplayConstraintId;
+    return Display.CONSTRAINTS.some((constraint) => constraint.id === requested) ? requested : "rgb";
   }
 
   function readOrbitSettings(): OrbitSettings {

@@ -285,7 +285,8 @@ namespace Juggler.Tests {
         outputMode: profile.outputMode,
         reflectionMode: profile.reflectionMode,
         epsilon: profile.epsilon,
-        maxDepth: 4
+        maxDepth: 4,
+        displayConstraintId: "ehb-64"
       },
       settings,
       { motionId: "juggler-reconstructed", sourceFrame: 0 }
@@ -304,6 +305,7 @@ namespace Juggler.Tests {
     assert(renderer.frames.every((frame) => frame.data.length === 24 * 15 * 4), "animation frame data size");
     assert(renderer.frames.every((frame) => frame.motionId === "juggler-reconstructed"), "animation frames record motion mode");
     assert(renderer.frames.every((frame) => frame.profileId === "reference"), "animation frames record render profile");
+    assert(renderer.frames.every((frame) => frame.displayConstraintId === "ehb-64"), "animation frames record display constraint");
     assert(renderer.frames.every((frame) => frame.motionClearance !== null), "animation frames record motion clearance");
     assert(renderer.frames.every((frame) => frame.motionBallClearance !== null), "animation frames record ball spacing");
     assert(renderer.frames.every((frame) => frame.motionBalls.length === 3), "animation frames record ball samples");
@@ -329,6 +331,7 @@ namespace Juggler.Tests {
     assert(manifest.format === "amiga-juggler-animation-manifest", "manifest format id");
     assert(manifest.version === 1, "manifest version");
     assert(manifest.render.profileId === "reference", "manifest records render profile");
+    assert(manifest.render.displayConstraintId === "ehb-64", "manifest records display constraint");
     assert(manifest.frames.length === renderer.frames.length, "manifest frame count");
     assert(manifest.frames[0].sourceFrameLabel.includes("apex"), "manifest source frame label");
     assert(manifest.frames[0].motion.balls.length === 3, "manifest records ball samples");
@@ -379,6 +382,24 @@ namespace Juggler.Tests {
     assert(red[0] >= red[1] && red[0] >= red[2], "HAM red channel update");
   }
 
+  function testDisplayConstraints(): void {
+    const ocs = Display.constrainRgb("ocs-12bit", [18, 31, 250]);
+    close(ocs[0], 17, 0, "OCS red nibble");
+    close(ocs[1], 34, 0, "OCS green nibble");
+    close(ocs[2], 255, 0, "OCS blue nibble");
+
+    const ehb = Display.constrainRgb("ehb-64", [40, 60, 80]);
+    close(ehb[0], 43, 0, "EHB red half-brite");
+    close(ehb[1], 60, 0, "EHB green half-brite");
+    close(ehb[2], 77, 0, "EHB blue half-brite");
+
+    const ham = new Display.ConstraintEncoder("ham6-approx");
+    ham.beginLine();
+    const pixel = ham.encodePixel(0, [200, 120, 40]);
+    assert(pixel.every(Number.isFinite), "HAM display encoder emits finite RGB");
+    assert(Display.labelFor("ham6-approx").includes("HAM6"), "display label exposes HAM6");
+  }
+
   function testRenderSmoke(): void {
     const scene = parse("robot");
     const world = Scenes.buildWorld(scene);
@@ -418,6 +439,7 @@ namespace Juggler.Tests {
     testCustomKeyframes();
     testAnimationRendererQueue();
     testHamEncoder();
+    testDisplayConstraints();
     testRenderSmoke();
     console.log("All tests passed");
   }

@@ -39,7 +39,9 @@ At a high level it supports:
 - Sky and checkerboard floor shading.
 - Direct lighting, shadows, highlights, and mirror reflections.
 - Source-like HAM output and modern RGB output paths.
+- Optional RGB, OCS 12-bit, Extra Half-Brite-style, and approximate HAM6 display constraints.
 - Render profiles that make historically relevant quirks explicit.
+- Fast wireframe and solid previews for interactive scene inspection.
 
 ## Animation Pipeline
 
@@ -59,6 +61,9 @@ Rendered animation frames retain metadata for inspection and export, including s
 - `src/scenes.ts` expands parsed scenes into renderable worlds and creates observers.
 - `src/renderer.ts` implements the CPU raytracer.
 - `src/ham.ts` implements the source-like HAM pixel encoding path.
+- `src/display.ts` applies post-render and preview display constraints.
+- `src/preview.ts` projects scene spheres into fast wireframe and solid canvas previews.
+- `src/transforms.ts` applies session-only group offsets for preview and render inspection.
 - `src/animation.ts` resolves camera paths, queues frame rendering, and builds animation manifests.
 - `src/motion-data.ts` stores reconstruction constants and reference-derived screen anchors.
 - `src/motion.ts` resolves reconstructed juggler ball, body, limb, and diagnostic motion.
@@ -105,4 +110,5 @@ Manual browser checks should use the standalone `index.html` loaded from disk. T
 - Render a short animation range.
 - Check that exported frame numbers and source-frame labels match the requested range.
 - Export a JSON animation manifest and inspect its frame metadata.
-- Switch render profiles and CRT display modes.
+- Switch render profiles, display constraints, preview modes, and CRT display modes.
+- In preview mode, test mouse orbit, wheel zoom, group picking, and temporary group transforms.

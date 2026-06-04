@@ -14,6 +14,7 @@
 - Render profiles now expose source-like, modern, and source-quirk mode indicators in the UI.
 - Realtime wireframe and solid preview modes are available alongside the raytrace view.
 - Preview mode supports mouse orbit, wheel zoom, camera height adjustment, group picking, and session-only group transforms.
+- Display constraints now include RGB, OCS 12-bit, Extra Half-Brite-style 64-color, and approximate HAM6 modes.
 - CRT emulation now cycles between off, scanline, slot-mask, and soft-glow modes.
 - Tests now cover physical cascade anchors, animated body pose, planted feet, body clearance, ball spacing, hand contact, motion metadata, JSON manifests, frame-range rendering, presets, phase labels, and unsupported-scene fallback.
 
@@ -70,7 +71,3 @@
 - Original HAM movie decoder in TypeScript.
 - Data-driven reconstruction of the original animation pipeline.
 - Additional historical scenes and comparison pages.
-
-## Ideas
-- Interactive mode with real-time rendering and free form movement
-- More Amiga like output modes like Half-brite, color constraints etc.

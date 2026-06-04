@@ -12,6 +12,7 @@ namespace Juggler.Renderer {
     readonly data: Uint8ClampedArray;
     readonly stats: RenderStats = { rays: 0, mirrorFallbacks: 0 };
     private readonly hamEncoder: Ham.HamEncoder | null;
+    private readonly displayEncoder: Display.ConstraintEncoder;
     private row = 0;
 
     constructor(
@@ -21,6 +22,7 @@ namespace Juggler.Renderer {
     ) {
       this.data = new Uint8ClampedArray(observer.nx * observer.ny * 4);
       this.hamEncoder = options.outputMode === "source-ham" ? new Ham.HamEncoder() : null;
+      this.displayEncoder = new Display.ConstraintEncoder(options.displayConstraintId ?? "rgb");
     }
 
     renderRows(count: number): number {
@@ -29,15 +31,17 @@ namespace Juggler.Renderer {
         if (this.hamEncoder) {
           this.hamEncoder.beginLine();
         }
+        this.displayEncoder.beginLine();
         for (let x = 0; x < this.observer.nx; x += 1) {
           const brightness = trace(pixelRay(this.observer, x, this.row), this.world, this.options, this.stats, 0);
           const rgb = this.options.outputMode === "source-ham"
             ? this.hamEncoder!.encodePixel(x, brightness)
             : modernRgb(brightness);
+          const constrained = this.displayEncoder.encodePixel(x, rgb);
           const offset = (this.row * this.observer.nx + x) * 4;
-          this.data[offset] = Math3.clampByte(rgb[0]);
-          this.data[offset + 1] = Math3.clampByte(rgb[1]);
-          this.data[offset + 2] = Math3.clampByte(rgb[2]);
+          this.data[offset] = Math3.clampByte(constrained[0]);
+          this.data[offset + 1] = Math3.clampByte(constrained[1]);
+          this.data[offset + 2] = Math3.clampByte(constrained[2]);
           this.data[offset + 3] = 255;
         }
       }

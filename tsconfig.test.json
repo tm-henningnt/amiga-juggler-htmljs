@@ -20,6 +20,7 @@
     "src/motion-data.ts",
     "src/motion.ts",
     "src/ham.ts",
+    "src/display.ts",
     "src/renderer.ts",
     "src/transforms.ts",
     "src/preview.ts",

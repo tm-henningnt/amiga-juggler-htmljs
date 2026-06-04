@@ -53,7 +53,8 @@ namespace Juggler.Preview {
     world: World,
     observer: Observer,
     mode: PreviewMode,
-    selectedGroupIndex: number | null = null
+    selectedGroupIndex: number | null = null,
+    displayConstraintId: DisplayConstraintId = "rgb"
   ): void {
     context.clearRect(0, 0, observer.nx, observer.ny);
     context.fillStyle = "#000000";
@@ -64,7 +65,7 @@ namespace Juggler.Preview {
     }
 
     for (const item of projectedSpheres(world, observer)) {
-      const color = sphereColor(item.sphere, mode);
+      const color = sphereColor(item.sphere, mode, displayConstraintId);
       context.beginPath();
       context.ellipse(item.x, item.y, Math.max(0.5, item.rx), Math.max(0.5, item.ry), 0, 0, Math.PI * 2);
       if (mode === "solid") {
@@ -82,19 +83,29 @@ namespace Juggler.Preview {
     }
   }
 
-  function sphereColor(sphere: Sphere, mode: PreviewMode): { fill: string; stroke: string } {
+  function sphereColor(sphere: Sphere, mode: PreviewMode, displayConstraintId: DisplayConstraintId): { fill: string; stroke: string } {
     if (sphere.type === MIRROR) {
       return mode === "wireframe"
-        ? { fill: "rgb(230,230,230)", stroke: "rgb(255,255,255)" }
-        : { fill: "rgb(210,220,230)", stroke: "rgb(255,255,255)" };
+        ? colorPair([230, 230, 230], [255, 255, 255], displayConstraintId)
+        : colorPair([210, 220, 230], [255, 255, 255], displayConstraintId);
     }
     if (sphere.type === BRIGHT) {
-      return { fill: "rgb(255,245,150)", stroke: "rgb(255,255,255)" };
+      return colorPair([255, 245, 150], [255, 255, 255], displayConstraintId);
     }
     const rgb = sphere.color.map((channel) => Math3.clampByte(channel * 255));
+    return colorPair(rgb as Vec3, mode === "wireframe" ? [255, 136, 0] : [0, 0, 0], displayConstraintId);
+  }
+
+  function colorPair(fill: Vec3, stroke: Vec3, displayConstraintId: DisplayConstraintId): { fill: string; stroke: string } {
+    const constrainedFill = Display.constrainRgb(displayConstraintId, fill);
+    const constrainedStroke = Display.constrainRgb(displayConstraintId, stroke);
     return {
-      fill: `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`,
-      stroke: mode === "wireframe" ? "rgb(255,136,0)" : "rgb(0,0,0)"
+      fill: cssRgb(constrainedFill),
+      stroke: cssRgb(constrainedStroke)
     };
+  }
+
+  function cssRgb(rgb: Vec3): string {
+    return `rgb(${Math3.clampByte(rgb[0])},${Math3.clampByte(rgb[1])},${Math3.clampByte(rgb[2])})`;
   }
 }

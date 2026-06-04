@@ -188,7 +188,8 @@ namespace Juggler.Animation {
       render: {
         width: first?.width ?? 0,
         height: first?.height ?? 0,
-        profileId: first?.profileId ?? "reference"
+        profileId: first?.profileId ?? "reference",
+        displayConstraintId: first?.displayConstraintId ?? "rgb"
       },
       animation: copyPathSettings(pathSettings),
       motion: { ...motionSettings },
@@ -278,7 +279,8 @@ namespace Juggler.Animation {
           motionBallClearance: this.currentBallClearance,
           motionBalls: copyMotionSamples(this.currentBallSamples),
           motionHands: copyMotionSamples(this.currentHandSamples),
-          profileId: this.renderOptions.profileId
+          profileId: this.renderOptions.profileId,
+          displayConstraintId: this.renderOptions.displayConstraintId ?? "rgb"
         };
         this.frames.push(completedFrame);
         this.frameIndex += 1;

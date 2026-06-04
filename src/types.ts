@@ -5,6 +5,7 @@ namespace Juggler {
   export type ReflectionMode = "standard" | "source-quirk";
   export type RenderProfileId = "reference" | "wright-rgb" | "source-quirk";
   export type PreviewMode = "raytrace" | "wireframe" | "solid";
+  export type DisplayConstraintId = "rgb" | "ocs-12bit" | "ehb-64" | "ham6-approx";
   export type MouseTool = "none" | "orbit-camera" | "move-group";
   export type GroupTransformState = Record<number, Vec3>;
   export type CameraPathId = "static" | "orbit-360" | "orbit-arc" | "dolly" | "custom-keyframes";
@@ -184,6 +185,7 @@ namespace Juggler {
     motionBalls: MotionObjectSample[];
     motionHands: MotionObjectSample[];
     profileId: RenderProfileId;
+    displayConstraintId: DisplayConstraintId;
   }
 
   export interface AnimationManifestDiagnostics {
@@ -227,6 +229,7 @@ namespace Juggler {
       width: number;
       height: number;
       profileId: RenderProfileId;
+      displayConstraintId: DisplayConstraintId;
     };
     animation: CameraPathSettings;
     motion: SceneMotionSettings;
@@ -250,6 +253,7 @@ namespace Juggler {
     reflectionMode: ReflectionMode;
     epsilon: number;
     maxDepth: number;
+    displayConstraintId?: DisplayConstraintId;
   }
 
   export interface RenderStats {

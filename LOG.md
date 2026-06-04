@@ -603,3 +603,31 @@ npm run build:single
 ```
 
 Browser smoke verification opened the generated `index.html` directly from disk, switched to solid preview, confirmed a nonblank canvas, used a wheel event to change orbit radius and redraw the preview, and found no console errors.
+
+## 2026-06-04: Amiga Display Constraints
+
+The final TODO ideas pass added explicit display constraints that can be applied to both fast previews and raytraced output.
+
+Implemented changes:
+
+- Added a `Display` selector to the render panel.
+- Added display constraint modes for exact RGB, OCS 12-bit RGB quantization, Extra Half-Brite-style 64-color output, and approximate HAM6 output.
+- Applied the selected display constraint as a post-render pixel pass in the raytracer.
+- Applied the same color constraints to wireframe and solid preview colors for fast inspection.
+- Stored the selected display constraint on rendered animation frames and JSON manifests.
+- Added profile indicator and animation fact text so buffered output provenance is visible in the UI.
+- Removed the completed ideas from `TODO.md`.
+
+Verification:
+
+```bash
+npm test
+npm run build:single
+```
+
+Browser smoke verification opened the generated `index.html` directly from disk and confirmed:
+
+- Solid preview redraws were nonblank for RGB, OCS 12-bit, EHB 64, and HAM6 approx display modes.
+- A 160 x 100 OCS 12-bit raytrace completed with nonblank output.
+- Profile indicators and animation facts reported the active display constraint.
+- No runtime errors appeared in the console; the only warning came from verification-time canvas readbacks.
