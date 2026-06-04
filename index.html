@@ -1443,30 +1443,42 @@ var Juggler;
             return samplePath(BALL_PATH, sampleFrame);
         }
         function armControls(side, sourceFrame) {
-            // Throws happen every 8 frames (path indices 8=left-hand, 16=right-hand).
-            // Left arm (side>0) peaks at index 8 → source frames 0,8,16.
-            // Right arm (side<0) peaks at index 16 → source frames 0,8,16 (staggered via position).
-            const pulse = side > 0
-                ? Math.max(throwPulse(sourceFrame, 0), throwPulse(sourceFrame, 8), throwPulse(sourceFrame, 16))
-                : Math.max(throwPulse(sourceFrame, 4), throwPulse(sourceFrame, 12), throwPulse(sourceFrame, 20));
-            const settle = 1 - pulse;
-            return [
-                {
-                    center: [0, side * 0.7, 5.1],
-                    radius: 0.2,
-                    interpolationFromPrevious: null
-                },
-                {
-                    center: [-0.25 - 0.08 * pulse, side * (1.18 + 0.16 * settle), 4.24 + 0.46 * pulse],
-                    radius: 0.2,
-                    interpolationFromPrevious: 6
-                },
-                {
-                    center: [-1.06 + 0.12 * pulse, side * (1.95 - 0.22 * pulse), 4.1 + 0.72 * pulse],
-                    radius: 0.1,
-                    interpolationFromPrevious: 7
-                }
-            ];
+            // Both arms throw at the same source frames (0, 8, 16) because all three balls
+            // arrive at each hand at those frames due to the 3-fold symmetric offsets.
+            // Wrist positions are aimed at the actual ball hand positions extracted from reference:
+            //   Left  hand: path[8]  = [-1.001, +1.191, 3.330]
+            //   Right hand: path[16] = [-0.382, -0.570, 3.212]
+            const pulse = Math.max(throwPulse(sourceFrame, 0), throwPulse(sourceFrame, 8), throwPulse(sourceFrame, 16));
+            if (side > 0) {
+                // Left arm: base [0, +0.7, 5.1]
+                // rest wrist [-0.85, +1.5, 4.0], throw wrist [-1.0, +1.2, 3.3]
+                return [
+                    { center: [0, 0.7, 5.1], radius: 0.2, interpolationFromPrevious: null },
+                    {
+                        center: [-0.4 - 0.1 * pulse, 1.0 + 0.0 * pulse, 4.6 - 0.4 * pulse],
+                        radius: 0.2, interpolationFromPrevious: 6
+                    },
+                    {
+                        center: [-0.85 - 0.15 * pulse, 1.5 - 0.3 * pulse, 4.0 - 0.7 * pulse],
+                        radius: 0.1, interpolationFromPrevious: 7
+                    }
+                ];
+            }
+            else {
+                // Right arm: base [0, -0.7, 5.1]
+                // rest wrist [-0.7, -1.3, 4.0], throw wrist [-0.4, -0.6, 3.2]
+                return [
+                    { center: [0, -0.7, 5.1], radius: 0.2, interpolationFromPrevious: null },
+                    {
+                        center: [-0.35 + 0.15 * pulse, -1.0 + 0.35 * pulse, 4.55 - 0.4 * pulse],
+                        radius: 0.2, interpolationFromPrevious: 6
+                    },
+                    {
+                        center: [-0.7 + 0.3 * pulse, -1.3 + 0.7 * pulse, 4.0 - 0.8 * pulse],
+                        radius: 0.1, interpolationFromPrevious: 7
+                    }
+                ];
+            }
         }
         function throwPulse(sourceFrame, centerFrame) {
             const distance = circularDistance(sourceFrame, centerFrame, Motion.SOURCE_FRAME_COUNT);
