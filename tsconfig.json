@@ -17,6 +17,7 @@
     "src/original-data.ts",
     "src/scenes.ts",
     "src/parser.ts",
+    "src/motion-data.ts",
     "src/motion.ts",
     "src/ham.ts",
     "src/renderer.ts",

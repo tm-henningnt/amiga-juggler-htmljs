@@ -25,6 +25,8 @@ namespace Juggler.App {
   const animationFacts = document.getElementById("animationFacts") as HTMLElement;
   const animationPathSelect = document.getElementById("animationPath") as HTMLSelectElement;
   const animationFramesInput = document.getElementById("animationFrames") as HTMLInputElement;
+  const animationRangeStartInput = document.getElementById("animationRangeStart") as HTMLInputElement;
+  const animationRangeEndInput = document.getElementById("animationRangeEnd") as HTMLInputElement;
   const animationFpsInput = document.getElementById("animationFps") as HTMLInputElement;
   const animationStartAngleInput = document.getElementById("animationStartAngle") as HTMLInputElement;
   const animationEndAngleInput = document.getElementById("animationEndAngle") as HTMLInputElement;
@@ -115,6 +117,8 @@ namespace Juggler.App {
     for (const control of [
       animationPathSelect,
       animationFramesInput,
+      animationRangeStartInput,
+      animationRangeEndInput,
       animationFpsInput,
       animationStartAngleInput,
       animationEndAngleInput,
@@ -261,7 +265,7 @@ namespace Juggler.App {
     timelineInput.value = "0";
     progressElement.value = 0;
     setStatus(
-      `Rendering ${settings.frameCount} animation frames with ` +
+      `Rendering frames ${settings.rangeStartFrame + 1}-${settings.rangeEndFrame + 1} of ${settings.frameCount} with ` +
       `${Animation.PATHS.find((path) => path.id === settings.pathId)?.label ?? settings.pathId} and ` +
       `${Motion.labelFor(motionSettings.motionId)}`
     );
@@ -346,7 +350,8 @@ namespace Juggler.App {
     const sourceFrame = frame.motionId === "juggler-reconstructed"
       ? `, source frame ${Math.floor(frame.sceneFrame % Motion.SOURCE_FRAME_COUNT) + 1}/${Motion.SOURCE_FRAME_COUNT}`
       : "";
-    setStatus(`Frame ${safeIndex + 1}/${animationFrames.length}${sourceFrame} at ${fps} fps`);
+    const clearance = frame.motionClearance === null ? "" : `, clearance ${frame.motionClearance.toFixed(2)}`;
+    setStatus(`Frame ${safeIndex + 1}/${animationFrames.length}, output ${frame.index + 1}${sourceFrame}${clearance} at ${fps} fps`);
   }
 
   function clearAnimationFrames(): void {
@@ -404,7 +409,7 @@ namespace Juggler.App {
 
     const blob = await stopped;
     const extension = kind === "mp4" ? "mp4" : "webm";
-    downloadBlob(blob, `${active.source.id}-${animationFrames.length}f.${extension}`);
+    downloadBlob(blob, `${active.source.id}-${animationFrames[0].index + 1}-${animationFrames[animationFrames.length - 1].index + 1}.${extension}`);
     setStatus(`Exported ${extension.toUpperCase()} (${formatBytes(blob.size)})`);
   }
 
@@ -425,7 +430,7 @@ namespace Juggler.App {
       exportCanvas.height = frame.height;
       exportContext.putImageData(new ImageData(frame.data as ImageDataArray, frame.width, frame.height), 0, 0);
       const blob = await canvasToBlob(exportCanvas);
-      downloadBlob(blob, `${active.source.id}-${String(frame.index).padStart(4, "0")}.png`);
+      downloadBlob(blob, `${active.source.id}-${String(frame.index + 1).padStart(4, "0")}.png`);
     }
     setStatus(`Exported ${animationFrames.length} PNG frames.`);
   }
@@ -489,6 +494,7 @@ namespace Juggler.App {
   function renderFacts(): void {
     const controls = Scenes.summarizeControls(active.parsed);
     const motionSettings = readSceneMotionSettings();
+    const diagnostics = Motion.diagnostics(active.parsed, active.world, motionSettings);
     setFacts(sceneFacts, [
       ["Groups", String(controls.groups)],
       ["Controls", String(controls.controls)],
@@ -498,6 +504,8 @@ namespace Juggler.App {
       ["Camera paths", Animation.sceneHasCameraPathData(active.parsed) ? "embedded" : "none in .dat"],
       ["Scene motion", Motion.labelFor(motionSettings.motionId)],
       ["Motion source", Motion.motionSummary(active.parsed, motionSettings)],
+      ["Ball clearance", diagnostics ? diagnostics.minBodyClearance.toFixed(2) : "n/a"],
+      ["Hand contact", diagnostics ? diagnostics.maxHandContactError.toFixed(2) : "n/a"],
       ["Lamp exposure", active.world.lampExposure.toFixed(2)]
     ]);
   }
@@ -522,12 +530,16 @@ namespace Juggler.App {
     }
     const settings = readAnimationSettingsLenient();
     const motionSettings = readSceneMotionSettings();
-    const seconds = settings.frameCount / settings.fps;
+    const diagnostics = Motion.diagnostics(active.parsed, active.world, motionSettings);
+    const rangeCount = settings.rangeEndFrame - settings.rangeStartFrame + 1;
+    const seconds = rangeCount / settings.fps;
     setFacts(animationFacts, [
       ["Buffered frames", String(animationFrames.length)],
       ["Duration", `${seconds.toFixed(2)}s`],
+      ["Range", `${settings.rangeStartFrame + 1}-${settings.rangeEndFrame + 1}`],
       ["Scene motion", Motion.labelFor(motionSettings.motionId)],
       ["Motion offset", Motion.motionSummary(active.parsed, motionSettings)],
+      ["Min clearance", diagnostics ? diagnostics.minBodyClearance.toFixed(2) : "n/a"],
       ["WebM", pickVideoMimeType("webm") ? "available" : "unavailable"],
       ["MP4", pickVideoMimeType("mp4") ? "available" : "unavailable"]
     ]);
@@ -543,9 +555,20 @@ namespace Juggler.App {
   }
 
   function readAnimationSettingsLenient(): CameraPathSettings {
+    const frameCount = clampInt(Number(animationFramesInput.value), 1, 360, 24);
+    const rangeStart = clampInt(Number(animationRangeStartInput.value), 1, frameCount, 1) - 1;
+    const rangeEnd = clampInt(Number(animationRangeEndInput.value), 1, frameCount, frameCount) - 1;
+    const safeStart = Math.min(rangeStart, rangeEnd);
+    const safeEnd = Math.max(rangeStart, rangeEnd);
+    animationRangeStartInput.max = String(frameCount);
+    animationRangeEndInput.max = String(frameCount);
+    animationRangeStartInput.value = String(safeStart + 1);
+    animationRangeEndInput.value = String(safeEnd + 1);
     return {
       pathId: animationPathSelect.value as CameraPathId,
-      frameCount: clampInt(Number(animationFramesInput.value), 1, 360, 24),
+      frameCount,
+      rangeStartFrame: safeStart,
+      rangeEndFrame: safeEnd,
       fps: clampInt(Number(animationFpsInput.value), 1, 60, 12),
       startAngleDeg: readNumber(animationStartAngleInput.value, 0),
       endAngleDeg: readNumber(animationEndAngleInput.value, 360),

@@ -11,7 +11,8 @@ The goal is preservation first: keep the source scene data, HAM-style output pat
 - Raytraces spheres, lamps, checkerboard ground, sky gradient, shadows, highlights, and recursive reflections.
 - Includes render profiles for source-like HAM output, modern RGB output, and the original reflection quirk study path.
 - Supports static renders, orbit/dolly/custom camera paths, animation rendering, playback, timeline scrubbing, PNG frame export, and browser-supported WebM/MP4 export.
-- Reconstructs a 24-frame juggling motion cycle for the robot scene. The original `.dat` files do not contain animation tracks; the motion is fitted from historical rendered output and is kept explicit in `src/motion.ts`.
+- Supports selected animation frame ranges while preserving absolute frame, source-frame, profile, render-time, camera-pose, and motion metadata.
+- Reconstructs a 24-frame juggling motion cycle for the robot scene. The original `.dat` files do not contain animation tracks; the motion is fitted from historical rendered output, depth-corrected along the source camera rays, and kept explicit in `src/motion-data.ts` / `src/motion.ts`.
 - Produces a single-file `index.html` bundle with no backend and no local server requirement.
 
 ## Source Material
@@ -68,7 +69,8 @@ Generated `dist/` and `dist-test/` files are ignored. The standalone `index.html
 - `src/renderer.ts` implements the CPU raytracer.
 - `src/ham.ts` implements the source-like HAM pixel encoding path.
 - `src/animation.ts` resolves camera paths and queues frame rendering.
-- `src/motion.ts` contains reconstructed source-frame scene motion for the juggler.
+- `src/motion-data.ts` stores reference-derived source-ray motion anchors.
+- `src/motion.ts` resolves corrected source-frame scene motion and diagnostics for the juggler.
 - `src/app.ts` wires the browser UI, rendering loop, playback, and export tools.
 - `scripts/build-single.mjs` inlines compiled JS/CSS into `index.html`.
 
@@ -82,6 +84,7 @@ Manual browser verification should include:
 - Render the default robot scene at 320 x 200.
 - Switch between static and reconstructed motion.
 - Render a short animation at 160 x 100 or 320 x 200.
+- Render a selected frame range and confirm exported frame numbers match the source timeline.
 - Scrub the timeline and confirm source-frame motion changes.
 - Export WebM/MP4 if supported by the current browser.
 

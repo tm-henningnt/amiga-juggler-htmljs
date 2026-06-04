@@ -125,6 +125,8 @@ namespace Juggler {
   export interface CameraPathSettings {
     pathId: CameraPathId;
     frameCount: number;
+    rangeStartFrame: number;
+    rangeEndFrame: number;
     fps: number;
     startAngleDeg: number;
     endAngleDeg: number;
@@ -150,6 +152,8 @@ namespace Juggler {
     pose: CameraPose;
     sceneFrame: number;
     motionId: SceneMotionId;
+    motionClearance: number | null;
+    profileId: RenderProfileId;
   }
 
   export interface AnimationProgress {

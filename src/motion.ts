@@ -14,38 +14,16 @@ namespace Juggler.Motion {
 
   const LEFT_ARM_GROUP = 12;
   const RIGHT_ARM_GROUP = 11;
-  const TAU = Math.PI * 2;
+  const BODY_COLLISION_GROUPS = [3, 4, 5, 6, 7, 8];
+  const LEFT_CONTACT_INDEX = 8;
+  const RIGHT_CONTACT_INDEX = 16;
 
-  // Reconstructed from manually labeled reference frames.
-  // 72-frame single-ball cycle (fall → hand-transition → rise) compressed 3× to 24 entries.
-  // Seam at index 23→0 is ~0.16 world units — smooth wraparound.
-  // offsets: group0=0 (apex at source 0), group1=8 (left hand), group2=16 (right throw)
-  const BALL_PATH: Vec3[] = [
-    [-0.076,  0.641, 7.191],
-    [-0.148,  0.757, 7.033],
-    [-0.228,  0.834, 6.757],
-    [-0.308,  0.911, 6.482],
-    [-0.420,  0.977, 6.009],
-    [-0.539,  1.040, 5.497],
-    [-0.707,  1.156, 4.827],
-    [-0.820,  1.080, 4.079],
-    [-1.001,  1.191, 3.330],
-    [-0.880,  1.022, 3.645],
-    [-0.777,  0.882, 3.921],
-    [-0.688,  0.737, 4.118],
-    [-0.567,  0.426, 4.158],
-    [-0.494,  0.205, 4.118],
-    [-0.429, -0.055, 3.961],
-    [-0.413, -0.262, 3.645],
-    [-0.382, -0.570, 3.212],
-    [-0.258, -0.383, 4.236],
-    [-0.171, -0.174, 5.103],
-    [-0.101, -0.042, 5.733],
-    [-0.062,  0.114, 6.245],
-    [-0.022,  0.270, 6.757],
-    [-0.029,  0.410, 6.994],
-    [-0.043,  0.511, 7.112]
-  ];
+  export interface MotionDiagnostics {
+    minBodyClearance: number;
+    minBodyClearanceFrame: number;
+    minBodyClearanceBallGroup: number;
+    maxHandContactError: number;
+  }
 
   export function availableMotions(scene: ParsedScene): Array<{ id: SceneMotionId; label: string }> {
     return MOTIONS.filter((motion) => motion.id === "static" || supportsJugglerMotion(scene));
@@ -101,6 +79,91 @@ namespace Juggler.Motion {
     return Scenes.buildWorld(animated);
   }
 
+  export function sourcePathPoint(pathIndex: number): Vec3 {
+    return correctedDepth(rawSourcePathPoint(pathIndex));
+  }
+
+  export function rawSourcePathPoint(pathIndex: number): Vec3 {
+    const index = Math.floor(mod(pathIndex, MotionData.RAW_BALL_PATH.length));
+    return [...MotionData.RAW_BALL_PATH[index]];
+  }
+
+  export function projectToSourcePixel(scene: ParsedScene, point: Vec3): [number, number] {
+    const observer = Scenes.createObserver(scene, Scenes.buildWorld(scene), 320, 200, {
+      enabled: false,
+      angleDeg: 0,
+      radius: 10
+    });
+    const delta = Math3.sub(point, observer.position);
+    const forward = Math3.dot(delta, observer.viewDir);
+    const x = Math3.dot(delta, observer.uhat) * observer.focalLength / forward;
+    const y = Math3.dot(delta, observer.vhat) * observer.focalLength / forward;
+    return [
+      x / observer.px + 0.5 * observer.nx,
+      0.5 * observer.ny - y / observer.py
+    ];
+  }
+
+  export function frameBodyClearance(world: World): number | null {
+    const balls = world.spheres.filter((sphere) => BALL_GROUPS.some((ball) => ball.groupIndex === sphere.groupIndex));
+    const body = world.spheres.filter((sphere) => BODY_COLLISION_GROUPS.includes(sphere.groupIndex));
+    if (!balls.length || !body.length) {
+      return null;
+    }
+
+    let minClearance = BIG;
+    for (const ball of balls) {
+      for (const bodySphere of body) {
+        const distance = Math3.length(Math3.sub(ball.position, bodySphere.position));
+        minClearance = Math.min(minClearance, distance - ball.radius - bodySphere.radius);
+      }
+    }
+    return minClearance;
+  }
+
+  export function diagnostics(scene: ParsedScene, baseWorld: World, settings: SceneMotionSettings): MotionDiagnostics | null {
+    if (settings.motionId !== "juggler-reconstructed" || !supportsJugglerMotion(scene)) {
+      return null;
+    }
+
+    let minBodyClearance = BIG;
+    let minBodyClearanceFrame = 0;
+    let minBodyClearanceBallGroup = -1;
+    let maxHandContactError = 0;
+
+    for (let frame = 0; frame < SOURCE_FRAME_COUNT; frame += 1) {
+      const world = resolveWorld(scene, baseWorld, settings, frame + settings.sourceFrame);
+      const body = world.spheres.filter((sphere) => BODY_COLLISION_GROUPS.includes(sphere.groupIndex));
+      for (const ball of BALL_GROUPS) {
+        const sphere = world.spheres.find((candidate) => candidate.groupIndex === ball.groupIndex);
+        if (!sphere) {
+          continue;
+        }
+        for (const bodySphere of body) {
+          const distance = Math3.length(Math3.sub(sphere.position, bodySphere.position));
+          const clearance = distance - sphere.radius - bodySphere.radius;
+          if (clearance < minBodyClearance) {
+            minBodyClearance = clearance;
+            minBodyClearanceFrame = frame;
+            minBodyClearanceBallGroup = ball.groupIndex;
+          }
+        }
+      }
+
+      if (contactPulse(frame + settings.sourceFrame) > 0.9) {
+        maxHandContactError = Math.max(maxHandContactError, handContactError(world, LEFT_ARM_GROUP));
+        maxHandContactError = Math.max(maxHandContactError, handContactError(world, RIGHT_ARM_GROUP));
+      }
+    }
+
+    return {
+      minBodyClearance,
+      minBodyClearanceFrame,
+      minBodyClearanceBallGroup,
+      maxHandContactError
+    };
+  }
+
   export function motionSummary(scene: ParsedScene, settings: SceneMotionSettings): string {
     if (settings.motionId === "juggler-reconstructed" && supportsJugglerMotion(scene)) {
       return `source frame ${Math.floor(mod(settings.sourceFrame, SOURCE_FRAME_COUNT)) + 1}/${SOURCE_FRAME_COUNT}`;
@@ -119,55 +182,91 @@ namespace Juggler.Motion {
   }
 
   function sampleBall(sampleFrame: number): Vec3 {
-    return samplePath(BALL_PATH, sampleFrame);
+    return samplePath(correctedBallPath(), sampleFrame);
   }
 
   function armControls(side: -1 | 1, sourceFrame: number): SphereControl[] {
-    // Both arms throw at the same source frames (0, 8, 16) because all three balls
-    // arrive at each hand at those frames due to the 3-fold symmetric offsets.
-    // Wrist positions are aimed at the actual ball hand positions extracted from reference:
-    //   Left  hand: path[8]  = [-1.001, +1.191, 3.330]
-    //   Right hand: path[16] = [-0.382, -0.570, 3.212]
     const pulse = Math.max(
       throwPulse(sourceFrame, 0),
       throwPulse(sourceFrame, 8),
       throwPulse(sourceFrame, 16)
     );
+    const leftContact = wristTarget(sourcePathPoint(LEFT_CONTACT_INDEX), 1);
+    const rightContact = wristTarget(sourcePathPoint(RIGHT_CONTACT_INDEX), -1);
+
     if (side > 0) {
-      // Left arm: base [0, +0.7, 5.1]
-      // rest wrist [-0.85, +1.5, 4.0], throw wrist [-1.0, +1.2, 3.3]
+      const wrist = Math3.lerpVec([-1.35, 1.7, 4.05], leftContact, pulse);
+      const elbow = Math3.lerpVec([0, 0.7, 5.1], wrist, 0.55);
       return [
         { center: [0, 0.7, 5.1], radius: 0.2, interpolationFromPrevious: null },
-        {
-          center: [-0.4 - 0.1 * pulse, 1.0 + 0.0 * pulse, 4.6 - 0.4 * pulse],
-          radius: 0.2, interpolationFromPrevious: 6
-        },
-        {
-          center: [-0.85 - 0.15 * pulse, 1.5 - 0.3 * pulse, 4.0 - 0.7 * pulse],
-          radius: 0.1, interpolationFromPrevious: 7
-        }
+        { center: elbow, radius: 0.2, interpolationFromPrevious: 6 },
+        { center: wrist, radius: 0.1, interpolationFromPrevious: 7 }
       ];
     } else {
-      // Right arm: base [0, -0.7, 5.1]
-      // rest wrist [-0.7, -1.3, 4.0], throw wrist [-0.4, -0.6, 3.2]
+      const wrist = Math3.lerpVec([-1.2, -1.55, 4.0], rightContact, pulse);
+      const elbow = Math3.lerpVec([0, -0.7, 5.1], wrist, 0.55);
       return [
         { center: [0, -0.7, 5.1], radius: 0.2, interpolationFromPrevious: null },
-        {
-          center: [-0.35 + 0.15 * pulse, -1.0 + 0.35 * pulse, 4.55 - 0.4 * pulse],
-          radius: 0.2, interpolationFromPrevious: 6
-        },
-        {
-          center: [-0.7 + 0.3 * pulse, -1.3 + 0.7 * pulse, 4.0 - 0.8 * pulse],
-          radius: 0.1, interpolationFromPrevious: 7
-        }
+        { center: elbow, radius: 0.2, interpolationFromPrevious: 6 },
+        { center: wrist, radius: 0.1, interpolationFromPrevious: 7 }
       ];
     }
+  }
+
+  function correctedBallPath(): Vec3[] {
+    return MotionData.RAW_BALL_PATH.map(correctedDepth);
+  }
+
+  function correctedDepth(rawPoint: Vec3): Vec3 {
+    return Math3.add(
+      MotionData.SOURCE_CAMERA_POSITION,
+      Math3.mul(Math3.sub(rawPoint, MotionData.SOURCE_CAMERA_POSITION), MotionData.DEPTH_CORRECTION_SCALE)
+    );
+  }
+
+  function wristTarget(ballCenter: Vec3, side: -1 | 1): Vec3 {
+    return [ballCenter[0] + 0.08, ballCenter[1] + side * 0.16, ballCenter[2] - 0.56];
+  }
+
+  function handContactError(world: World, armGroup: number): number {
+    const wrist = lastSphereForGroup(world, armGroup);
+    if (!wrist) {
+      return BIG;
+    }
+    let best = BIG;
+    for (const ball of BALL_GROUPS) {
+      const sphere = world.spheres.find((candidate) => candidate.groupIndex === ball.groupIndex);
+      if (!sphere) {
+        continue;
+      }
+      const surfaceDistance = Math.abs(Math3.length(Math3.sub(sphere.position, wrist.position)) - sphere.radius - wrist.radius);
+      best = Math.min(best, surfaceDistance);
+    }
+    return best;
+  }
+
+  function lastSphereForGroup(world: World, groupIndex: number): Sphere | null {
+    let match: Sphere | null = null;
+    for (const sphere of world.spheres) {
+      if (sphere.groupIndex === groupIndex) {
+        match = sphere;
+      }
+    }
+    return match;
   }
 
   function throwPulse(sourceFrame: number, centerFrame: number): number {
     const distance = circularDistance(sourceFrame, centerFrame, SOURCE_FRAME_COUNT);
     const normalized = Math.max(0, 1 - distance / 4);
     return normalized * normalized;
+  }
+
+  function contactPulse(sourceFrame: number): number {
+    return Math.max(
+      throwPulse(sourceFrame, 0),
+      throwPulse(sourceFrame, 8),
+      throwPulse(sourceFrame, 16)
+    );
   }
 
   function samplePath(path: Vec3[], sampleFrame: number): Vec3 {

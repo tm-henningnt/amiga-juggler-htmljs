@@ -15,6 +15,8 @@ namespace Juggler.Animation {
     return {
       pathId: "orbit-360",
       frameCount: 24,
+      rangeStartFrame: 0,
+      rangeEndFrame: 23,
       fps: 12,
       startAngleDeg: 0,
       endAngleDeg: 360,
@@ -110,10 +112,12 @@ namespace Juggler.Animation {
 
   export class AnimationRenderer {
     readonly frames: RenderedFrame[] = [];
-    private frameIndex = 0;
+    private frameIndex: number;
+    private renderedIndex = 0;
     private frameRenderer: Renderer.FrameRenderer | null = null;
     private frameStarted = 0;
     private currentPose: CameraPose | null = null;
+    private currentClearance: number | null = null;
 
     constructor(
       private readonly scene: ParsedScene,
@@ -123,18 +127,22 @@ namespace Juggler.Animation {
       private readonly renderOptions: RenderOptions,
       private readonly pathSettings: CameraPathSettings,
       private readonly motionSettings: SceneMotionSettings = { motionId: "static", sourceFrame: 0 }
-    ) {}
+    ) {
+      this.frameIndex = rangeStart(pathSettings);
+    }
 
     step(rowsPerTick: number): AnimationProgress {
-      const frameCount = Math.max(1, Math.round(this.pathSettings.frameCount));
-      if (this.frameIndex >= frameCount) {
+      const outputFrameCount = rangeFrameCount(this.pathSettings);
+      const endFrame = rangeEnd(this.pathSettings);
+      if (this.frameIndex > endFrame) {
         return this.progress(null, true);
       }
 
       if (!this.frameRenderer) {
-        const sourceFrame = Motion.animationSampleFrame(this.motionSettings, this.frameIndex, frameCount);
+        const sourceFrame = Motion.animationSampleFrame(this.motionSettings, this.frameIndex, totalFrameCount(this.pathSettings));
         const frameWorld = Motion.resolveWorld(this.scene, this.world, this.motionSettings, sourceFrame);
         this.currentPose = evaluateCameraPath(this.scene, this.world, this.pathSettings, this.frameIndex);
+        this.currentClearance = Motion.frameBodyClearance(frameWorld);
         const observer = Scenes.createObserverFromPose(this.currentPose, this.width, this.height);
         this.frameRenderer = new Renderer.FrameRenderer(frameWorld, observer, this.renderOptions);
         this.frameStarted = now();
@@ -151,24 +159,28 @@ namespace Juggler.Animation {
           stats: { ...this.frameRenderer.stats },
           renderMs: now() - this.frameStarted,
           pose: this.currentPose!,
-          sceneFrame: Motion.animationSampleFrame(this.motionSettings, this.frameIndex, frameCount),
-          motionId: this.motionSettings.motionId
+          sceneFrame: Motion.animationSampleFrame(this.motionSettings, this.frameIndex, totalFrameCount(this.pathSettings)),
+          motionId: this.motionSettings.motionId,
+          motionClearance: this.currentClearance,
+          profileId: this.renderOptions.profileId
         };
         this.frames.push(completedFrame);
         this.frameIndex += 1;
+        this.renderedIndex += 1;
         this.frameRenderer = null;
         this.currentPose = null;
+        this.currentClearance = null;
       }
 
-      return this.progress(completedFrame, this.frameIndex >= frameCount);
+      return this.progress(completedFrame, this.renderedIndex >= outputFrameCount);
     }
 
     private progress(completedFrame: RenderedFrame | null, done: boolean): AnimationProgress {
-      const frameCount = Math.max(1, Math.round(this.pathSettings.frameCount));
+      const frameCount = rangeFrameCount(this.pathSettings);
       const rowProgress = this.frameRenderer ? this.frameRenderer.progress() : 0;
-      const overallProgress = Math.min(1, (this.frameIndex + rowProgress) / frameCount);
+      const overallProgress = Math.min(1, (this.renderedIndex + rowProgress) / frameCount);
       return {
-        frameIndex: Math.min(this.frameIndex, frameCount - 1),
+        frameIndex: Math.min(this.renderedIndex, frameCount - 1),
         frameCount,
         rowProgress,
         overallProgress,
@@ -186,6 +198,22 @@ namespace Juggler.Animation {
       target: [...target],
       focalLength
     };
+  }
+
+  function totalFrameCount(settings: CameraPathSettings): number {
+    return Math.max(1, Math.round(settings.frameCount));
+  }
+
+  function rangeStart(settings: CameraPathSettings): number {
+    return Math.max(0, Math.min(totalFrameCount(settings) - 1, Math.round(settings.rangeStartFrame)));
+  }
+
+  function rangeEnd(settings: CameraPathSettings): number {
+    return Math.max(rangeStart(settings), Math.min(totalFrameCount(settings) - 1, Math.round(settings.rangeEndFrame)));
+  }
+
+  function rangeFrameCount(settings: CameraPathSettings): number {
+    return rangeEnd(settings) - rangeStart(settings) + 1;
   }
 
   function evaluateKeyframes(keyframes: CameraKeyframe[], t: number, fallback: CameraPose): CameraPose {

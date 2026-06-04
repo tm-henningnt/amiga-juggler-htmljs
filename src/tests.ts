@@ -153,15 +153,26 @@ namespace Juggler.Tests {
     const frame0 = Motion.resolveWorld(robot, robotWorld, { motionId: "juggler-reconstructed", sourceFrame: 0 }, 0);
     assert(frame0 !== robotWorld, "juggler motion resolves a new world");
     assert(frame0.spheres.length === robotWorld.spheres.length, "juggler motion keeps robot sphere count");
-    // Balls at source frame 0: group0 offset=0 → path[0], group1 offset=8 → path[8], group2 offset=16 → path[16]
-    close(frame0.spheres[0].position[0], -0.076, 1e-3, "first ball source x");
-    close(frame0.spheres[0].position[2], 7.191, 1e-3, "first ball source z (apex)");
-    close(frame0.spheres[1].position[2], 3.330, 1e-3, "second ball source z (left hand)");
-    close(frame0.spheres[2].position[2], 3.212, 1e-3, "third ball source z (right throw)");
+    // Balls at source frame 0: group0 offset=0 → path[0], group1 offset=8 → path[8], group2 offset=16 → path[16].
+    // The rendered path is corrected along the same source-screen rays so it clears the body in 3D.
+    close(frame0.spheres[0].position[0], -1.5646, 1e-4, "first ball corrected source x");
+    close(frame0.spheres[0].position[2], 6.93735, 1e-4, "first ball corrected source z (apex)");
+    close(frame0.spheres[1].position[2], 3.6555, 1e-4, "second ball corrected source z (left hand)");
+    close(frame0.spheres[2].position[2], 3.5552, 1e-4, "third ball corrected source z (right throw)");
 
     const frame6 = Motion.resolveWorld(robot, robotWorld, { motionId: "juggler-reconstructed", sourceFrame: 0 }, 6);
     assert(Math.abs(frame6.spheres[0].position[2] - frame0.spheres[0].position[2]) > 1.0, "first ball descends across 6 frames");
-    assert(frame6.spheres[55].position[2] > frame0.spheres[55].position[2], "right arm rises for throw");
+
+    const rawPixel = Motion.projectToSourcePixel(robot, Motion.rawSourcePathPoint(0));
+    const correctedPixel = Motion.projectToSourcePixel(robot, Motion.sourcePathPoint(0));
+    close(correctedPixel[0], rawPixel[0], 1e-9, "depth correction preserves source x projection");
+    close(correctedPixel[1], rawPixel[1], 1e-9, "depth correction preserves source y projection");
+
+    const diagnostics = Motion.diagnostics(robot, robotWorld, { motionId: "juggler-reconstructed", sourceFrame: 0 });
+    assert(diagnostics !== null, "juggler diagnostics available");
+    const motionDiagnostics = diagnostics!;
+    assert(motionDiagnostics.minBodyClearance > 0.35, `juggler balls clear body/head, min ${motionDiagnostics.minBodyClearance}`);
+    assert(motionDiagnostics.maxHandContactError < 0.15, `juggler hands meet balls, max ${motionDiagnostics.maxHandContactError}`);
 
     const elephant = parse("ele");
     assert(!Motion.availableMotions(elephant).some((motion) => motion.id === "juggler-reconstructed"), "elephant stays static-only");
@@ -225,7 +236,42 @@ namespace Juggler.Tests {
     assert(renderer.frames.every((frame, index) => frame.index === index), "animation frame order");
     assert(renderer.frames.every((frame) => frame.data.length === 24 * 15 * 4), "animation frame data size");
     assert(renderer.frames.every((frame) => frame.motionId === "juggler-reconstructed"), "animation frames record motion mode");
+    assert(renderer.frames.every((frame) => frame.profileId === "reference"), "animation frames record render profile");
+    assert(renderer.frames.every((frame) => frame.motionClearance !== null), "animation frames record motion clearance");
     assert(renderer.frames[1].sceneFrame > renderer.frames[0].sceneFrame, "animation frames advance scene source frame");
+
+    const rangeSettings = Animation.defaultSettings();
+    rangeSettings.pathId = "static";
+    rangeSettings.frameCount = 8;
+    rangeSettings.rangeStartFrame = 2;
+    rangeSettings.rangeEndFrame = 4;
+    const rangeRenderer = new Animation.AnimationRenderer(
+      scene,
+      world,
+      16,
+      10,
+      {
+        profileId: profile.id,
+        outputMode: profile.outputMode,
+        reflectionMode: profile.reflectionMode,
+        epsilon: profile.epsilon,
+        maxDepth: 4
+      },
+      rangeSettings,
+      { motionId: "juggler-reconstructed", sourceFrame: 0 }
+    );
+
+    guard = 0;
+    do {
+      progress = rangeRenderer.step(5);
+      guard += 1;
+      assert(guard < 100, "range animation queue completed");
+    } while (!progress.done);
+
+    assert(rangeRenderer.frames.length === 3, "range animation frame count");
+    assert(rangeRenderer.frames[0].index === 2, "range first frame keeps absolute index");
+    assert(rangeRenderer.frames[2].index === 4, "range final frame keeps absolute index");
+    close(rangeRenderer.frames[0].sceneFrame, 6, 1e-9, "range first frame samples absolute source frame");
   }
 
   function testHamEncoder(): void {

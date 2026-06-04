@@ -316,7 +316,7 @@ All tests pass. `npm run build:single` produces a valid standalone `index.html`.
 
 - The hand-level balls (z ≈ 3.2–3.3) are at hip/upper-leg height in the robot's coordinate frame. Some visual overlap with the lower body occurs during the hand-to-hand transition (path indices 9–15), which mirrors the original animation behavior. Further refinement would require per-ball paths rather than the single shared `BALL_PATH`.
 - The arm group indices (11 = right, 12 = left) have not been cross-checked against robot.dat geometry; the assignment may need swapping.
-- The `TAU` constant in `src/motion.ts` is declared but unused — a minor cleanup opportunity.
+- The later depth-correction pass moved path data out of `src/motion.ts`; older inline-path cleanup notes are now superseded.
 
 ## Open Questions
 
@@ -325,3 +325,52 @@ All tests pass. `npm run build:single` produces a valid standalone `index.html`.
 - How close should the renderer aim to get to pixel parity before adding more modern render features?
 - Should the reconstructed motion model remain hand-authored/fitted, or move to a richer keyframe data format?
 - Should the Workbench UI stay purely CSS/HTML, or should period-correct icons and bitmap assets be introduced?
+
+## 2026-06-04: 3D Ball Clearance Correction
+
+The next correction addressed a specific failure in the reference-fitted ball path: the path matched source-frame screen positions, but because it used a fixed-depth back-projection, several balls passed through the robot head and torso in 3D.
+
+The fix keeps the reference-frame pixel alignment but changes the physical depth:
+
+- Moved the raw reference-derived path into `src/motion-data.ts`.
+- Treated those raw points as source camera ray anchors, not final 3D positions.
+- Applied a depth correction scale of `0.85` along the original camera rays.
+- Preserved projection through `Motion.projectToSourcePixel()`.
+- Added body/head clearance diagnostics with `Motion.frameBodyClearance()` and `Motion.diagnostics()`.
+- Made arm wrist targets derive from corrected ball contact positions.
+- Added animation-frame `motionClearance` metadata.
+- Exposed compact clearance/contact facts in the Workbench UI.
+
+Regression tests now verify that corrected points still reproject to the original source pixels, all source-frame balls clear the robot body/head, and hand-contact frames remain close to the arm endpoints.
+
+## 2026-06-04: Frame Range And Animation Metadata
+
+The animation workflow now supports rendering a selected output-frame range instead of always rendering the full timeline.
+
+Implemented changes:
+
+- Added first-frame and last-frame controls to the animation panel.
+- Clamped and normalized frame ranges in the UI, including reversed ranges and frame-count changes.
+- Updated `AnimationRenderer` to render only the requested range while keeping absolute output-frame indices.
+- Kept motion sampling tied to the full animation timeline, so rendering frames 3-5 of an 8-frame animation samples the same motion/camera positions as the full render.
+- Added render profile and ball/body clearance metadata to each completed frame.
+- Updated PNG and video export filenames to use absolute frame numbers.
+- Added UI facts for selected range, duration, render profile, source frame, clearance, hand contact, and minimum clearance.
+
+Verification:
+
+```bash
+npm test
+npm run build:single
+```
+
+The test suite now includes a regression that renders frames 3-5 of an 8-frame sequence and verifies the returned frames keep absolute indices 3-5 and sample the correct absolute source frame.
+
+Browser smoke verification opened the generated `index.html` directly from disk, rendered an 8-frame static-camera animation range of frames 3-5 at 160 x 100, and confirmed:
+
+- The UI reported `Animation ready: 3 frames`.
+- The timeline exposed three buffered frames (`max = 2`).
+- Scrubbing reported absolute output frames 3, 4, and 5.
+- Source frames advanced as 7/24, 10/24, and 13/24.
+- Each canvas frame was nonblank, and adjacent frames differed by thousands of pixels.
+- No runtime errors appeared in the console; the only warning came from verification-time canvas readbacks.
