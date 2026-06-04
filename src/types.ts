@@ -4,6 +4,7 @@ namespace Juggler {
   export type OutputMode = "source-ham" | "modern-rgb";
   export type ReflectionMode = "standard" | "source-quirk";
   export type RenderProfileId = "reference" | "wright-rgb" | "source-quirk";
+  export type RenderAccelerationMode = "none" | "bvh";
   export type PreviewMode = "raytrace" | "wireframe" | "solid";
   export type DisplayConstraintId = "rgb" | "ocs-12bit" | "ehb-64" | "ham6-approx";
   export type MouseTool = "none" | "orbit-camera" | "move-group";
@@ -254,10 +255,16 @@ namespace Juggler {
     epsilon: number;
     maxDepth: number;
     displayConstraintId?: DisplayConstraintId;
+    acceleration?: RenderAccelerationMode;
+    tileSize?: number;
   }
 
   export interface RenderStats {
     rays: number;
     mirrorFallbacks: number;
+    sphereTests?: number;
+    bvhNodeTests?: number;
+    pixels?: number;
+    tiles?: number;
   }
 }

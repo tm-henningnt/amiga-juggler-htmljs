@@ -2159,12 +2159,22 @@ var Juggler;
                 this.observer = observer;
                 this.options = options;
                 this.stats = { rays: 0, mirrorFallbacks: 0 };
+                this.renderMode = null;
                 this.row = 0;
+                this.tileCursor = 0;
                 this.data = new Uint8ClampedArray(observer.nx * observer.ny * 4);
                 this.hamEncoder = options.outputMode === "source-ham" ? new Juggler.Ham.HamEncoder() : null;
                 this.displayEncoder = new Juggler.Display.ConstraintEncoder(options.displayConstraintId ?? "rgb");
+                this.sphereIndex = options.acceleration === "none" ? null : new SphereIndex(world.spheres);
+                this.tileSize = Math.max(4, Math.min(64, Math.round(options.tileSize ?? 16)));
+                this.tileColumns = Math.ceil(observer.nx / this.tileSize);
+                this.tileRows = Math.ceil(observer.ny / this.tileSize);
             }
             renderRows(count) {
+                if (this.renderMode === "tile") {
+                    return this.row;
+                }
+                this.renderMode = "row";
                 const limit = Math.min(this.observer.ny, this.row + count);
                 for (; this.row < limit; this.row += 1) {
                     if (this.hamEncoder) {
@@ -2172,25 +2182,88 @@ var Juggler;
                     }
                     this.displayEncoder.beginLine();
                     for (let x = 0; x < this.observer.nx; x += 1) {
-                        const brightness = trace(pixelRay(this.observer, x, this.row), this.world, this.options, this.stats, 0);
-                        const rgb = this.options.outputMode === "source-ham"
-                            ? this.hamEncoder.encodePixel(x, brightness)
-                            : modernRgb(brightness);
-                        const constrained = this.displayEncoder.encodePixel(x, rgb);
-                        const offset = (this.row * this.observer.nx + x) * 4;
-                        this.data[offset] = Juggler.Math3.clampByte(constrained[0]);
-                        this.data[offset + 1] = Juggler.Math3.clampByte(constrained[1]);
-                        this.data[offset + 2] = Juggler.Math3.clampByte(constrained[2]);
-                        this.data[offset + 3] = 255;
+                        this.renderPixel(x, this.row);
                     }
                 }
                 return this.row;
             }
+            renderBudget(milliseconds) {
+                const deadline = now() + Math.max(0, milliseconds);
+                if (this.requiresLineOrder()) {
+                    this.renderMode = "row";
+                    do {
+                        this.renderRows(1);
+                    } while (!this.done() && now() < deadline);
+                    return this.progress();
+                }
+                this.renderMode = "tile";
+                do {
+                    this.renderNextTile();
+                } while (!this.done() && now() < deadline);
+                return this.progress();
+            }
+            renderTiles(count) {
+                if (this.requiresLineOrder()) {
+                    return this.renderRows(count);
+                }
+                if (this.renderMode === "row") {
+                    return this.tileCursor;
+                }
+                this.renderMode = "tile";
+                const limit = Math.min(this.totalTiles(), this.tileCursor + Math.max(1, Math.round(count)));
+                while (this.tileCursor < limit) {
+                    this.renderNextTile();
+                }
+                return this.tileCursor;
+            }
             done() {
+                if (this.renderMode === "tile") {
+                    return this.tileCursor >= this.totalTiles();
+                }
                 return this.row >= this.observer.ny;
             }
             progress() {
+                if (this.renderMode === "tile") {
+                    return this.tileCursor / this.totalTiles();
+                }
                 return this.row / this.observer.ny;
+            }
+            renderNextTile() {
+                if (this.tileCursor >= this.totalTiles()) {
+                    return;
+                }
+                const tileX = this.tileCursor % this.tileColumns;
+                const tileY = Math.floor(this.tileCursor / this.tileColumns);
+                const x0 = tileX * this.tileSize;
+                const y0 = tileY * this.tileSize;
+                const x1 = Math.min(this.observer.nx, x0 + this.tileSize);
+                const y1 = Math.min(this.observer.ny, y0 + this.tileSize);
+                for (let y = y0; y < y1; y += 1) {
+                    for (let x = x0; x < x1; x += 1) {
+                        this.renderPixel(x, y);
+                    }
+                }
+                this.tileCursor += 1;
+                incrementStat(this.stats, "tiles");
+            }
+            renderPixel(x, y) {
+                const brightness = trace(pixelRay(this.observer, x, y), this.world, this.options, this.stats, 0, this.sphereIndex);
+                const rgb = this.options.outputMode === "source-ham"
+                    ? this.hamEncoder.encodePixel(x, brightness)
+                    : modernRgb(brightness);
+                const constrained = this.displayEncoder.encodePixel(x, rgb);
+                const offset = (y * this.observer.nx + x) * 4;
+                this.data[offset] = Juggler.Math3.clampByte(constrained[0]);
+                this.data[offset + 1] = Juggler.Math3.clampByte(constrained[1]);
+                this.data[offset + 2] = Juggler.Math3.clampByte(constrained[2]);
+                this.data[offset + 3] = 255;
+                incrementStat(this.stats, "pixels");
+            }
+            requiresLineOrder() {
+                return this.options.outputMode === "source-ham" || this.options.displayConstraintId === "ham6-approx";
+            }
+            totalTiles() {
+                return this.tileColumns * this.tileRows;
             }
         }
         Renderer.FrameRenderer = FrameRenderer;
@@ -2201,17 +2274,13 @@ var Juggler;
             return { origin: observer.position, direction: Juggler.Math3.sub(target, observer.position) };
         }
         Renderer.pixelRay = pixelRay;
-        function trace(ray, world, options, stats, depth) {
+        function trace(ray, world, options, stats, depth, sphereIndex = null) {
             stats.rays += 1;
-            let tMin = Juggler.BIG;
-            let nearestSphere = null;
-            for (const sphere of world.spheres) {
-                const t = intersectSphere(ray, sphere, options.epsilon);
-                if (t !== null && t < tMin) {
-                    tMin = t;
-                    nearestSphere = sphere;
-                }
-            }
+            const nearest = sphereIndex
+                ? sphereIndex.nearest(ray, options.epsilon, stats)
+                : nearestSphere(ray, world.spheres, options.epsilon, stats);
+            let tMin = nearest?.t ?? Juggler.BIG;
+            const nearestSphereHit = nearest?.sphere ?? null;
             for (const lamp of world.lamps) {
                 const t = intersectLamp(ray, lamp, options.epsilon);
                 if (t !== null && t < tMin) {
@@ -2232,24 +2301,24 @@ var Juggler;
                     color: world.horizon[tile].color,
                     sphere: null
                 };
-                return patchBrightness(patch, world, options);
+                return patchBrightness(patch, world, options, stats, sphereIndex);
             }
-            if (nearestSphere) {
+            if (nearestSphereHit) {
                 const position = pointOnRay(ray, tMin);
-                const normal = Juggler.Math3.mul(Juggler.Math3.sub(position, nearestSphere.position), 1 / nearestSphere.radius);
+                const normal = Juggler.Math3.mul(Juggler.Math3.sub(position, nearestSphereHit.position), 1 / nearestSphereHit.radius);
                 const patch = {
                     position,
                     normal,
-                    color: nearestSphere.color,
-                    sphere: nearestSphere
+                    color: nearestSphereHit.color,
+                    sphere: nearestSphereHit
                 };
-                if (nearestSphere.type === Juggler.BRIGHT && glint(patch, world, ray, options, stats)) {
+                if (nearestSphereHit.type === Juggler.BRIGHT && glint(patch, world, ray, options, stats, sphereIndex)) {
                     return [1, 1, 1];
                 }
-                if (nearestSphere.type === Juggler.MIRROR) {
-                    return mirrorBrightness(patch, world, ray, options, stats, depth);
+                if (nearestSphereHit.type === Juggler.MIRROR) {
+                    return mirrorBrightness(patch, world, ray, options, stats, depth, sphereIndex);
                 }
-                return patchBrightness(patch, world, options);
+                return patchBrightness(patch, world, options, stats, sphereIndex);
             }
             return skyBrightness(ray, world);
         }
@@ -2316,7 +2385,7 @@ var Juggler;
                 cos2 * world.skyHorizon[2] + sin2 * world.skyZenith[2]
             ];
         }
-        function patchBrightness(patch, world, options) {
+        function patchBrightness(patch, world, options, stats, sphereIndex) {
             const diffuse = (Juggler.Math3.dot([0, 0, 1], patch.normal) + 1.5) * 0.4;
             const brightness = [
                 diffuse * world.illum[0] * patch.color[0],
@@ -2330,16 +2399,9 @@ var Juggler;
                     continue;
                 }
                 const shadowRay = { origin: patch.position, direction: lampVector };
-                let shadowed = false;
-                for (const sphere of world.spheres) {
-                    if (sphere === patch.sphere) {
-                        continue;
-                    }
-                    if (intersectSphere(shadowRay, sphere, options.epsilon) !== null) {
-                        shadowed = true;
-                        break;
-                    }
-                }
+                const shadowed = sphereIndex
+                    ? sphereIndex.anyHit(shadowRay, options.epsilon, stats, patch.sphere)
+                    : anySphereHit(shadowRay, world.spheres, options.epsilon, stats, patch.sphere);
                 if (shadowed) {
                     continue;
                 }
@@ -2351,7 +2413,7 @@ var Juggler;
             }
             return brightness;
         }
-        function glint(patch, world, incident, options, stats) {
+        function glint(patch, world, incident, options, stats, sphereIndex) {
             let reflected = null;
             let reflectedLength2 = 0;
             for (const lamp of world.lamps) {
@@ -2361,16 +2423,9 @@ var Juggler;
                     continue;
                 }
                 const shadowRay = { origin: patch.position, direction: lampVector };
-                let shadowed = false;
-                for (const sphere of world.spheres) {
-                    if (sphere === patch.sphere) {
-                        continue;
-                    }
-                    if (intersectSphere(shadowRay, sphere, options.epsilon) !== null) {
-                        shadowed = true;
-                        break;
-                    }
-                }
+                const shadowed = sphereIndex
+                    ? sphereIndex.anyHit(shadowRay, options.epsilon, stats, patch.sphere)
+                    : anySphereHit(shadowRay, world.spheres, options.epsilon, stats, patch.sphere);
                 if (shadowed) {
                     continue;
                 }
@@ -2386,7 +2441,7 @@ var Juggler;
             }
             return false;
         }
-        function mirrorBrightness(patch, world, incident, options, stats, depth) {
+        function mirrorBrightness(patch, world, incident, options, stats, depth, sphereIndex) {
             const normalDotIncident = Juggler.Math3.dot(patch.normal, incident.direction);
             if (normalDotIncident >= 0) {
                 return [0, 0, 0];
@@ -2395,7 +2450,7 @@ var Juggler;
                 return [0, 0, 0];
             }
             const reflected = reflectVector(incident.direction, patch.normal, options.reflectionMode, options.epsilon, stats);
-            const brightness = trace({ origin: patch.position, direction: reflected }, world, options, stats, depth + 1);
+            const brightness = trace({ origin: patch.position, direction: reflected }, world, options, stats, depth + 1, sphereIndex);
             return [
                 brightness[0] * patch.color[0],
                 brightness[1] * patch.color[1],
@@ -2440,6 +2495,167 @@ var Juggler;
                 Juggler.Math3.clampByte(Math.pow(Math.max(0, brightness[1]), 0.82) * 255),
                 Juggler.Math3.clampByte(Math.pow(Math.max(0, brightness[2]), 0.82) * 255)
             ];
+        }
+        class SphereIndex {
+            constructor(spheres) {
+                this.root = spheres.length ? buildNode(spheres) : null;
+            }
+            nearest(ray, epsilon, stats) {
+                if (!this.root) {
+                    return null;
+                }
+                let nearest = null;
+                const stack = [this.root];
+                while (stack.length) {
+                    const node = stack.pop();
+                    incrementStat(stats, "bvhNodeTests");
+                    if (!intersectBounds(ray, node.bounds, epsilon, nearest?.t ?? Juggler.BIG)) {
+                        continue;
+                    }
+                    if (node.spheres.length) {
+                        for (const sphere of node.spheres) {
+                            const t = intersectSphereCounted(ray, sphere, epsilon, stats);
+                            if (t !== null && t < (nearest?.t ?? Juggler.BIG)) {
+                                nearest = { sphere, t };
+                            }
+                        }
+                        continue;
+                    }
+                    if (node.left) {
+                        stack.push(node.left);
+                    }
+                    if (node.right) {
+                        stack.push(node.right);
+                    }
+                }
+                return nearest;
+            }
+            anyHit(ray, epsilon, stats, excludedSphere) {
+                if (!this.root) {
+                    return false;
+                }
+                const stack = [this.root];
+                while (stack.length) {
+                    const node = stack.pop();
+                    incrementStat(stats, "bvhNodeTests");
+                    if (!intersectBounds(ray, node.bounds, epsilon, Juggler.BIG)) {
+                        continue;
+                    }
+                    if (node.spheres.length) {
+                        for (const sphere of node.spheres) {
+                            if (sphere === excludedSphere) {
+                                continue;
+                            }
+                            if (intersectSphereCounted(ray, sphere, epsilon, stats) !== null) {
+                                return true;
+                            }
+                        }
+                        continue;
+                    }
+                    if (node.left) {
+                        stack.push(node.left);
+                    }
+                    if (node.right) {
+                        stack.push(node.right);
+                    }
+                }
+                return false;
+            }
+        }
+        Renderer.SphereIndex = SphereIndex;
+        function nearestSphere(ray, spheres, epsilon, stats) {
+            let nearest = null;
+            for (const sphere of spheres) {
+                const t = intersectSphereCounted(ray, sphere, epsilon, stats);
+                if (t !== null && t < (nearest?.t ?? Juggler.BIG)) {
+                    nearest = { sphere, t };
+                }
+            }
+            return nearest;
+        }
+        function anySphereHit(ray, spheres, epsilon, stats, excludedSphere) {
+            for (const sphere of spheres) {
+                if (sphere === excludedSphere) {
+                    continue;
+                }
+                if (intersectSphereCounted(ray, sphere, epsilon, stats) !== null) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        function intersectSphereCounted(ray, sphere, epsilon, stats) {
+            incrementStat(stats, "sphereTests");
+            return intersectSphere(ray, sphere, epsilon);
+        }
+        function buildNode(spheres) {
+            const bounds = boundsForSpheres(spheres);
+            if (spheres.length <= 6) {
+                return { bounds, left: null, right: null, spheres };
+            }
+            const axis = widestAxis(bounds);
+            const sorted = spheres.slice().sort((a, b) => a.position[axis] - b.position[axis]);
+            const middle = Math.floor(sorted.length / 2);
+            return {
+                bounds,
+                left: buildNode(sorted.slice(0, middle)),
+                right: buildNode(sorted.slice(middle)),
+                spheres: []
+            };
+        }
+        function boundsForSpheres(spheres) {
+            const min = [Juggler.BIG, Juggler.BIG, Juggler.BIG];
+            const max = [-Juggler.BIG, -Juggler.BIG, -Juggler.BIG];
+            for (const sphere of spheres) {
+                for (let axis = 0; axis < 3; axis += 1) {
+                    min[axis] = Math.min(min[axis], sphere.position[axis] - sphere.radius);
+                    max[axis] = Math.max(max[axis], sphere.position[axis] + sphere.radius);
+                }
+            }
+            return { min, max };
+        }
+        function widestAxis(bounds) {
+            const x = bounds.max[0] - bounds.min[0];
+            const y = bounds.max[1] - bounds.min[1];
+            const z = bounds.max[2] - bounds.min[2];
+            if (x >= y && x >= z) {
+                return 0;
+            }
+            return y >= z ? 1 : 2;
+        }
+        function intersectBounds(ray, bounds, epsilon, maximum) {
+            let tMin = epsilon;
+            let tMax = maximum;
+            for (let axis = 0; axis < 3; axis += 1) {
+                const origin = ray.origin[axis];
+                const direction = ray.direction[axis];
+                if (Math.abs(direction) < 1e-12) {
+                    if (origin < bounds.min[axis] || origin > bounds.max[axis]) {
+                        return false;
+                    }
+                    continue;
+                }
+                const inv = 1 / direction;
+                let t0 = (bounds.min[axis] - origin) * inv;
+                let t1 = (bounds.max[axis] - origin) * inv;
+                if (t0 > t1) {
+                    const swap = t0;
+                    t0 = t1;
+                    t1 = swap;
+                }
+                tMin = Math.max(tMin, t0);
+                tMax = Math.min(tMax, t1);
+                if (tMax < tMin) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        function incrementStat(stats, key) {
+            stats[key] = (stats[key] ?? 0) + 1;
+        }
+        function now() {
+            return typeof performance !== "undefined" ? performance.now() : Date.now();
         }
     })(Renderer = Juggler.Renderer || (Juggler.Renderer = {}));
 })(Juggler || (Juggler = {}));

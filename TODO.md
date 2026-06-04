@@ -15,6 +15,7 @@
 - Realtime wireframe and solid preview modes are available alongside the raytrace view.
 - Preview mode supports mouse orbit, wheel zoom, camera height adjustment, group picking, and session-only group transforms.
 - Display constraints now include RGB, OCS 12-bit, Extra Half-Brite-style 64-color, and approximate HAM6 modes.
+- CPU rendering now has BVH sphere acceleration, tile/time-budget rendering for line-order-safe modes, and expanded render stats.
 - CRT emulation now cycles between off, scanline, slot-mask, and soft-glow modes.
 - Tests now cover physical cascade anchors, animated body pose, planted feet, body clearance, ball spacing, hand contact, motion metadata, JSON manifests, frame-range rendering, presets, phase labels, and unsupported-scene fallback.
 
@@ -31,7 +32,7 @@
 
 - Continue validating camera setup, sphere hierarchy, material IDs, lighting, and reflections against known original frames.
 - Add anti-aliasing as an optional modern mode while keeping source-like output available.
-- Improve performance with tiling, spatial acceleration, or Web Workers.
+- Add Web Worker rendering for background progressive stills and live raytraced interaction.
 - Add optional higher-quality shadows, area lights, depth of field, and motion blur as non-source modes.
 - Investigate a WASM or direct C-port path for stricter renderer parity.
 

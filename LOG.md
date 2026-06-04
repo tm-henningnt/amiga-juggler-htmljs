@@ -631,3 +631,24 @@ Browser smoke verification opened the generated `index.html` directly from disk 
 - A 160 x 100 OCS 12-bit raytrace completed with nonblank output.
 - Profile indicators and animation facts reported the active display constraint.
 - No runtime errors appeared in the console; the only warning came from verification-time canvas readbacks.
+
+## 2026-06-04: CPU Renderer Acceleration
+
+The first modern rendering pass improved the current CPU raytracer without changing the legacy/source-like output defaults.
+
+Implemented changes:
+
+- Added BVH sphere acceleration for primary, shadow, and reflection rays.
+- Kept a brute-force acceleration mode for parity testing.
+- Added tile rendering and a time-budget API for modes that do not depend on left-to-right HAM line state.
+- Kept source-HAM and HAM6 approximate display output row-sequential so historical output remains deterministic.
+- Added render stats for sphere tests, BVH node tests, rendered pixels, and tiles.
+- Updated TODO/technical notes to mark spatial acceleration and tile rendering as completed foundations.
+
+Verification:
+
+```bash
+npm test
+```
+
+The test suite now renders the same modern RGB frame through brute-force rows, BVH rows, and BVH tiles, then asserts the pixel buffers match exactly while BVH performs fewer sphere tests.

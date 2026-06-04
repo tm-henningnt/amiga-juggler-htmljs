@@ -400,6 +400,46 @@ namespace Juggler.Tests {
     assert(Display.labelFor("ham6-approx").includes("HAM6"), "display label exposes HAM6");
   }
 
+  function testAcceleratedRendererParity(): void {
+    const scene = parse("robot");
+    const world = Scenes.buildWorld(scene);
+    const observer = Scenes.createObserver(scene, world, 48, 30, { enabled: false, angleDeg: 0, radius: 10 });
+    const profile = Profiles.byId("wright-rgb");
+    const baseOptions: RenderOptions = {
+      profileId: profile.id,
+      outputMode: profile.outputMode,
+      reflectionMode: profile.reflectionMode,
+      epsilon: profile.epsilon,
+      maxDepth: 3,
+      displayConstraintId: "rgb"
+    };
+
+    const brute = new Renderer.FrameRenderer(world, observer, { ...baseOptions, acceleration: "none" });
+    while (!brute.done()) {
+      brute.renderRows(4);
+    }
+
+    const bvhRows = new Renderer.FrameRenderer(world, observer, { ...baseOptions, acceleration: "bvh" });
+    while (!bvhRows.done()) {
+      bvhRows.renderRows(4);
+    }
+
+    const bvhTiles = new Renderer.FrameRenderer(world, observer, { ...baseOptions, acceleration: "bvh", tileSize: 8 });
+    while (!bvhTiles.done()) {
+      bvhTiles.renderTiles(2);
+    }
+
+    assert(brute.stats.sphereTests && brute.stats.sphereTests > 0, "brute renderer counts sphere tests");
+    assert(bvhRows.stats.bvhNodeTests && bvhRows.stats.bvhNodeTests > 0, "BVH renderer counts node tests");
+    assert((bvhRows.stats.sphereTests ?? BIG) < (brute.stats.sphereTests ?? 0), "BVH reduces sphere tests");
+    assert(equalData(brute.data, bvhRows.data), "BVH row output matches brute output");
+    assert(equalData(brute.data, bvhTiles.data), "BVH tile output matches brute output");
+
+    const budgeted = new Renderer.FrameRenderer(world, observer, { ...baseOptions, acceleration: "bvh", tileSize: 8 });
+    const progress = budgeted.renderBudget(0);
+    assert(progress > 0 && progress < 1, "budget renderer advances at least one tile");
+  }
+
   function testRenderSmoke(): void {
     const scene = parse("robot");
     const world = Scenes.buildWorld(scene);
@@ -425,6 +465,18 @@ namespace Juggler.Tests {
     assert(renderer.stats.rays > 0, "render ray count");
   }
 
+  function equalData(a: Uint8ClampedArray, b: Uint8ClampedArray): boolean {
+    if (a.length !== b.length) {
+      return false;
+    }
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i] !== b[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   export function run(): void {
     testRobotParser();
     testRobotExpansionAgainstWright();
@@ -440,6 +492,7 @@ namespace Juggler.Tests {
     testAnimationRendererQueue();
     testHamEncoder();
     testDisplayConstraints();
+    testAcceleratedRendererParity();
     testRenderSmoke();
     console.log("All tests passed");
   }

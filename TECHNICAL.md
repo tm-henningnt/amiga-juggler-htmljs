@@ -38,6 +38,8 @@ At a high level it supports:
 - Sphere and ground intersections.
 - Sky and checkerboard floor shading.
 - Direct lighting, shadows, highlights, and mirror reflections.
+- BVH sphere acceleration for ray/sphere queries.
+- Tile and time-budget rendering for line-order-safe modes.
 - Source-like HAM output and modern RGB output paths.
 - Optional RGB, OCS 12-bit, Extra Half-Brite-style, and approximate HAM6 display constraints.
 - Render profiles that make historically relevant quirks explicit.
