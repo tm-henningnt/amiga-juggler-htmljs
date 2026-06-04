@@ -527,3 +527,21 @@ Browser smoke verification opened the generated `index.html` directly from disk 
 - Motion diagnostics remain positive with body clearance `0.63`, ball spacing `0.25`, and hand contact `0.11`.
 - A 6-frame 160 x 100 source-camera render completed with nonblank output.
 - No console errors appeared.
+
+## 2026-06-04: README And Technical Notes Split
+
+The README was rewritten to describe the project in functional terms instead of tracking implementation status.
+
+Implemented changes:
+
+- Removed the status-heavy README structure.
+- Added a shorter README focused on the Juggler's origins, source material, standalone use, and attribution.
+- Referenced the AlphaPixel GitHub archive as the recovered source base.
+- Called out Ernie Wright's notes, Meatfighter's Java reimplementation, and historical frame/movie material as reconstruction sources.
+- Moved build, architecture, runtime, and verification notes into `TECHNICAL.md`.
+
+Verification:
+
+```bash
+git diff --check
+```
