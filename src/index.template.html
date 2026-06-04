@@ -11,11 +11,11 @@
 /*__INLINE_CSS__*/
   </style>
 </head>
-<body>
+<body data-crt-mode="scanlines">
   <div class="wb-screen-bar" role="banner">
     <span class="wb-screen-title">The Juggler Raytracer</span>
     <span class="wb-screen-controls">
-      <button id="scanlineToggle" class="wb-screen-btn" data-active="true" title="Toggle CRT scanlines">CRT</button>
+      <button id="scanlineToggle" class="wb-screen-btn" data-active="true" title="Cycle CRT emulation mode">CRT SCAN</button>
     </span>
     <span class="wb-screen-meta">Eric Graham, 1987 &bull; Amiga Raytrace Reconstruction</span>
   </div>
@@ -254,12 +254,27 @@
       });
     });
 
-    // CRT scanline toggle
+    // CRT emulation mode cycle
     var scanBtn = document.getElementById('scanlineToggle');
     if (scanBtn) {
+      var crtModes = [
+        { id: 'off', label: 'CRT OFF', active: 'false' },
+        { id: 'scanlines', label: 'CRT SCAN', active: 'true' },
+        { id: 'slot-mask', label: 'CRT SLOT', active: 'true' },
+        { id: 'soft-glow', label: 'CRT SOFT', active: 'true' }
+      ];
+      var crtModeIndex = 1;
+      function applyCrtMode() {
+        var mode = crtModes[crtModeIndex];
+        document.body.setAttribute('data-crt-mode', mode.id);
+        scanBtn.textContent = mode.label;
+        scanBtn.setAttribute('data-active', mode.active);
+        scanBtn.setAttribute('title', 'CRT mode: ' + mode.label);
+      }
+      applyCrtMode();
       scanBtn.addEventListener('click', function() {
-        var scanOn = document.body.classList.toggle('no-scanlines');
-        scanBtn.setAttribute('data-active', scanOn ? 'false' : 'true');
+        crtModeIndex = (crtModeIndex + 1) % crtModes.length;
+        applyCrtMode();
       });
     }
   </script>

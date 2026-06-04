@@ -14,6 +14,7 @@ The goal is preservation first: keep the source scene data, HAM-style output pat
 - Supports selected animation frame ranges, source-cycle presets, and phase-labeled source frames while preserving absolute frame, source-frame, profile, render-time, camera-pose, and motion metadata.
 - Reconstructs a 24-frame juggling motion cycle for the robot scene. The original `.dat` files do not contain animation tracks; the motion is fitted from historical rendered output, depth-corrected along the source camera rays, and kept explicit in `src/motion-data.ts` / `src/motion.ts`.
 - Produces a single-file `index.html` bundle with no backend and no local server requirement.
+- Includes browser-side CRT emulation modes: off, scanlines, slot mask, and soft glow.
 
 ## Source Material
 
@@ -84,6 +85,7 @@ Manual browser verification should include:
 - Render the default robot scene at 320 x 200.
 - Switch between static and reconstructed motion.
 - Switch render profiles and confirm the mode indicators distinguish HAM source output, RGB modern output, and source reflection quirk mode.
+- Cycle the CRT control through off, scanline, slot-mask, and soft-glow modes.
 - Render a short animation at 160 x 100 or 320 x 200.
 - Render a selected frame range and confirm exported frame numbers match the source timeline.
 - Apply a camera preset and source-cycle preset, then confirm the animation facts show the expected source range.

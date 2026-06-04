@@ -364,6 +364,8 @@ npm test
 npm run build:single
 ```
 
+Browser smoke verification opened the generated `index.html` from disk and confirmed the screen-bar button cycles through `scanlines`, `slot-mask`, `soft-glow`, `off`, then back to `scanlines`, with matching button labels and active states.
+
 The test suite now includes a regression that renders frames 3-5 of an 8-frame sequence and verifies the returned frames keep absolute indices 3-5 and sample the correct absolute source frame.
 
 Browser smoke verification opened the generated `index.html` directly from disk, rendered an 8-frame static-camera animation range of frames 3-5 at 160 x 100, and confirmed:
@@ -423,3 +425,22 @@ Browser smoke verification switched all three render profiles in the generated `
 - `reference`: HAM source output, standard reflections, epsilon `0.00001`
 - `wright-rgb`: RGB modern output, standard reflections, epsilon `0.00001`
 - `source-quirk`: HAM source output, source reflection quirk, epsilon `0.001`
+
+## 2026-06-04: CRT Emulation Modes
+
+The screen-bar CRT control now cycles through multiple display overlays instead of only toggling scanlines on and off.
+
+Implemented changes:
+
+- Added body-level CRT modes: `off`, `scanlines`, `slot-mask`, and `soft-glow`.
+- Kept scanlines as the default mode to preserve the existing look.
+- Added a slot-mask overlay with vertical grille structure and scanline darkening.
+- Added a soft-glow mode with subtle vignette, light scanlines, saturation, and contrast lift.
+- Updated the screen-bar button label and active state as the user cycles modes.
+
+Verification:
+
+```bash
+npm test
+npm run build:single
+```

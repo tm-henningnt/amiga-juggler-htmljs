@@ -193,11 +193,24 @@ canvas {
   image-rendering: crisp-edges;
 }
 
-/* Scanline overlay — hidden when body has .no-scanlines */
-body:not(.no-scanlines) .canvas-frame::after {
+body[data-crt-mode="soft-glow"] .canvas-frame {
+  box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.14), 0 0 14px rgba(255, 136, 0, 0.16);
+}
+
+body[data-crt-mode="soft-glow"] canvas {
+  filter: contrast(1.08) saturate(1.08);
+}
+
+body[data-crt-mode="scanlines"] .canvas-frame::after,
+body[data-crt-mode="slot-mask"] .canvas-frame::after,
+body[data-crt-mode="soft-glow"] .canvas-frame::after {
   content: '';
   position: absolute;
   inset: 0;
+  pointer-events: none;
+}
+
+body[data-crt-mode="scanlines"] .canvas-frame::after {
   background: repeating-linear-gradient(
     0deg,
     transparent 0px,
@@ -205,7 +218,36 @@ body:not(.no-scanlines) .canvas-frame::after {
     rgba(0, 0, 0, 0.18) 1px,
     rgba(0, 0, 0, 0.18) 2px
   );
-  pointer-events: none;
+}
+
+body[data-crt-mode="slot-mask"] .canvas-frame::after {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.05) 0px,
+      rgba(255, 255, 255, 0.05) 1px,
+      rgba(0, 0, 0, 0.12) 1px,
+      rgba(0, 0, 0, 0.12) 3px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 1px,
+      rgba(0, 0, 0, 0.16) 1px,
+      rgba(0, 0, 0, 0.16) 2px
+    );
+}
+
+body[data-crt-mode="soft-glow"] .canvas-frame::after {
+  background:
+    radial-gradient(ellipse at center, transparent 62%, rgba(0, 0, 0, 0.18) 100%),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 2px,
+      rgba(0, 0, 0, 0.10) 2px,
+      rgba(0, 0, 0, 0.10) 3px
+    );
 }
 
 /* Status strip */
@@ -483,6 +525,7 @@ button:disabled {
 
 .wb-screen-btn {
   height: 18px;
+  min-width: 70px;
   padding: 0 7px;
   font: inherit;
   font-size: 13px;
@@ -537,11 +580,11 @@ button:disabled {
 
   </style>
 </head>
-<body>
+<body data-crt-mode="scanlines">
   <div class="wb-screen-bar" role="banner">
     <span class="wb-screen-title">The Juggler Raytracer</span>
     <span class="wb-screen-controls">
-      <button id="scanlineToggle" class="wb-screen-btn" data-active="true" title="Toggle CRT scanlines">CRT</button>
+      <button id="scanlineToggle" class="wb-screen-btn" data-active="true" title="Cycle CRT emulation mode">CRT SCAN</button>
     </span>
     <span class="wb-screen-meta">Eric Graham, 1987 &bull; Amiga Raytrace Reconstruction</span>
   </div>
@@ -3142,12 +3185,27 @@ window.addEventListener("DOMContentLoaded", () => Juggler.App.start());
       });
     });
 
-    // CRT scanline toggle
+    // CRT emulation mode cycle
     var scanBtn = document.getElementById('scanlineToggle');
     if (scanBtn) {
+      var crtModes = [
+        { id: 'off', label: 'CRT OFF', active: 'false' },
+        { id: 'scanlines', label: 'CRT SCAN', active: 'true' },
+        { id: 'slot-mask', label: 'CRT SLOT', active: 'true' },
+        { id: 'soft-glow', label: 'CRT SOFT', active: 'true' }
+      ];
+      var crtModeIndex = 1;
+      function applyCrtMode() {
+        var mode = crtModes[crtModeIndex];
+        document.body.setAttribute('data-crt-mode', mode.id);
+        scanBtn.textContent = mode.label;
+        scanBtn.setAttribute('data-active', mode.active);
+        scanBtn.setAttribute('title', 'CRT mode: ' + mode.label);
+      }
+      applyCrtMode();
       scanBtn.addEventListener('click', function() {
-        var scanOn = document.body.classList.toggle('no-scanlines');
-        scanBtn.setAttribute('data-active', scanOn ? 'false' : 'true');
+        crtModeIndex = (crtModeIndex + 1) % crtModes.length;
+        applyCrtMode();
       });
     }
   </script>

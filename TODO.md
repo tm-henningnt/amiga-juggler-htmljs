@@ -9,6 +9,7 @@
 - Named camera and source-cycle presets are available for inspecting historical motion phases.
 - Source-frame labels now identify major cycle phases such as apex, left catch, and right catch.
 - Render profiles now expose source-like, modern, and source-quirk mode indicators in the UI.
+- CRT emulation now cycles between off, scanline, slot-mask, and soft-glow modes.
 - Tests now cover projection preservation, body clearance, hand contact, motion metadata, frame-range rendering, presets, phase labels, and unsupported-scene fallback.
 
 ## Historical Accuracy
@@ -70,3 +71,4 @@
 - Mouse controlled camera placement / scene rotation
 - Mouse controlled object placement
 - Interactive mode with real-time rendering and free form movement
+- More Amiga like output modes like Half-brite, color constraints etc.
