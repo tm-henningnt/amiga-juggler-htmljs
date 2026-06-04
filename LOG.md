@@ -708,3 +708,32 @@ Browser smoke verification opened the generated `index.html` directly from disk,
 - AA controls were enabled in Modern quality mode.
 - The render traced more rays than the non-AA baseline.
 - No runtime errors appeared in the console; the only warning came from verification-time canvas readbacks.
+
+## 2026-06-04: Live Raytrace And Free Camera
+
+The fourth modern rendering pass connected the faster CPU renderer to interactive scene work.
+
+Implemented changes:
+
+- Added a `Live Raytrace` view mode beside Raytrace, Wireframe, and Solid.
+- Added a `Free camera` mouse tool.
+- Added camera position and target controls plus a reset-to-source-camera action.
+- Added session-only free camera pose state that overrides source/orbit camera for stills, previews, live raytrace, and worker renders.
+- Implemented free-camera rotation, Shift-drag strafing, and wheel dolly.
+- Added adaptive live render resolution while dragging, followed by an idle refinement render after pointer release.
+- Kept orbit camera, wireframe/solid previews, group picking, group transforms, and legacy still raytrace behavior intact.
+- Updated TODO and technical notes to mark live raytrace and free camera movement as completed foundation work.
+
+Verification:
+
+```bash
+npm test
+npm run build:single
+```
+
+Browser smoke verification opened the generated `index.html` directly from disk and confirmed:
+
+- Live Raytrace rendered a nonblank 160 x 100 frame.
+- Editing the camera pose switched camera facts to free mode and redrew a nonblank live raytrace.
+- Free-camera wheel dolly redrew a nonblank live raytrace.
+- No runtime errors appeared in the console; the only warning came from verification-time canvas readbacks.

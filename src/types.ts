@@ -7,9 +7,9 @@ namespace Juggler {
   export type RenderQualityId = "legacy" | "interactive" | "modern-quality";
   export type AntiAliasModeId = "off" | "ordered-2x" | "adaptive-2x";
   export type RenderAccelerationMode = "none" | "bvh";
-  export type PreviewMode = "raytrace" | "wireframe" | "solid";
+  export type PreviewMode = "raytrace" | "live-raytrace" | "wireframe" | "solid";
   export type DisplayConstraintId = "rgb" | "ocs-12bit" | "ehb-64" | "ham6-approx";
-  export type MouseTool = "none" | "orbit-camera" | "move-group";
+  export type MouseTool = "none" | "orbit-camera" | "free-camera" | "move-group";
   export type GroupTransformState = Record<number, Vec3>;
   export type CameraPathId = "static" | "orbit-360" | "orbit-arc" | "dolly" | "custom-keyframes";
   export type CameraPresetId = "custom" | "source-camera" | "source-orbit" | "left-catch-arc" | "right-catch-arc" | "overhead-clearance" | "source-dolly";
@@ -283,6 +283,7 @@ namespace Juggler {
     width: number;
     height: number;
     orbit: OrbitSettings;
+    cameraPose: CameraPose | null;
     motionSettings: SceneMotionSettings;
     sourceFrame: number;
     groupTransforms: GroupTransformState;

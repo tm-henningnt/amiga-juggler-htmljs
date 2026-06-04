@@ -26,7 +26,9 @@ namespace Juggler.RenderWorker {
       Motion.resolveWorld(request.parsed, request.world, request.motionSettings, request.sourceFrame),
       request.groupTransforms
     );
-    const observer = Scenes.createObserver(request.parsed, request.world, request.width, request.height, request.orbit);
+    const observer = request.cameraPose
+      ? Scenes.createObserverFromPose(request.cameraPose, request.width, request.height)
+      : Scenes.createObserver(request.parsed, request.world, request.width, request.height, request.orbit);
     const renderer = new Renderer.FrameRenderer(renderWorld, observer, request.options);
     const budgetMs = Math.max(1, request.budgetMs);
 

@@ -4,6 +4,7 @@ namespace Juggler.Preview {
 
   export const MODES: Array<{ id: PreviewMode; label: string }> = [
     { id: "raytrace", label: "Raytrace" },
+    { id: "live-raytrace", label: "Live Raytrace" },
     { id: "wireframe", label: "Wireframe" },
     { id: "solid", label: "Solid" }
   ];

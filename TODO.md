@@ -18,6 +18,7 @@
 - CPU rendering now has BVH sphere acceleration, tile/time-budget rendering for line-order-safe modes, and expanded render stats.
 - Standalone worker rendering now runs still raytraces off the main thread when browser support is available.
 - Modern quality mode now provides opt-in ordered and adaptive 2x anti-aliasing while Legacy remains AA-off.
+- Live Raytrace view and Free camera mode now support session-only free movement with adaptive interactive rendering.
 - CRT emulation now cycles between off, scanline, slot-mask, and soft-glow modes.
 - Tests now cover physical cascade anchors, animated body pose, planted feet, body clearance, ball spacing, hand contact, motion metadata, JSON manifests, frame-range rendering, presets, phase labels, and unsupported-scene fallback.
 
@@ -33,7 +34,7 @@
 ## Rendering
 
 - Continue validating camera setup, sphere hierarchy, material IDs, lighting, and reflections against known original frames.
-- Continue improving interactive render scheduling and measured frame latency.
+- Continue improving measured frame latency and deeper render telemetry.
 - Add optional higher-quality shadows, area lights, depth of field, and motion blur as non-source modes.
 - Investigate a WASM or direct C-port path for stricter renderer parity.
 
@@ -53,7 +54,6 @@
 ## UI
 
 - Add material and lighting inspection controls without making source-like defaults ambiguous.
-- Add camera position/target editing for exact pose work.
 - Improve progress reporting for long animation renders.
 - Keep the standalone file-load workflow intact.
 

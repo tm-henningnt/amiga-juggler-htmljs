@@ -47,6 +47,7 @@ At a high level it supports:
 - Optional RGB, OCS 12-bit, Extra Half-Brite-style, and approximate HAM6 display constraints.
 - Render profiles that make historically relevant quirks explicit.
 - Fast wireframe and solid previews for interactive scene inspection.
+- Live raytraced previews for session camera and transform work.
 
 ## Animation Pipeline
 
@@ -116,5 +117,5 @@ Manual browser checks should use the standalone `index.html` loaded from disk. T
 - Render a short animation range.
 - Check that exported frame numbers and source-frame labels match the requested range.
 - Export a JSON animation manifest and inspect its frame metadata.
-- Switch render profiles, display constraints, preview modes, and CRT display modes.
-- In preview mode, test mouse orbit, wheel zoom, group picking, and temporary group transforms.
+- Switch render profiles, display constraints, preview modes, quality modes, and CRT display modes.
+- In preview modes, test mouse orbit, free camera movement, wheel dolly/zoom, group picking, and temporary group transforms.

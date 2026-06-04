@@ -173,6 +173,7 @@ namespace Juggler.Tests {
     const scene = parse("robot");
     const world = Scenes.buildWorld(scene);
     const observer = Scenes.createObserver(scene, world, 320, 200, { enabled: false, angleDeg: 0, radius: 10 });
+    assert(Preview.MODES.some((mode) => mode.id === "live-raytrace"), "preview modes include live raytrace");
     const projected = Preview.projectedSpheres(world, observer);
     assert(projected.length > 20, "preview projects visible robot spheres");
     assert(projected.every((item) => Number.isFinite(item.x) && Number.isFinite(item.y)), "preview coordinates are finite");

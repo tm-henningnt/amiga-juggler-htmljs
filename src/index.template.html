@@ -144,6 +144,38 @@
             Height offset
             <input id="orbitHeight" type="number" min="-80" max="80" step="0.25" value="0">
           </label>
+          <div class="split-row three">
+            <label>
+              Pos X
+              <input id="cameraPosX" type="number" step="0.1" value="-10">
+            </label>
+            <label>
+              Pos Y
+              <input id="cameraPosY" type="number" step="0.1" value="-4">
+            </label>
+            <label>
+              Pos Z
+              <input id="cameraPosZ" type="number" step="0.1" value="5.5">
+            </label>
+          </div>
+          <div class="split-row three">
+            <label>
+              Tgt X
+              <input id="cameraTargetX" type="number" step="0.1" value="-9">
+            </label>
+            <label>
+              Tgt Y
+              <input id="cameraTargetY" type="number" step="0.1" value="-4">
+            </label>
+            <label>
+              Tgt Z
+              <input id="cameraTargetZ" type="number" step="0.1" value="5.5">
+            </label>
+          </div>
+          <div class="button-row">
+            <button id="writeCameraPose">Use Pose</button>
+            <button id="resetCameraPose">Reset Camera</button>
+          </div>
           <dl id="cameraFacts" class="facts"></dl>
         </div>
       </section>

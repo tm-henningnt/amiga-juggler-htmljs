@@ -12,6 +12,8 @@ namespace Juggler.App {
     startAngle: number;
     startHeight: number;
     startOffset: Vec3;
+    startPosition: Vec3;
+    startTarget: Vec3;
     observer: Observer | null;
   }
 
@@ -32,6 +34,14 @@ namespace Juggler.App {
   const orbitAngleInput = document.getElementById("orbitAngle") as HTMLInputElement;
   const orbitRadiusInput = document.getElementById("orbitRadius") as HTMLInputElement;
   const orbitHeightInput = document.getElementById("orbitHeight") as HTMLInputElement;
+  const cameraPosXInput = document.getElementById("cameraPosX") as HTMLInputElement;
+  const cameraPosYInput = document.getElementById("cameraPosY") as HTMLInputElement;
+  const cameraPosZInput = document.getElementById("cameraPosZ") as HTMLInputElement;
+  const cameraTargetXInput = document.getElementById("cameraTargetX") as HTMLInputElement;
+  const cameraTargetYInput = document.getElementById("cameraTargetY") as HTMLInputElement;
+  const cameraTargetZInput = document.getElementById("cameraTargetZ") as HTMLInputElement;
+  const writeCameraPoseButton = document.getElementById("writeCameraPose") as HTMLButtonElement;
+  const resetCameraPoseButton = document.getElementById("resetCameraPose") as HTMLButtonElement;
   const mouseToolSelect = document.getElementById("mouseTool") as HTMLSelectElement;
   const selectionFacts = document.getElementById("selectionFacts") as HTMLElement;
   const transformXInput = document.getElementById("transformX") as HTMLInputElement;
@@ -80,6 +90,7 @@ namespace Juggler.App {
   let bufferedAnimationSettings: CameraPathSettings | null = null;
   let bufferedMotionSettings: SceneMotionSettings | null = null;
   let groupTransforms: GroupTransformState = Transforms.empty();
+  let freeCameraPose: CameraPose | null = null;
   let selectedGroupIndex: number | null = null;
   let pointerDrag: PointerDrag | null = null;
   let activeRenderWorker: Worker | null = null;
@@ -130,6 +141,7 @@ namespace Juggler.App {
     }
     for (const tool of [
       { id: "orbit-camera" as MouseTool, label: "Orbit camera" },
+      { id: "free-camera" as MouseTool, label: "Free camera" },
       { id: "move-group" as MouseTool, label: "Move group" },
       { id: "none" as MouseTool, label: "None" }
     ]) {
@@ -234,6 +246,18 @@ namespace Juggler.App {
     }
     resetGroupTransformButton.addEventListener("click", resetSelectedTransform);
     resetAllTransformsButton.addEventListener("click", resetAllTransforms);
+    writeCameraPoseButton.addEventListener("click", writeFreeCameraPoseFromInputs);
+    resetCameraPoseButton.addEventListener("click", resetCameraPose);
+    for (const control of [
+      cameraPosXInput,
+      cameraPosYInput,
+      cameraPosZInput,
+      cameraTargetXInput,
+      cameraTargetYInput,
+      cameraTargetZInput
+    ]) {
+      control.addEventListener("change", writeFreeCameraPoseFromInputs);
+    }
 
     for (const control of [orbitEnabledInput, orbitAngleInput, orbitRadiusInput, orbitHeightInput, resolutionSelect]) {
       control.addEventListener("change", refreshCameraFacts);
@@ -275,6 +299,7 @@ namespace Juggler.App {
       active = { source, parsed, world };
       resetAnimationBuffer();
       groupTransforms = Transforms.empty();
+      freeCameraPose = null;
       selectedGroupIndex = null;
       refreshMotionOptions();
       writeDefaultCustomKeyframes();
@@ -311,7 +336,7 @@ namespace Juggler.App {
       return;
     }
     if (readPreviewMode() !== "raytrace") {
-      renderPreview();
+      refreshActiveView();
       return;
     }
 
@@ -341,7 +366,7 @@ namespace Juggler.App {
     }
 
     const renderWorld = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
-    const observer = Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
+    const observer = createDisplayObserver(width, height);
     const renderer = new Renderer.FrameRenderer(renderWorld, observer, renderOptions);
     const image = new ImageData(renderer.data as ImageDataArray, width, height);
     const started = performance.now();
@@ -378,7 +403,7 @@ namespace Juggler.App {
       return;
     }
     const mode = readPreviewMode();
-    if (mode === "raytrace") {
+    if (mode === "raytrace" || mode === "live-raytrace") {
       return;
     }
 
@@ -386,7 +411,7 @@ namespace Juggler.App {
     const [width, height] = parseResolution();
     const motionSettings = readSceneMotionSettings();
     const renderWorld = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
-    const observer = Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
+    const observer = createDisplayObserver(width, height);
     canvas.width = width;
     canvas.height = height;
     context.imageSmoothingEnabled = false;
@@ -399,9 +424,62 @@ namespace Juggler.App {
   }
 
   function refreshActiveView(): void {
-    if (readPreviewMode() !== "raytrace") {
+    const mode = readPreviewMode();
+    if (mode === "live-raytrace") {
+      renderLiveRaytrace();
+      return;
+    }
+    if (mode !== "raytrace") {
       renderPreview();
     }
+  }
+
+  function renderLiveRaytrace(): void {
+    if (!context || !active) {
+      return;
+    }
+    abortWork();
+    const token = abortToken;
+    const [width, height] = liveResolution();
+    const motionSettings = readSceneMotionSettings();
+    const renderWorld = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
+    const observer = createDisplayObserver(width, height);
+    const profile = Profiles.byId(profileSelect.value);
+    const options: RenderOptions = {
+      ...readRenderOptions(profile),
+      qualityId: "interactive",
+      antiAliasMode: "off",
+      maxDepth: Math.min(2, Math.max(1, Number(maxDepthInput.value) || 2)),
+      tileSize: 16
+    };
+    const renderer = new Renderer.FrameRenderer(renderWorld, observer, options);
+    const image = new ImageData(renderer.data as ImageDataArray, width, height);
+
+    canvas.width = width;
+    canvas.height = height;
+    context.imageSmoothingEnabled = false;
+    progressElement.value = 0;
+    setStatus(`Live raytrace ${active.source.name}, ${Motion.motionSummary(active.parsed, motionSettings)}`);
+
+    const started = performance.now();
+    const tick = (): void => {
+      if (token !== abortToken) {
+        return;
+      }
+      renderer.renderBudget(10);
+      context.putImageData(image, 0, 0);
+      progressElement.value = renderer.progress();
+      if (!renderer.done()) {
+        window.requestAnimationFrame(tick);
+        return;
+      }
+      const seconds = (performance.now() - started) / 1000;
+      setStatus(
+        `Live raytrace ready in ${seconds.toFixed(2)}s, ${width} x ${height}, ` +
+        `${renderer.stats.rays} rays, ${renderer.stats.sphereTests ?? 0} sphere tests`
+      );
+    };
+    window.requestAnimationFrame(tick);
   }
 
   function resolvedDisplayWorld(motionSettings: SceneMotionSettings, sourceFrame: number): World {
@@ -419,6 +497,7 @@ namespace Juggler.App {
     const tool = readMouseTool();
     if (tool === "orbit-camera") {
       orbitEnabledInput.checked = true;
+      freeCameraPose = null;
       pointerDrag = {
         tool,
         startX: point[0],
@@ -426,8 +505,29 @@ namespace Juggler.App {
         startAngle: readNumber(orbitAngleInput.value, 0),
         startHeight: readNumber(orbitHeightInput.value, 0),
         startOffset: [0, 0, 0],
+        startPosition: [0, 0, 0],
+        startTarget: [0, 0, 0],
         observer: null
       };
+      canvas.setPointerCapture(event.pointerId);
+      return;
+    }
+
+    if (tool === "free-camera") {
+      const pose = ensureFreeCameraPose();
+      pointerDrag = {
+        tool,
+        startX: point[0],
+        startY: point[1],
+        startAngle: 0,
+        startHeight: 0,
+        startOffset: [0, 0, 0],
+        startPosition: [...pose.position],
+        startTarget: [...pose.target],
+        observer: createDisplayObserver(canvas.width, canvas.height)
+      };
+      orbitEnabledInput.checked = false;
+      refreshCameraFacts();
       canvas.setPointerCapture(event.pointerId);
       return;
     }
@@ -448,11 +548,13 @@ namespace Juggler.App {
         startAngle: 0,
         startHeight: 0,
         startOffset,
+        startPosition: [0, 0, 0],
+        startTarget: [0, 0, 0],
         observer: preview.observer
       };
       updateTransformInputs(startOffset);
       refreshSelectionFacts();
-      renderPreview();
+      refreshActiveView();
       canvas.setPointerCapture(event.pointerId);
     }
   }
@@ -472,7 +574,35 @@ namespace Juggler.App {
         orbitHeightInput.value = String(clampNumber(pointerDrag.startHeight - dy * 0.04, -80, 80, 0).toFixed(2));
       }
       refreshCameraFacts();
-      renderPreview();
+      refreshActiveView();
+      return;
+    }
+
+    if (pointerDrag.tool === "free-camera" && pointerDrag.observer) {
+      if (event.shiftKey) {
+        const scale = Math.max(0.01, Math3.length(Math3.sub(pointerDrag.startTarget, pointerDrag.startPosition)) / 320);
+        const move = Math3.add(
+          Math3.mul(pointerDrag.observer.uhat, dx * scale),
+          Math3.mul(pointerDrag.observer.vhat, -dy * scale)
+        );
+        setFreeCameraPose({
+          position: Math3.add(pointerDrag.startPosition, move),
+          target: Math3.add(pointerDrag.startTarget, move),
+          focalLength: active.parsed.focalLength
+        });
+        return;
+      }
+
+      const startDirection = Math3.normalize(Math3.sub(pointerDrag.startTarget, pointerDrag.startPosition));
+      const distance = Math.max(0.1, Math3.length(Math3.sub(pointerDrag.startTarget, pointerDrag.startPosition)));
+      const yawed = rotateAroundAxis(startDirection, [0, 0, 1], -dx * 0.01);
+      const pitched = rotateAroundAxis(yawed, pointerDrag.observer.uhat, dy * 0.01);
+      const direction = Math3.normalize(pitched);
+      setFreeCameraPose({
+        position: [...pointerDrag.startPosition],
+        target: Math3.add(pointerDrag.startPosition, Math3.mul(direction, distance)),
+        focalLength: active.parsed.focalLength
+      });
       return;
     }
 
@@ -488,6 +618,7 @@ namespace Juggler.App {
   }
 
   function handleCanvasPointerUp(event: PointerEvent): void {
+    const hadDrag = pointerDrag !== null;
     if (pointerDrag) {
       try {
         canvas.releasePointerCapture(event.pointerId);
@@ -496,26 +627,46 @@ namespace Juggler.App {
       }
     }
     pointerDrag = null;
+    if (hadDrag && readPreviewMode() === "live-raytrace") {
+      refreshActiveView();
+    }
   }
 
   function handleCanvasWheel(event: WheelEvent): void {
-    if (readPreviewMode() === "raytrace" || readMouseTool() !== "orbit-camera") {
+    if (readPreviewMode() === "raytrace") {
+      return;
+    }
+    if (readMouseTool() === "free-camera") {
+      event.preventDefault();
+      const pose = ensureFreeCameraPose();
+      const direction = Math3.normalize(Math3.sub(pose.target, pose.position));
+      const step = Math.sign(event.deltaY) * -0.5;
+      const move = Math3.mul(direction, step);
+      setFreeCameraPose({
+        position: Math3.add(pose.position, move),
+        target: Math3.add(pose.target, move),
+        focalLength: pose.focalLength
+      });
+      return;
+    }
+    if (readMouseTool() !== "orbit-camera") {
       return;
     }
     event.preventDefault();
     orbitEnabledInput.checked = true;
+    freeCameraPose = null;
     const current = readNumber(orbitRadiusInput.value, 10);
     const next = clampNumber(current + Math.sign(event.deltaY) * 0.5, 1, 120, 10);
     orbitRadiusInput.value = String(next);
     refreshCameraFacts();
-    renderPreview();
+    refreshActiveView();
   }
 
   function previewWorldAndObserver(): { world: World; observer: Observer } {
     const [width, height] = parseResolution();
     const motionSettings = readSceneMotionSettings();
     const world = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
-    const observer = Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
+    const observer = createDisplayObserver(width, height);
     return { world, observer };
   }
 
@@ -590,6 +741,65 @@ namespace Juggler.App {
     transformXInput.value = offset[0].toFixed(2);
     transformYInput.value = offset[1].toFixed(2);
     transformZInput.value = offset[2].toFixed(2);
+  }
+
+  function writeCameraPoseInputs(pose: CameraPose): void {
+    cameraPosXInput.value = pose.position[0].toFixed(2);
+    cameraPosYInput.value = pose.position[1].toFixed(2);
+    cameraPosZInput.value = pose.position[2].toFixed(2);
+    cameraTargetXInput.value = pose.target[0].toFixed(2);
+    cameraTargetYInput.value = pose.target[1].toFixed(2);
+    cameraTargetZInput.value = pose.target[2].toFixed(2);
+  }
+
+  function writeFreeCameraPoseFromInputs(): void {
+    if (!active) {
+      return;
+    }
+    const position: Vec3 = [
+      readNumber(cameraPosXInput.value, active.parsed.observerPosition[0]),
+      readNumber(cameraPosYInput.value, active.parsed.observerPosition[1]),
+      readNumber(cameraPosZInput.value, active.parsed.observerPosition[2])
+    ];
+    const target: Vec3 = [
+      readNumber(cameraTargetXInput.value, position[0] + 1),
+      readNumber(cameraTargetYInput.value, position[1]),
+      readNumber(cameraTargetZInput.value, position[2])
+    ];
+    if (Math3.length(Math3.sub(target, position)) < 0.001) {
+      setStatus("Camera target must differ from position.");
+      return;
+    }
+    freeCameraPose = {
+      position,
+      target,
+      focalLength: active.parsed.focalLength
+    };
+    orbitEnabledInput.checked = false;
+    resetAnimationBuffer();
+    refreshCameraFacts();
+    refreshActiveView();
+  }
+
+  function resetCameraPose(): void {
+    freeCameraPose = null;
+    orbitEnabledInput.checked = false;
+    resetAnimationBuffer();
+    refreshCameraFacts();
+    refreshActiveView();
+    setStatus("Camera reset to source pose.");
+  }
+
+  function setFreeCameraPose(pose: CameraPose): void {
+    if (Math3.length(Math3.sub(pose.target, pose.position)) < 0.001) {
+      return;
+    }
+    freeCameraPose = copyCameraPose(pose);
+    orbitEnabledInput.checked = false;
+    writeCameraPoseInputs(freeCameraPose);
+    resetAnimationBuffer();
+    refreshCameraFacts();
+    refreshActiveView();
   }
 
   function renderAnimation(): void {
@@ -904,6 +1114,7 @@ namespace Juggler.App {
       width,
       height,
       orbit: readOrbitSettings(),
+      cameraPose: freeCameraPose ? copyCameraPose(freeCameraPose) : null,
       motionSettings,
       sourceFrame: motionSettings.sourceFrame,
       groupTransforms: copyGroupTransforms(groupTransforms),
@@ -1031,8 +1242,11 @@ namespace Juggler.App {
       return;
     }
     const [width, height] = parseResolution();
-    const observer = Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
+    const pose = currentCameraPose(width, height);
+    const observer = createDisplayObserver(width, height);
+    writeCameraPoseInputs(pose);
     setFacts(cameraFacts, [
+      ["Mode", freeCameraPose ? "free" : orbitEnabledInput.checked ? "orbit" : "source"],
       ["Position", Math3.formatVec(observer.position, 2)],
       ["Altitude", `${(observer.altitudeRad * 180 / Math.PI).toFixed(2)} deg`],
       ["Azimuth", `${(observer.azimuthRad * 180 / Math.PI).toFixed(2)} deg`],
@@ -1234,6 +1448,45 @@ namespace Juggler.App {
     };
   }
 
+  function createDisplayObserver(width: number, height: number): Observer {
+    if (freeCameraPose) {
+      return Scenes.createObserverFromPose(freeCameraPose, width, height);
+    }
+    return Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
+  }
+
+  function currentCameraPose(width: number, height: number): CameraPose {
+    if (freeCameraPose) {
+      return copyCameraPose(freeCameraPose);
+    }
+    if (orbitEnabledInput.checked) {
+      const observer = Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
+      return {
+        position: [...observer.position],
+        target: Scenes.sceneTarget(active.world),
+        focalLength: active.parsed.focalLength
+      };
+    }
+    return Scenes.staticCameraPose(active.parsed);
+  }
+
+  function ensureFreeCameraPose(): CameraPose {
+    if (!freeCameraPose) {
+      const [width, height] = parseResolution();
+      freeCameraPose = currentCameraPose(width, height);
+      writeCameraPoseInputs(freeCameraPose);
+    }
+    return freeCameraPose;
+  }
+
+  function copyCameraPose(pose: CameraPose): CameraPose {
+    return {
+      position: [...pose.position],
+      target: [...pose.target],
+      focalLength: pose.focalLength
+    };
+  }
+
   function drawImageData(data: Uint8ClampedArray, width: number, height: number): void {
     if (!context) {
       return;
@@ -1262,6 +1515,17 @@ namespace Juggler.App {
   function parseResolution(): [number, number] {
     const [width, height] = resolutionSelect.value.split("x").map((value) => Number(value));
     return [width, height];
+  }
+
+  function liveResolution(): [number, number] {
+    const [width, height] = parseResolution();
+    const capScale = Math.min(1, 320 / Math.max(width, 1), 200 / Math.max(height, 1));
+    const dragScale = pointerDrag ? 0.5 : 1;
+    const scale = capScale * dragScale;
+    return [
+      Math.max(80, Math.round(width * scale)),
+      Math.max(50, Math.round(height * scale))
+    ];
   }
 
   function readPreviewMode(): PreviewMode {
@@ -1299,7 +1563,7 @@ namespace Juggler.App {
 
   function readMouseTool(): MouseTool {
     const requested = mouseToolSelect.value as MouseTool;
-    return requested === "orbit-camera" || requested === "move-group" || requested === "none" ? requested : "orbit-camera";
+    return requested === "orbit-camera" || requested === "free-camera" || requested === "move-group" || requested === "none" ? requested : "orbit-camera";
   }
 
   function readRowsPerTick(): number {
@@ -1370,6 +1634,19 @@ namespace Juggler.App {
 
   function normalizeAngle(value: number): number {
     return ((value % 360) + 360) % 360;
+  }
+
+  function rotateAroundAxis(vector: Vec3, axis: Vec3, angle: number): Vec3 {
+    const unit = Math3.normalize(axis);
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    return Math3.add(
+      Math3.add(
+        Math3.mul(vector, cos),
+        Math3.mul(Math3.cross(unit, vector), sin)
+      ),
+      Math3.mul(unit, Math3.dot(unit, vector) * (1 - cos))
+    );
   }
 
   function cameraPresetLabel(presetId: CameraPresetId): string {

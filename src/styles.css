@@ -407,6 +407,10 @@ input[type="checkbox"] {
   gap: 6px;
 }
 
+.split-row.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 button {
   min-height: 28px;
   padding: 3px 8px;
