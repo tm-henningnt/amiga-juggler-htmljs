@@ -26,6 +26,10 @@ Additional historical rendering notes:
 
 http://www.etwright.org/cghist/juggler_rt.html
 
+Independent Meatfighter reimplementation used for reconstructed body and ball animation patterns:
+
+https://meatfighter.com/juggler/
+
 Important source-truth note: the original archive has static text scene files and compressed rendered movie payloads (`movie.data` and `movie2.data`). It does not appear to include parametric juggler/body/ball motion data. This project therefore treats the juggling animation as a reconstruction target, not as parsed hidden data.
 
 ## Use
@@ -71,7 +75,7 @@ Generated `dist/` and `dist-test/` files are ignored. The standalone `index.html
 - `src/ham.ts` implements the source-like HAM pixel encoding path.
 - `src/animation.ts` resolves camera paths, queues frame rendering, and builds structured animation manifests.
 - `src/motion-data.ts` stores the physical cascade constants and reference-derived screen anchors.
-- `src/motion.ts` resolves reconstructed source-frame scene motion and diagnostics for the juggler.
+- `src/motion.ts` resolves reconstructed source-frame ball, body, limb, and diagnostic motion for the juggler.
 - `src/app.ts` wires the browser UI, rendering loop, playback, and export tools.
 - `scripts/build-single.mjs` inlines compiled JS/CSS into `index.html`.
 

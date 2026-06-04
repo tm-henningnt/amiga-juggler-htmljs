@@ -12,12 +12,43 @@ namespace Juggler.Motion {
     { groupIndex: 2, arc: "high" as BallArc, offset: 0 }
   ];
 
+  const HEAD_GROUP = 3;
+  const HAIR_GROUP = 4;
+  const LEFT_EYE_GROUP = 5;
+  const RIGHT_EYE_GROUP = 6;
+  const NECK_GROUP = 7;
+  const TORSO_GROUP = 8;
+  const LEFT_LEG_GROUP = 9;
+  const RIGHT_LEG_GROUP = 10;
   const LEFT_ARM_GROUP = 12;
   const RIGHT_ARM_GROUP = 11;
   const BODY_COLLISION_GROUPS = [3, 4, 5, 6, 7, 8];
   const LEFT_CONTACT_INDEX = 8;
   const RIGHT_CONTACT_INDEX = 16;
+
+  const HIPS_MIN_Z = 3.18;
+  const HIPS_MAX_Z = 3.36;
+  const TORSO_LENGTH = 1.3;
+  const NECK_OFFSET = 2.2;
+  const HEAD_OFFSET = 2.78;
+  const HAIR_OFFSET = 2.8;
+  const SHOULDER_OFFSET = 1.8;
+  const SHOULDER_SIDE = 0.7;
+  const HIP_SOCKET_OFFSET = -0.4;
+  const LEG_SIDE = 0.6;
+  const ARM_UPPER_LENGTH = 1.25;
+  const ARM_LOWER_LENGTH = 1.35;
+  const LEG_UPPER_LENGTH = 1.43;
+  const LEG_LOWER_LENGTH = 1.62;
+
   type BallArc = "high" | "low";
+
+  interface BodyPose {
+    hips: Vec3;
+    vertical: Vec3;
+    side: Vec3;
+    oscillation: number;
+  }
 
   export interface MotionDiagnostics {
     minBodyClearance: number;
@@ -78,6 +109,7 @@ namespace Juggler.Motion {
     }
 
     const animated = cloneScene(scene);
+    const pose = bodyPose(sourceFrame);
     for (const ball of BALL_GROUPS) {
       const group = animated.groups[ball.groupIndex];
       const source = scene.groups[ball.groupIndex];
@@ -91,8 +123,9 @@ namespace Juggler.Motion {
       }];
     }
 
-    animated.groups[RIGHT_ARM_GROUP].controls = armControls(-1, sourceFrame);
-    animated.groups[LEFT_ARM_GROUP].controls = armControls(1, sourceFrame);
+    applyBodyControls(animated, pose);
+    animated.groups[RIGHT_ARM_GROUP].controls = armControls(-1, sourceFrame, pose);
+    animated.groups[LEFT_ARM_GROUP].controls = armControls(1, sourceFrame, pose);
     return Scenes.buildWorld(animated);
   }
 
@@ -286,29 +319,77 @@ namespace Juggler.Motion {
     return arc === "high" ? sampleHighArc(sampleFrame) : sampleLowArc(sampleFrame);
   }
 
-  function armControls(side: -1 | 1, sourceFrame: number): SphereControl[] {
+  function applyBodyControls(scene: ParsedScene, pose: BodyPose): void {
+    scene.groups[TORSO_GROUP].controls = [
+      { center: bodyPoint(pose, TORSO_LENGTH, 0, 0), radius: 0.8, interpolationFromPrevious: null },
+      { center: pose.hips, radius: 0.6, interpolationFromPrevious: 5 }
+    ];
+    scene.groups[NECK_GROUP].controls = [
+      { center: bodyPoint(pose, NECK_OFFSET, 0, 0), radius: 0.2, interpolationFromPrevious: null }
+    ];
+    scene.groups[HEAD_GROUP].controls = [
+      { center: bodyPoint(pose, HEAD_OFFSET, 0, 0), radius: 0.5, interpolationFromPrevious: null }
+    ];
+    scene.groups[HAIR_GROUP].controls = [
+      { center: bodyPoint(pose, HAIR_OFFSET, 0, 0.02), radius: 0.5, interpolationFromPrevious: null }
+    ];
+    scene.groups[LEFT_EYE_GROUP].controls = [
+      { center: bodyPoint(pose, HEAD_OFFSET, 0.2, -0.4), radius: 0.15, interpolationFromPrevious: null }
+    ];
+    scene.groups[RIGHT_EYE_GROUP].controls = [
+      { center: bodyPoint(pose, HEAD_OFFSET, -0.2, -0.4), radius: 0.15, interpolationFromPrevious: null }
+    ];
+    scene.groups[LEFT_LEG_GROUP].controls = legControls(1, pose);
+    scene.groups[RIGHT_LEG_GROUP].controls = legControls(-1, pose);
+  }
+
+  function bodyPose(sourceFrame: number): BodyPose {
+    const angle = 2 * Math.PI * mod(sourceFrame, SOURCE_FRAME_COUNT) / SOURCE_FRAME_COUNT;
+    const oscillation = 0.5 * (1 + Math.cos(angle));
+    const hipsZ = HIPS_MIN_Z + (HIPS_MAX_Z - HIPS_MIN_Z) * oscillation;
+    const lateralTilt = (HIPS_MIN_Z - HIPS_MAX_Z) * Math.sin(angle);
+    const vertical = Math3.normalize([0, lateralTilt, TORSO_LENGTH]);
+    const side = Math3.normalize([0, vertical[2], -vertical[1]]);
+    return {
+      hips: [0, 0, hipsZ],
+      vertical,
+      side,
+      oscillation
+    };
+  }
+
+  function bodyPoint(pose: BodyPose, verticalOffset: number, sideOffset: number, depthOffset: number): Vec3 {
+    return Math3.add(
+      Math3.add(pose.hips, Math3.mul(pose.vertical, verticalOffset)),
+      Math3.add(Math3.mul(pose.side, sideOffset), [depthOffset, 0, 0])
+    );
+  }
+
+  function legControls(side: -1 | 1, pose: BodyPose): SphereControl[] {
+    const hip = bodyPoint(pose, HIP_SOCKET_OFFSET, side * LEG_SIDE, 0);
+    const foot: Vec3 = side > 0 ? [-0.4, 0.6, 0] : [0.4, -0.6, 0];
+    const knee = solveTwoBone(hip, foot, side > 0 ? [-1, 0, -0.2] : [1, 0, -0.2], LEG_UPPER_LENGTH, LEG_LOWER_LENGTH);
+    return [
+      { center: hip, radius: 0.2, interpolationFromPrevious: null },
+      { center: knee, radius: 0.2, interpolationFromPrevious: 6 },
+      { center: foot, radius: 0.1, interpolationFromPrevious: 7 }
+    ];
+  }
+
+  function armControls(side: -1 | 1, sourceFrame: number, pose: BodyPose): SphereControl[] {
     const handCenter = side > 0 ? MotionData.LEFT_HAND_BALL_CENTER : MotionData.RIGHT_HAND_BALL_CENTER;
     const contactBall = nearestBallToHand(sourceFrame, handCenter);
     const pulse = handProximityPulse(contactBall, handCenter);
     const contact = wristTarget(contactBall, side);
-
-    if (side > 0) {
-      const wrist = Math3.lerpVec([-1.35, 1.7, 4.05], contact, pulse);
-      const elbow = Math3.lerpVec([0, 0.7, 5.1], wrist, 0.55);
-      return [
-        { center: [0, 0.7, 5.1], radius: 0.2, interpolationFromPrevious: null },
-        { center: elbow, radius: 0.2, interpolationFromPrevious: 6 },
-        { center: wrist, radius: 0.1, interpolationFromPrevious: 7 }
-      ];
-    } else {
-      const wrist = Math3.lerpVec([-1.2, -1.55, 4.0], contact, pulse);
-      const elbow = Math3.lerpVec([0, -0.7, 5.1], wrist, 0.55);
-      return [
-        { center: [0, -0.7, 5.1], radius: 0.2, interpolationFromPrevious: null },
-        { center: elbow, radius: 0.2, interpolationFromPrevious: 6 },
-        { center: wrist, radius: 0.1, interpolationFromPrevious: 7 }
-      ];
-    }
+    const shoulder = bodyPoint(pose, SHOULDER_OFFSET, side * SHOULDER_SIDE, 0);
+    const rest = bodyPoint(pose, 0.85 + 0.1 * pose.oscillation, side * 1.55, -1.05 - 0.15 * pose.oscillation);
+    const wrist = Math3.lerpVec(rest, contact, pulse);
+    const elbow = solveTwoBone(shoulder, wrist, [-0.35, side * 0.7, -0.65], ARM_UPPER_LENGTH, ARM_LOWER_LENGTH);
+    return [
+      { center: shoulder, radius: 0.2, interpolationFromPrevious: null },
+      { center: elbow, radius: 0.2, interpolationFromPrevious: 6 },
+      { center: wrist, radius: 0.1, interpolationFromPrevious: 7 }
+    ];
   }
 
   function sampleHighArc(sampleFrame: number): Vec3 {
@@ -355,6 +436,33 @@ namespace Juggler.Motion {
       }
     }
     return best;
+  }
+
+  function solveTwoBone(start: Vec3, end: Vec3, bendHint: Vec3, lengthA: number, lengthB: number): Vec3 {
+    const toEnd = Math3.sub(end, start);
+    const distance = Math3.length(toEnd);
+    if (distance < 1e-6) {
+      return Math3.add(start, Math3.mul(Math3.normalize(bendHint), lengthA));
+    }
+
+    const forward = Math3.mul(toEnd, 1 / distance);
+    let bendAxis = Math3.sub(bendHint, Math3.mul(forward, Math3.dot(bendHint, forward)));
+    if (Math3.length(bendAxis) < 1e-6) {
+      bendAxis = Math3.cross(forward, [0, 0, 1]);
+    }
+    if (Math3.length(bendAxis) < 1e-6) {
+      bendAxis = Math3.cross(forward, [0, 1, 0]);
+    }
+    bendAxis = Math3.normalize(bendAxis);
+
+    const reachableDistance = Math.min(distance, Math.max(1e-6, lengthA + lengthB - 1e-6));
+    const base = (lengthA * lengthA - lengthB * lengthB + reachableDistance * reachableDistance) / (2 * reachableDistance);
+    const height = Math.sqrt(Math.max(0, lengthA * lengthA - base * base));
+    const distanceScale = distance / reachableDistance;
+    return Math3.add(
+      start,
+      Math3.add(Math3.mul(forward, base * distanceScale), Math3.mul(bendAxis, height))
+    );
   }
 
   function handProximityPulse(ballCenter: Vec3, handCenter: Vec3): number {

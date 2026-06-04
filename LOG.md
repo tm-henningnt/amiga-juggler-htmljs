@@ -448,8 +448,6 @@ npm test
 npm run build:single
 ```
 
-Browser smoke verification opened the generated `index.html` from disk and confirmed the screen-bar button cycles through `scanlines`, `slot-mask`, `soft-glow`, `off`, then back to `scanlines`, with matching button labels and active states.
-
 The test suite now checks camera preset application, cycle preset ranges, source-frame labels, and source-range label formatting.
 
 Browser smoke verification opened the generated `index.html` from disk, applied the overhead clearance camera preset and apex-to-left source-cycle preset, then rendered a shortened 1-3 range at 160 x 100. Scrubbing confirmed source labels advanced from `1/24 apex` to `2/24 falling to left catch` and `3/24 falling to left catch`, each frame was nonblank, and adjacent frames differed by more than 7,800 pixels.
@@ -498,3 +496,34 @@ Verification:
 npm test
 npm run build:single
 ```
+
+Browser smoke verification opened the generated `index.html` from disk and confirmed the screen-bar button cycles through `scanlines`, `slot-mask`, `soft-glow`, `off`, then back to `scanlines`, with matching button labels and active states.
+
+## 2026-06-04: Meatfighter-Style Body Motion
+
+The previous reconstructed motion only moved the balls and posed the arms toward catches. That made the robot look like a static body with flapping arms, while the Meatfighter reimplementation animates the full juggler pose.
+
+Implemented changes:
+
+- Added a Meatfighter-inspired hips oscillator scaled to the 24-frame reconstructed source cycle.
+- Rebuilt torso, neck, head, eyes, and hair controls from the animated hips/body frame each source frame.
+- Added planted-leg IK so the hips move while the feet stay grounded.
+- Replaced fixed-shoulder arm posing with moving shoulders and two-bone IK arms.
+- Kept the existing ballistic ball cascade and clearance diagnostics intact.
+- Updated README and TODO to document the Meatfighter body-motion source and the completed body-pose slice.
+
+Verification:
+
+```bash
+npm test
+npm run build:single
+```
+
+The test suite now checks that the head sways, torso bobs, shoulders and hips follow the body pose, and feet remain planted while the existing ball/body clearance and hand-contact checks keep passing.
+
+Browser smoke verification opened the generated `index.html` directly from disk and confirmed:
+
+- Reconstructed world positions report head sway, torso bob, moving shoulders, moving hips, and planted feet.
+- Motion diagnostics remain positive with body clearance `0.63`, ball spacing `0.25`, and hand contact `0.11`.
+- A 6-frame 160 x 100 source-camera render completed with nonblank output.
+- No console errors appeared.

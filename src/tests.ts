@@ -13,6 +13,10 @@ namespace Juggler.Tests {
     return Parser.parseDatScene(ORIGINAL_DAT[id], `${id}.dat`);
   }
 
+  function groupSpheres(world: World, groupIndex: number): Sphere[] {
+    return world.spheres.filter((sphere) => sphere.groupIndex === groupIndex);
+  }
+
   function testRobotParser(): void {
     const scene = parse("robot");
     const world = Scenes.buildWorld(scene);
@@ -187,6 +191,16 @@ namespace Juggler.Tests {
 
     const frame20 = Motion.resolveWorld(robot, robotWorld, { motionId: "juggler-reconstructed", sourceFrame: 0 }, 20);
     assert(Math.abs(frame20.spheres[0].position[2] - frame0.spheres[0].position[2]) > 1.0, "first ball descends across ballistic arc");
+
+    const frame6 = Motion.resolveWorld(robot, robotWorld, { motionId: "juggler-reconstructed", sourceFrame: 0 }, 6);
+    const frame12 = Motion.resolveWorld(robot, robotWorld, { motionId: "juggler-reconstructed", sourceFrame: 0 }, 12);
+    assert(Math.abs(groupSpheres(frame6, 3)[0].position[1] - groupSpheres(frame0, 3)[0].position[1]) > 0.15, "head sways with animated hips");
+    assert(Math.abs(groupSpheres(frame12, 8)[0].position[2] - groupSpheres(frame0, 8)[0].position[2]) > 0.12, "torso bobs over the cycle");
+    assert(Math3.length(Math3.sub(groupSpheres(frame6, 12)[0].position, groupSpheres(frame0, 12)[0].position)) > 0.1, "left shoulder follows torso pose");
+    assert(Math3.length(Math3.sub(groupSpheres(frame12, 9)[0].position, groupSpheres(frame0, 9)[0].position)) > 0.1, "left hip follows torso pose");
+    const leftFoot0 = groupSpheres(frame0, 9)[groupSpheres(frame0, 9).length - 1];
+    const leftFoot6 = groupSpheres(frame6, 9)[groupSpheres(frame6, 9).length - 1];
+    close(Math3.length(Math3.sub(leftFoot6.position, leftFoot0.position)), 0, 1e-9, "left foot remains planted");
 
     const rawPoint = Motion.rawSourcePathPoint(0);
     const renderedPoint = Motion.sourcePathPoint(0);

@@ -4,6 +4,7 @@
 
 - Reference screen anchors and physical cascade constants are committed in `src/motion-data.ts`.
 - Reconstructed ball positions now use a Meatfighter-inspired ballistic cascade so the balls clear the body/head and each other in 3D.
+- Reconstructed juggler motion now includes Meatfighter-inspired hips, torso, head, eyes, hair, legs, shoulders, and IK arms.
 - Motion diagnostics now report ball/body clearance, ball/ball spacing, and hand-contact error.
 - Frame-range rendering/export is implemented with absolute output-frame metadata.
 - Named camera and source-cycle presets are available for inspecting historical motion phases.
@@ -12,14 +13,14 @@
 - Animation JSON manifest export is available from the standalone browser UI.
 - Render profiles now expose source-like, modern, and source-quirk mode indicators in the UI.
 - CRT emulation now cycles between off, scanline, slot-mask, and soft-glow modes.
-- Tests now cover physical cascade anchors, body clearance, ball spacing, hand contact, motion metadata, JSON manifests, frame-range rendering, presets, phase labels, and unsupported-scene fallback.
+- Tests now cover physical cascade anchors, animated body pose, planted feet, body clearance, ball spacing, hand contact, motion metadata, JSON manifests, frame-range rendering, presets, phase labels, and unsupported-scene fallback.
 
 ## Historical Accuracy
 
 - Decode or document the `movie.data` and `movie2.data` compressed HAM movie formats.
 - Extract the full 24-frame historical movie sequence into a committed test/reference fixture if licensing and bundle size remain acceptable.
 - Continue fitting the reconstructed juggling motion frame-by-frame against the historical frames.
-- Refine robot body pose, hand timing, and ball arcs until key frames match the source output more closely.
+- Continue refining robot body pose, hand timing, and ball arcs until key frames match the source output more closely.
 - Add a side-by-side or overlay comparison mode for rendered frames versus historical reference frames.
 - Preserve evidence for every source-truth decision in code comments or documentation.
 
