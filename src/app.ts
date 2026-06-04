@@ -10,6 +10,7 @@ namespace Juggler.App {
   const sceneMotionSelect = document.getElementById("sceneMotion") as HTMLSelectElement;
   const motionFrameInput = document.getElementById("motionFrame") as HTMLInputElement;
   const resolutionSelect = document.getElementById("resolution") as HTMLSelectElement;
+  const previewModeSelect = document.getElementById("previewMode") as HTMLSelectElement;
   const profileSelect = document.getElementById("renderProfile") as HTMLSelectElement;
   const profileIndicators = document.getElementById("profileIndicators") as HTMLElement;
   const rowsPerTickInput = document.getElementById("rowsPerTick") as HTMLInputElement;
@@ -77,6 +78,12 @@ namespace Juggler.App {
       option.textContent = profile.label;
       profileSelect.appendChild(option);
     }
+    for (const mode of Preview.MODES) {
+      const option = document.createElement("option");
+      option.value = mode.id;
+      option.textContent = mode.label;
+      previewModeSelect.appendChild(option);
+    }
     for (const path of Animation.PATHS) {
       const option = document.createElement("option");
       option.value = path.id;
@@ -109,14 +116,20 @@ namespace Juggler.App {
       resetAnimationBuffer();
       renderFacts();
       refreshAnimationFacts();
+      refreshActiveView();
     });
     motionFrameInput.addEventListener("input", () => {
       resetAnimationBuffer();
       renderFacts();
       refreshAnimationFacts();
+      refreshActiveView();
     });
     renderButton.addEventListener("click", () => renderStill());
     abortButton.addEventListener("click", abortWork);
+    previewModeSelect.addEventListener("change", () => {
+      abortWork();
+      refreshActiveView();
+    });
     profileSelect.addEventListener("change", () => {
       resetAnimationBuffer();
       refreshProfileIndicators();
@@ -141,6 +154,8 @@ namespace Juggler.App {
     for (const control of [orbitEnabledInput, orbitAngleInput, orbitRadiusInput, resolutionSelect]) {
       control.addEventListener("change", refreshCameraFacts);
       control.addEventListener("input", refreshCameraFacts);
+      control.addEventListener("change", refreshActiveView);
+      control.addEventListener("input", refreshActiveView);
     }
     for (const control of [
       animationPathSelect,
@@ -208,6 +223,10 @@ namespace Juggler.App {
     if (!context || !active) {
       return;
     }
+    if (readPreviewMode() !== "raytrace") {
+      renderPreview();
+      return;
+    }
 
     abortWork();
     const token = abortToken;
@@ -256,6 +275,37 @@ namespace Juggler.App {
     };
 
     window.requestAnimationFrame(tick);
+  }
+
+  function renderPreview(): void {
+    if (!context || !active) {
+      return;
+    }
+    const mode = readPreviewMode();
+    if (mode === "raytrace") {
+      return;
+    }
+
+    abortWork();
+    const [width, height] = parseResolution();
+    const motionSettings = readSceneMotionSettings();
+    const renderWorld = Motion.resolveWorld(active.parsed, active.world, motionSettings, motionSettings.sourceFrame);
+    const observer = Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
+    canvas.width = width;
+    canvas.height = height;
+    context.imageSmoothingEnabled = false;
+    Preview.draw(context, renderWorld, observer, mode);
+    progressElement.value = 1;
+    setStatus(
+      `${previewModeLabel(mode)} preview: ${active.source.name}, ${Motion.motionSummary(active.parsed, motionSettings)}, ` +
+      `${renderWorld.spheres.length} spheres`
+    );
+  }
+
+  function refreshActiveView(): void {
+    if (readPreviewMode() !== "raytrace") {
+      renderPreview();
+    }
   }
 
   function renderAnimation(): void {
@@ -785,6 +835,11 @@ namespace Juggler.App {
     return [width, height];
   }
 
+  function readPreviewMode(): PreviewMode {
+    const requested = previewModeSelect.value as PreviewMode;
+    return Preview.MODES.some((mode) => mode.id === requested) ? requested : "raytrace";
+  }
+
   function readOrbitSettings(): OrbitSettings {
     return {
       enabled: orbitEnabledInput.checked,
@@ -865,6 +920,10 @@ namespace Juggler.App {
 
   function cyclePresetLabel(presetId: MotionCyclePresetId): string {
     return Animation.CYCLE_PRESETS.find((preset) => preset.id === presetId)?.label ?? presetId;
+  }
+
+  function previewModeLabel(modeId: PreviewMode): string {
+    return Preview.MODES.find((mode) => mode.id === modeId)?.label ?? modeId;
   }
 
   function setStatus(text: string): void {

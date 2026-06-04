@@ -561,3 +561,24 @@ Verification:
 ```bash
 npm run build:single
 ```
+
+## 2026-06-04: Realtime Preview Modes
+
+The first TODO ideas pass added fast inspection render modes without changing the existing raytracer default.
+
+Implemented changes:
+
+- Added a `View` selector with `Raytrace`, `Wireframe`, and `Solid` modes.
+- Added a `Preview` module that projects resolved world spheres through the current observer.
+- Wireframe mode draws projected sphere outlines directly to the canvas.
+- Solid mode draws flat material-colored projected spheres with simple depth sorting.
+- Kept `Raytrace` as the default high-quality render path.
+
+Verification:
+
+```bash
+npm test
+npm run build:single
+```
+
+Browser smoke verification opened the generated `index.html` directly from disk, switched to 160 x 100 wireframe and solid previews, confirmed both were nonblank, and found no console errors.

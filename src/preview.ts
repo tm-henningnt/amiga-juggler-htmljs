@@ -1,0 +1,81 @@
+namespace Juggler.Preview {
+  const WIRE_ALPHA = 0.95;
+  const SOLID_ALPHA = 0.88;
+
+  export const MODES: Array<{ id: PreviewMode; label: string }> = [
+    { id: "raytrace", label: "Raytrace" },
+    { id: "wireframe", label: "Wireframe" },
+    { id: "solid", label: "Solid" }
+  ];
+
+  export function projectSphere(sphere: Sphere, observer: Observer): ProjectedSphere | null {
+    const delta = Math3.sub(sphere.position, observer.position);
+    const depth = Math3.dot(delta, observer.viewDir);
+    if (depth <= observer.focalLength * 0.1) {
+      return null;
+    }
+
+    const cameraX = Math3.dot(delta, observer.uhat) * observer.focalLength / depth;
+    const cameraY = Math3.dot(delta, observer.vhat) * observer.focalLength / depth;
+    const x = cameraX / observer.px + 0.5 * observer.nx;
+    const y = 0.5 * observer.ny - cameraY / observer.py;
+    const rx = Math.abs(sphere.radius * observer.focalLength / depth / observer.px);
+    const ry = Math.abs(sphere.radius * observer.focalLength / depth / observer.py);
+
+    if (x + rx < 0 || x - rx > observer.nx || y + ry < 0 || y - ry > observer.ny) {
+      return null;
+    }
+
+    return { sphere, x, y, rx, ry, depth };
+  }
+
+  export function projectedSpheres(world: World, observer: Observer): ProjectedSphere[] {
+    return world.spheres
+      .map((sphere) => projectSphere(sphere, observer))
+      .filter((sphere): sphere is ProjectedSphere => sphere !== null)
+      .sort((a, b) => b.depth - a.depth);
+  }
+
+  export function draw(context: CanvasRenderingContext2D, world: World, observer: Observer, mode: PreviewMode): void {
+    context.clearRect(0, 0, observer.nx, observer.ny);
+    context.fillStyle = "#000000";
+    context.fillRect(0, 0, observer.nx, observer.ny);
+
+    if (mode === "raytrace") {
+      return;
+    }
+
+    for (const item of projectedSpheres(world, observer)) {
+      const color = sphereColor(item.sphere, mode);
+      context.beginPath();
+      context.ellipse(item.x, item.y, Math.max(0.5, item.rx), Math.max(0.5, item.ry), 0, 0, Math.PI * 2);
+      if (mode === "solid") {
+        context.globalAlpha = SOLID_ALPHA;
+        context.fillStyle = color.fill;
+        context.fill();
+        context.globalAlpha = 1;
+      }
+      context.globalAlpha = mode === "wireframe" ? WIRE_ALPHA : 1;
+      context.strokeStyle = color.stroke;
+      context.lineWidth = item.sphere.type === MIRROR ? 2 : 1;
+      context.stroke();
+      context.globalAlpha = 1;
+    }
+  }
+
+  function sphereColor(sphere: Sphere, mode: PreviewMode): { fill: string; stroke: string } {
+    if (sphere.type === MIRROR) {
+      return mode === "wireframe"
+        ? { fill: "rgb(230,230,230)", stroke: "rgb(255,255,255)" }
+        : { fill: "rgb(210,220,230)", stroke: "rgb(255,255,255)" };
+    }
+    if (sphere.type === BRIGHT) {
+      return { fill: "rgb(255,245,150)", stroke: "rgb(255,255,255)" };
+    }
+    const rgb = sphere.color.map((channel) => Math3.clampByte(channel * 255));
+    return {
+      fill: `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`,
+      stroke: mode === "wireframe" ? "rgb(255,136,0)" : "rgb(0,0,0)"
+    };
+  }
+}

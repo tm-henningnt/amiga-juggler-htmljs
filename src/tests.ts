@@ -169,6 +169,19 @@ namespace Juggler.Tests {
     assert(Motion.sourceRangeLabel({ motionId: "juggler-reconstructed", sourceFrame: 0 }, 0, 8, 24).includes("->"), "source range label spans frames");
   }
 
+  function testPreviewProjection(): void {
+    const scene = parse("robot");
+    const world = Scenes.buildWorld(scene);
+    const observer = Scenes.createObserver(scene, world, 320, 200, { enabled: false, angleDeg: 0, radius: 10 });
+    const projected = Preview.projectedSpheres(world, observer);
+    assert(projected.length > 20, "preview projects visible robot spheres");
+    assert(projected.every((item) => Number.isFinite(item.x) && Number.isFinite(item.y)), "preview coordinates are finite");
+    assert(projected.every((item) => item.rx > 0 && item.ry > 0), "preview projected radii are positive");
+    for (let i = 1; i < projected.length; i += 1) {
+      assert(projected[i - 1].depth >= projected[i].depth, "preview sorts far spheres before near spheres");
+    }
+  }
+
   function testSceneMotion(): void {
     const robot = parse("robot");
     const robotWorld = Scenes.buildWorld(robot);
@@ -384,6 +397,7 @@ namespace Juggler.Tests {
     testProfilesAndReflection();
     testAnimationPaths();
     testAnimationPresets();
+    testPreviewProjection();
     testSceneMotion();
     testCustomKeyframes();
     testAnimationRendererQueue();

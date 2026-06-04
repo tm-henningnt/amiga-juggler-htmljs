@@ -4,6 +4,7 @@ namespace Juggler {
   export type OutputMode = "source-ham" | "modern-rgb";
   export type ReflectionMode = "standard" | "source-quirk";
   export type RenderProfileId = "reference" | "wright-rgb" | "source-quirk";
+  export type PreviewMode = "raytrace" | "wireframe" | "solid";
   export type CameraPathId = "static" | "orbit-360" | "orbit-arc" | "dolly" | "custom-keyframes";
   export type CameraPresetId = "custom" | "source-camera" | "source-orbit" | "left-catch-arc" | "right-catch-arc" | "overhead-clearance" | "source-dolly";
   export type MotionCyclePresetId = "custom" | "full-cycle" | "apex-to-left" | "left-to-right" | "right-to-apex";
@@ -27,6 +28,15 @@ namespace Juggler {
   export interface RenderProfileTag {
     label: string;
     kind: "source" | "modern" | "quirk" | "neutral";
+  }
+
+  export interface ProjectedSphere {
+    sphere: Sphere;
+    x: number;
+    y: number;
+    rx: number;
+    ry: number;
+    depth: number;
   }
 
   export interface SceneSource {

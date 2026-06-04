@@ -659,6 +659,10 @@ button:disabled {
             </select>
           </label>
           <label>
+            View
+            <select id="previewMode"></select>
+          </label>
+          <label>
             Profile
             <select id="renderProfile"></select>
           </label>
@@ -2340,6 +2344,84 @@ var Juggler;
 })(Juggler || (Juggler = {}));
 var Juggler;
 (function (Juggler) {
+    var Preview;
+    (function (Preview) {
+        const WIRE_ALPHA = 0.95;
+        const SOLID_ALPHA = 0.88;
+        Preview.MODES = [
+            { id: "raytrace", label: "Raytrace" },
+            { id: "wireframe", label: "Wireframe" },
+            { id: "solid", label: "Solid" }
+        ];
+        function projectSphere(sphere, observer) {
+            const delta = Juggler.Math3.sub(sphere.position, observer.position);
+            const depth = Juggler.Math3.dot(delta, observer.viewDir);
+            if (depth <= observer.focalLength * 0.1) {
+                return null;
+            }
+            const cameraX = Juggler.Math3.dot(delta, observer.uhat) * observer.focalLength / depth;
+            const cameraY = Juggler.Math3.dot(delta, observer.vhat) * observer.focalLength / depth;
+            const x = cameraX / observer.px + 0.5 * observer.nx;
+            const y = 0.5 * observer.ny - cameraY / observer.py;
+            const rx = Math.abs(sphere.radius * observer.focalLength / depth / observer.px);
+            const ry = Math.abs(sphere.radius * observer.focalLength / depth / observer.py);
+            if (x + rx < 0 || x - rx > observer.nx || y + ry < 0 || y - ry > observer.ny) {
+                return null;
+            }
+            return { sphere, x, y, rx, ry, depth };
+        }
+        Preview.projectSphere = projectSphere;
+        function projectedSpheres(world, observer) {
+            return world.spheres
+                .map((sphere) => projectSphere(sphere, observer))
+                .filter((sphere) => sphere !== null)
+                .sort((a, b) => b.depth - a.depth);
+        }
+        Preview.projectedSpheres = projectedSpheres;
+        function draw(context, world, observer, mode) {
+            context.clearRect(0, 0, observer.nx, observer.ny);
+            context.fillStyle = "#000000";
+            context.fillRect(0, 0, observer.nx, observer.ny);
+            if (mode === "raytrace") {
+                return;
+            }
+            for (const item of projectedSpheres(world, observer)) {
+                const color = sphereColor(item.sphere, mode);
+                context.beginPath();
+                context.ellipse(item.x, item.y, Math.max(0.5, item.rx), Math.max(0.5, item.ry), 0, 0, Math.PI * 2);
+                if (mode === "solid") {
+                    context.globalAlpha = SOLID_ALPHA;
+                    context.fillStyle = color.fill;
+                    context.fill();
+                    context.globalAlpha = 1;
+                }
+                context.globalAlpha = mode === "wireframe" ? WIRE_ALPHA : 1;
+                context.strokeStyle = color.stroke;
+                context.lineWidth = item.sphere.type === Juggler.MIRROR ? 2 : 1;
+                context.stroke();
+                context.globalAlpha = 1;
+            }
+        }
+        Preview.draw = draw;
+        function sphereColor(sphere, mode) {
+            if (sphere.type === Juggler.MIRROR) {
+                return mode === "wireframe"
+                    ? { fill: "rgb(230,230,230)", stroke: "rgb(255,255,255)" }
+                    : { fill: "rgb(210,220,230)", stroke: "rgb(255,255,255)" };
+            }
+            if (sphere.type === Juggler.BRIGHT) {
+                return { fill: "rgb(255,245,150)", stroke: "rgb(255,255,255)" };
+            }
+            const rgb = sphere.color.map((channel) => Juggler.Math3.clampByte(channel * 255));
+            return {
+                fill: `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`,
+                stroke: mode === "wireframe" ? "rgb(255,136,0)" : "rgb(0,0,0)"
+            };
+        }
+    })(Preview = Juggler.Preview || (Juggler.Preview = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
     var Animation;
     (function (Animation) {
         Animation.PATHS = [
@@ -2684,6 +2766,7 @@ var Juggler;
         const sceneMotionSelect = document.getElementById("sceneMotion");
         const motionFrameInput = document.getElementById("motionFrame");
         const resolutionSelect = document.getElementById("resolution");
+        const previewModeSelect = document.getElementById("previewMode");
         const profileSelect = document.getElementById("renderProfile");
         const profileIndicators = document.getElementById("profileIndicators");
         const rowsPerTickInput = document.getElementById("rowsPerTick");
@@ -2748,6 +2831,12 @@ var Juggler;
                 option.textContent = profile.label;
                 profileSelect.appendChild(option);
             }
+            for (const mode of Juggler.Preview.MODES) {
+                const option = document.createElement("option");
+                option.value = mode.id;
+                option.textContent = mode.label;
+                previewModeSelect.appendChild(option);
+            }
             for (const path of Juggler.Animation.PATHS) {
                 const option = document.createElement("option");
                 option.value = path.id;
@@ -2779,14 +2868,20 @@ var Juggler;
                 resetAnimationBuffer();
                 renderFacts();
                 refreshAnimationFacts();
+                refreshActiveView();
             });
             motionFrameInput.addEventListener("input", () => {
                 resetAnimationBuffer();
                 renderFacts();
                 refreshAnimationFacts();
+                refreshActiveView();
             });
             renderButton.addEventListener("click", () => renderStill());
             abortButton.addEventListener("click", abortWork);
+            previewModeSelect.addEventListener("change", () => {
+                abortWork();
+                refreshActiveView();
+            });
             profileSelect.addEventListener("change", () => {
                 resetAnimationBuffer();
                 refreshProfileIndicators();
@@ -2810,6 +2905,8 @@ var Juggler;
             for (const control of [orbitEnabledInput, orbitAngleInput, orbitRadiusInput, resolutionSelect]) {
                 control.addEventListener("change", refreshCameraFacts);
                 control.addEventListener("input", refreshCameraFacts);
+                control.addEventListener("change", refreshActiveView);
+                control.addEventListener("input", refreshActiveView);
             }
             for (const control of [
                 animationPathSelect,
@@ -2875,6 +2972,10 @@ var Juggler;
             if (!context || !active) {
                 return;
             }
+            if (readPreviewMode() !== "raytrace") {
+                renderPreview();
+                return;
+            }
             abortWork();
             const token = abortToken;
             const [width, height] = parseResolution();
@@ -2912,6 +3013,32 @@ var Juggler;
                     `${renderer.stats.rays} rays, ${renderer.stats.mirrorFallbacks} source-reflection fallbacks`);
             };
             window.requestAnimationFrame(tick);
+        }
+        function renderPreview() {
+            if (!context || !active) {
+                return;
+            }
+            const mode = readPreviewMode();
+            if (mode === "raytrace") {
+                return;
+            }
+            abortWork();
+            const [width, height] = parseResolution();
+            const motionSettings = readSceneMotionSettings();
+            const renderWorld = Juggler.Motion.resolveWorld(active.parsed, active.world, motionSettings, motionSettings.sourceFrame);
+            const observer = Juggler.Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
+            canvas.width = width;
+            canvas.height = height;
+            context.imageSmoothingEnabled = false;
+            Juggler.Preview.draw(context, renderWorld, observer, mode);
+            progressElement.value = 1;
+            setStatus(`${previewModeLabel(mode)} preview: ${active.source.name}, ${Juggler.Motion.motionSummary(active.parsed, motionSettings)}, ` +
+                `${renderWorld.spheres.length} spheres`);
+        }
+        function refreshActiveView() {
+            if (readPreviewMode() !== "raytrace") {
+                renderPreview();
+            }
         }
         function renderAnimation() {
             if (!context || !active) {
@@ -3374,6 +3501,10 @@ var Juggler;
             const [width, height] = resolutionSelect.value.split("x").map((value) => Number(value));
             return [width, height];
         }
+        function readPreviewMode() {
+            const requested = previewModeSelect.value;
+            return Juggler.Preview.MODES.some((mode) => mode.id === requested) ? requested : "raytrace";
+        }
         function readOrbitSettings() {
             return {
                 enabled: orbitEnabledInput.checked,
@@ -3445,6 +3576,9 @@ var Juggler;
         }
         function cyclePresetLabel(presetId) {
             return Juggler.Animation.CYCLE_PRESETS.find((preset) => preset.id === presetId)?.label ?? presetId;
+        }
+        function previewModeLabel(modeId) {
+            return Juggler.Preview.MODES.find((mode) => mode.id === modeId)?.label ?? modeId;
         }
         function setStatus(text) {
             statusElement.textContent = text;
