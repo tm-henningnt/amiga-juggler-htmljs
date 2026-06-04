@@ -701,7 +701,44 @@ button:disabled {
             Orbit radius
             <input id="orbitRadius" type="number" min="1" max="120" value="10">
           </label>
+          <label>
+            Height offset
+            <input id="orbitHeight" type="number" min="-80" max="80" step="0.25" value="0">
+          </label>
           <dl id="cameraFacts" class="facts"></dl>
+        </div>
+      </section>
+
+      <section class="wb-window" data-collapsed="true" aria-labelledby="title-interactive">
+        <div class="wb-titlebar">
+          <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
+          <span class="wb-title-text" id="title-interactive">Interactive</span>
+          <span class="wb-gadget wb-gadget-depth" aria-hidden="true"></span>
+        </div>
+        <div class="wb-body">
+          <label>
+            Mouse tool
+            <select id="mouseTool"></select>
+          </label>
+          <dl id="selectionFacts" class="facts"></dl>
+          <div class="split-row">
+            <label>
+              Move X
+              <input id="transformX" type="number" step="0.1" value="0">
+            </label>
+            <label>
+              Move Y
+              <input id="transformY" type="number" step="0.1" value="0">
+            </label>
+          </div>
+          <label>
+            Move Z
+            <input id="transformZ" type="number" step="0.1" value="0">
+          </label>
+          <div class="button-row">
+            <button id="resetGroupTransform">Reset Group</button>
+            <button id="resetAllTransforms">Reset All</button>
+          </div>
         </div>
       </section>
 
@@ -1169,7 +1206,7 @@ var Juggler;
                 const position = [
                     center[0] - orbit.radius * Math.cos(angle),
                     center[1] - orbit.radius * Math.sin(angle),
-                    scene.observerPosition[2]
+                    scene.observerPosition[2] + (orbit.heightOffset ?? 0)
                 ];
                 const direction = Juggler.Math3.sub(center, position);
                 const azimuthDeg = Math.atan2(direction[1], direction[0]) / RAD;
@@ -2344,6 +2381,71 @@ var Juggler;
 })(Juggler || (Juggler = {}));
 var Juggler;
 (function (Juggler) {
+    var Transforms;
+    (function (Transforms) {
+        function empty() {
+            return {};
+        }
+        Transforms.empty = empty;
+        function hasTransforms(transforms) {
+            return Object.keys(transforms).length > 0;
+        }
+        Transforms.hasTransforms = hasTransforms;
+        function offsetFor(transforms, groupIndex) {
+            const offset = transforms[groupIndex];
+            return offset ? [...offset] : [0, 0, 0];
+        }
+        Transforms.offsetFor = offsetFor;
+        function setOffset(transforms, groupIndex, offset) {
+            const next = { ...transforms };
+            if (Juggler.Math3.length(offset) < 1e-9) {
+                delete next[groupIndex];
+            }
+            else {
+                next[groupIndex] = [...offset];
+            }
+            return next;
+        }
+        Transforms.setOffset = setOffset;
+        function clearGroup(transforms, groupIndex) {
+            const next = { ...transforms };
+            delete next[groupIndex];
+            return next;
+        }
+        Transforms.clearGroup = clearGroup;
+        function apply(world, transforms) {
+            if (!hasTransforms(transforms)) {
+                return world;
+            }
+            return {
+                spheres: world.spheres.map((sphere) => {
+                    const offset = transforms[sphere.groupIndex];
+                    return {
+                        ...sphere,
+                        position: offset ? Juggler.Math3.add(sphere.position, offset) : [...sphere.position],
+                        color: [...sphere.color]
+                    };
+                }),
+                lamps: world.lamps.map((lamp) => ({
+                    position: [...lamp.position],
+                    radius: lamp.radius,
+                    color: [...lamp.color]
+                })),
+                horizon: [
+                    { ...world.horizon[0], position: [...world.horizon[0].position], normal: [...world.horizon[0].normal], color: [...world.horizon[0].color] },
+                    { ...world.horizon[1], position: [...world.horizon[1].position], normal: [...world.horizon[1].normal], color: [...world.horizon[1].color] }
+                ],
+                illum: [...world.illum],
+                skyZenith: [...world.skyZenith],
+                skyHorizon: [...world.skyHorizon],
+                lampExposure: world.lampExposure
+            };
+        }
+        Transforms.apply = apply;
+    })(Transforms = Juggler.Transforms || (Juggler.Transforms = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
     var Preview;
     (function (Preview) {
         const WIRE_ALPHA = 0.95;
@@ -2378,7 +2480,19 @@ var Juggler;
                 .sort((a, b) => b.depth - a.depth);
         }
         Preview.projectedSpheres = projectedSpheres;
-        function draw(context, world, observer, mode) {
+        function pickGroup(world, observer, screenX, screenY) {
+            const projected = projectedSpheres(world, observer).slice().sort((a, b) => a.depth - b.depth);
+            for (const item of projected) {
+                const dx = (screenX - item.x) / Math.max(0.5, item.rx);
+                const dy = (screenY - item.y) / Math.max(0.5, item.ry);
+                if (dx * dx + dy * dy <= 1) {
+                    return item.sphere.groupIndex;
+                }
+            }
+            return null;
+        }
+        Preview.pickGroup = pickGroup;
+        function draw(context, world, observer, mode, selectedGroupIndex = null) {
             context.clearRect(0, 0, observer.nx, observer.ny);
             context.fillStyle = "#000000";
             context.fillRect(0, 0, observer.nx, observer.ny);
@@ -2395,9 +2509,10 @@ var Juggler;
                     context.fill();
                     context.globalAlpha = 1;
                 }
+                const selected = selectedGroupIndex !== null && item.sphere.groupIndex === selectedGroupIndex;
                 context.globalAlpha = mode === "wireframe" ? WIRE_ALPHA : 1;
-                context.strokeStyle = color.stroke;
-                context.lineWidth = item.sphere.type === Juggler.MIRROR ? 2 : 1;
+                context.strokeStyle = selected ? "rgb(255,136,0)" : color.stroke;
+                context.lineWidth = selected ? 3 : item.sphere.type === Juggler.MIRROR ? 2 : 1;
                 context.stroke();
                 context.globalAlpha = 1;
             }
@@ -2591,7 +2706,7 @@ var Juggler;
         }
         Animation.createManifest = createManifest;
         class AnimationRenderer {
-            constructor(scene, world, width, height, renderOptions, pathSettings, motionSettings = { motionId: "static", sourceFrame: 0 }) {
+            constructor(scene, world, width, height, renderOptions, pathSettings, motionSettings = { motionId: "static", sourceFrame: 0 }, groupTransforms = {}) {
                 this.scene = scene;
                 this.world = world;
                 this.width = width;
@@ -2599,6 +2714,7 @@ var Juggler;
                 this.renderOptions = renderOptions;
                 this.pathSettings = pathSettings;
                 this.motionSettings = motionSettings;
+                this.groupTransforms = groupTransforms;
                 this.frames = [];
                 this.renderedIndex = 0;
                 this.frameRenderer = null;
@@ -2618,7 +2734,7 @@ var Juggler;
                 }
                 if (!this.frameRenderer) {
                     const sourceFrame = Juggler.Motion.animationSampleFrame(this.motionSettings, this.frameIndex, totalFrameCount(this.pathSettings));
-                    const frameWorld = Juggler.Motion.resolveWorld(this.scene, this.world, this.motionSettings, sourceFrame);
+                    const frameWorld = Juggler.Transforms.apply(Juggler.Motion.resolveWorld(this.scene, this.world, this.motionSettings, sourceFrame), this.groupTransforms);
                     this.currentPose = evaluateCameraPath(this.scene, this.world, this.pathSettings, this.frameIndex);
                     this.currentClearance = Juggler.Motion.frameBodyClearance(frameWorld);
                     this.currentBallClearance = Juggler.Motion.frameBallClearance(frameWorld);
@@ -2774,6 +2890,14 @@ var Juggler;
         const orbitEnabledInput = document.getElementById("orbitEnabled");
         const orbitAngleInput = document.getElementById("orbitAngle");
         const orbitRadiusInput = document.getElementById("orbitRadius");
+        const orbitHeightInput = document.getElementById("orbitHeight");
+        const mouseToolSelect = document.getElementById("mouseTool");
+        const selectionFacts = document.getElementById("selectionFacts");
+        const transformXInput = document.getElementById("transformX");
+        const transformYInput = document.getElementById("transformY");
+        const transformZInput = document.getElementById("transformZ");
+        const resetGroupTransformButton = document.getElementById("resetGroupTransform");
+        const resetAllTransformsButton = document.getElementById("resetAllTransforms");
         const renderButton = document.getElementById("render");
         const abortButton = document.getElementById("abort");
         const statusElement = document.getElementById("status");
@@ -2813,6 +2937,9 @@ var Juggler;
         let animationFrames = [];
         let bufferedAnimationSettings = null;
         let bufferedMotionSettings = null;
+        let groupTransforms = Juggler.Transforms.empty();
+        let selectedGroupIndex = null;
+        let pointerDrag = null;
         let playbackTimer = 0;
         let playbackIndex = 0;
         function start() {
@@ -2836,6 +2963,16 @@ var Juggler;
                 option.value = mode.id;
                 option.textContent = mode.label;
                 previewModeSelect.appendChild(option);
+            }
+            for (const tool of [
+                { id: "orbit-camera", label: "Orbit camera" },
+                { id: "move-group", label: "Move group" },
+                { id: "none", label: "None" }
+            ]) {
+                const option = document.createElement("option");
+                option.value = tool.id;
+                option.textContent = tool.label;
+                mouseToolSelect.appendChild(option);
             }
             for (const path of Juggler.Animation.PATHS) {
                 const option = document.createElement("option");
@@ -2902,7 +3039,19 @@ var Juggler;
             });
             animationCameraPresetSelect.addEventListener("change", applyAnimationCameraPreset);
             animationCyclePresetSelect.addEventListener("change", applyAnimationCyclePreset);
-            for (const control of [orbitEnabledInput, orbitAngleInput, orbitRadiusInput, resolutionSelect]) {
+            mouseToolSelect.value = "orbit-camera";
+            canvas.addEventListener("pointerdown", handleCanvasPointerDown);
+            canvas.addEventListener("pointermove", handleCanvasPointerMove);
+            canvas.addEventListener("pointerup", handleCanvasPointerUp);
+            canvas.addEventListener("pointerleave", handleCanvasPointerUp);
+            canvas.addEventListener("wheel", handleCanvasWheel, { passive: false });
+            for (const control of [transformXInput, transformYInput, transformZInput]) {
+                control.addEventListener("change", writeSelectedTransformFromInputs);
+                control.addEventListener("input", writeSelectedTransformFromInputs);
+            }
+            resetGroupTransformButton.addEventListener("click", resetSelectedTransform);
+            resetAllTransformsButton.addEventListener("click", resetAllTransforms);
+            for (const control of [orbitEnabledInput, orbitAngleInput, orbitRadiusInput, orbitHeightInput, resolutionSelect]) {
                 control.addEventListener("change", refreshCameraFacts);
                 control.addEventListener("input", refreshCameraFacts);
                 control.addEventListener("change", refreshActiveView);
@@ -2940,12 +3089,15 @@ var Juggler;
                 const world = Juggler.Scenes.buildWorld(parsed);
                 active = { source, parsed, world };
                 resetAnimationBuffer();
+                groupTransforms = Juggler.Transforms.empty();
+                selectedGroupIndex = null;
                 refreshMotionOptions();
                 writeDefaultCustomKeyframes();
                 setStatus(`Loaded ${source.name}`);
                 renderFacts();
                 refreshCameraFacts();
                 refreshAnimationFacts();
+                refreshSelectionFacts();
             }
             catch (error) {
                 setStatus(error instanceof Error ? error.message : String(error));
@@ -2980,7 +3132,7 @@ var Juggler;
             const token = abortToken;
             const [width, height] = parseResolution();
             const motionSettings = readSceneMotionSettings();
-            const renderWorld = Juggler.Motion.resolveWorld(active.parsed, active.world, motionSettings, motionSettings.sourceFrame);
+            const renderWorld = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
             const observer = Juggler.Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
             const profile = Juggler.Profiles.byId(profileSelect.value);
             const renderer = new Juggler.Renderer.FrameRenderer(renderWorld, observer, readRenderOptions(profile));
@@ -3025,12 +3177,12 @@ var Juggler;
             abortWork();
             const [width, height] = parseResolution();
             const motionSettings = readSceneMotionSettings();
-            const renderWorld = Juggler.Motion.resolveWorld(active.parsed, active.world, motionSettings, motionSettings.sourceFrame);
+            const renderWorld = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
             const observer = Juggler.Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
             canvas.width = width;
             canvas.height = height;
             context.imageSmoothingEnabled = false;
-            Juggler.Preview.draw(context, renderWorld, observer, mode);
+            Juggler.Preview.draw(context, renderWorld, observer, mode, selectedGroupIndex);
             progressElement.value = 1;
             setStatus(`${previewModeLabel(mode)} preview: ${active.source.name}, ${Juggler.Motion.motionSummary(active.parsed, motionSettings)}, ` +
                 `${renderWorld.spheres.length} spheres`);
@@ -3039,6 +3191,173 @@ var Juggler;
             if (readPreviewMode() !== "raytrace") {
                 renderPreview();
             }
+        }
+        function resolvedDisplayWorld(motionSettings, sourceFrame) {
+            return Juggler.Transforms.apply(Juggler.Motion.resolveWorld(active.parsed, active.world, motionSettings, sourceFrame), groupTransforms);
+        }
+        function handleCanvasPointerDown(event) {
+            if (!active || readPreviewMode() === "raytrace") {
+                return;
+            }
+            const point = canvasPoint(event);
+            const tool = readMouseTool();
+            if (tool === "orbit-camera") {
+                orbitEnabledInput.checked = true;
+                pointerDrag = {
+                    tool,
+                    startX: point[0],
+                    startY: point[1],
+                    startAngle: readNumber(orbitAngleInput.value, 0),
+                    startHeight: readNumber(orbitHeightInput.value, 0),
+                    startOffset: [0, 0, 0],
+                    observer: null
+                };
+                canvas.setPointerCapture(event.pointerId);
+                return;
+            }
+            if (tool === "move-group") {
+                const preview = previewWorldAndObserver();
+                const groupIndex = Juggler.Preview.pickGroup(preview.world, preview.observer, point[0], point[1]);
+                if (groupIndex === null) {
+                    setStatus("No group under pointer.");
+                    return;
+                }
+                selectedGroupIndex = groupIndex;
+                const startOffset = Juggler.Transforms.offsetFor(groupTransforms, groupIndex);
+                pointerDrag = {
+                    tool,
+                    startX: point[0],
+                    startY: point[1],
+                    startAngle: 0,
+                    startHeight: 0,
+                    startOffset,
+                    observer: preview.observer
+                };
+                updateTransformInputs(startOffset);
+                refreshSelectionFacts();
+                renderPreview();
+                canvas.setPointerCapture(event.pointerId);
+            }
+        }
+        function handleCanvasPointerMove(event) {
+            if (!pointerDrag || readPreviewMode() === "raytrace") {
+                return;
+            }
+            const point = canvasPoint(event);
+            const dx = point[0] - pointerDrag.startX;
+            const dy = point[1] - pointerDrag.startY;
+            if (pointerDrag.tool === "orbit-camera") {
+                orbitEnabledInput.checked = true;
+                orbitAngleInput.value = String(normalizeAngle(pointerDrag.startAngle + dx * 0.5));
+                if (event.shiftKey) {
+                    orbitHeightInput.value = String(clampNumber(pointerDrag.startHeight - dy * 0.04, -80, 80, 0).toFixed(2));
+                }
+                refreshCameraFacts();
+                renderPreview();
+                return;
+            }
+            if (pointerDrag.tool === "move-group" && selectedGroupIndex !== null && pointerDrag.observer) {
+                const scale = Math.max(0.01, readNumber(orbitRadiusInput.value, 10) / 320);
+                const planeMove = Juggler.Math3.add(Juggler.Math3.mul(pointerDrag.observer.uhat, dx * scale), Juggler.Math3.mul(pointerDrag.observer.vhat, -dy * scale));
+                const nextOffset = Juggler.Math3.add(pointerDrag.startOffset, planeMove);
+                setSelectedTransform(nextOffset);
+            }
+        }
+        function handleCanvasPointerUp(event) {
+            if (pointerDrag) {
+                try {
+                    canvas.releasePointerCapture(event.pointerId);
+                }
+                catch {
+                    // Pointer capture may already be released after pointerleave.
+                }
+            }
+            pointerDrag = null;
+        }
+        function handleCanvasWheel(event) {
+            if (readPreviewMode() === "raytrace" || readMouseTool() !== "orbit-camera") {
+                return;
+            }
+            event.preventDefault();
+            orbitEnabledInput.checked = true;
+            const current = readNumber(orbitRadiusInput.value, 10);
+            const next = clampNumber(current + Math.sign(event.deltaY) * 0.5, 1, 120, 10);
+            orbitRadiusInput.value = String(next);
+            refreshCameraFacts();
+            renderPreview();
+        }
+        function previewWorldAndObserver() {
+            const [width, height] = parseResolution();
+            const motionSettings = readSceneMotionSettings();
+            const world = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
+            const observer = Juggler.Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
+            return { world, observer };
+        }
+        function canvasPoint(event) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / Math.max(1, rect.width);
+            const scaleY = canvas.height / Math.max(1, rect.height);
+            return [
+                (event.clientX - rect.left) * scaleX,
+                (event.clientY - rect.top) * scaleY
+            ];
+        }
+        function writeSelectedTransformFromInputs() {
+            if (selectedGroupIndex === null) {
+                refreshSelectionFacts();
+                return;
+            }
+            setSelectedTransform([
+                readNumber(transformXInput.value, 0),
+                readNumber(transformYInput.value, 0),
+                readNumber(transformZInput.value, 0)
+            ]);
+        }
+        function setSelectedTransform(offset) {
+            if (selectedGroupIndex === null) {
+                return;
+            }
+            groupTransforms = Juggler.Transforms.setOffset(groupTransforms, selectedGroupIndex, offset);
+            updateTransformInputs(Juggler.Transforms.offsetFor(groupTransforms, selectedGroupIndex));
+            resetAnimationBuffer();
+            refreshSelectionFacts();
+            refreshActiveView();
+        }
+        function resetSelectedTransform() {
+            if (selectedGroupIndex === null) {
+                return;
+            }
+            groupTransforms = Juggler.Transforms.clearGroup(groupTransforms, selectedGroupIndex);
+            updateTransformInputs([0, 0, 0]);
+            resetAnimationBuffer();
+            refreshSelectionFacts();
+            refreshActiveView();
+        }
+        function resetAllTransforms() {
+            groupTransforms = Juggler.Transforms.empty();
+            updateTransformInputs([0, 0, 0]);
+            resetAnimationBuffer();
+            refreshSelectionFacts();
+            refreshActiveView();
+            setStatus("All group transforms reset.");
+        }
+        function refreshSelectionFacts() {
+            const hasSelection = selectedGroupIndex !== null;
+            const offset = hasSelection ? Juggler.Transforms.offsetFor(groupTransforms, selectedGroupIndex) : [0, 0, 0];
+            transformXInput.disabled = !hasSelection;
+            transformYInput.disabled = !hasSelection;
+            transformZInput.disabled = !hasSelection;
+            resetGroupTransformButton.disabled = !hasSelection;
+            setFacts(selectionFacts, [
+                ["Selected", hasSelection ? `Group ${selectedGroupIndex}` : "none"],
+                ["Offset", Juggler.Math3.formatVec(offset, 2)],
+                ["Transforms", String(Object.keys(groupTransforms).length)]
+            ]);
+        }
+        function updateTransformInputs(offset) {
+            transformXInput.value = offset[0].toFixed(2);
+            transformYInput.value = offset[1].toFixed(2);
+            transformZInput.value = offset[2].toFixed(2);
         }
         function renderAnimation() {
             if (!context || !active) {
@@ -3064,7 +3383,7 @@ var Juggler;
             const motionSettings = readSceneMotionSettings();
             bufferedAnimationSettings = copyAnimationSettings(settings);
             bufferedMotionSettings = { ...motionSettings };
-            const renderer = new Juggler.Animation.AnimationRenderer(active.parsed, active.world, width, height, readRenderOptions(profile), settings, motionSettings);
+            const renderer = new Juggler.Animation.AnimationRenderer(active.parsed, active.world, width, height, readRenderOptions(profile), settings, motionSettings, groupTransforms);
             const rowsPerTick = readRowsPerTick();
             canvas.width = width;
             canvas.height = height;
@@ -3316,6 +3635,7 @@ var Juggler;
                 ["Position", Juggler.Math3.formatVec(observer.position, 2)],
                 ["Altitude", `${(observer.altitudeRad * 180 / Math.PI).toFixed(2)} deg`],
                 ["Azimuth", `${(observer.azimuthRad * 180 / Math.PI).toFixed(2)} deg`],
+                ["Height", readNumber(orbitHeightInput.value, 0).toFixed(2)],
                 ["Focal", observer.focalLength.toFixed(3)]
             ]);
         }
@@ -3509,8 +3829,13 @@ var Juggler;
             return {
                 enabled: orbitEnabledInput.checked,
                 angleDeg: Number(orbitAngleInput.value) || 0,
-                radius: Number(orbitRadiusInput.value) || 10
+                radius: Number(orbitRadiusInput.value) || 10,
+                heightOffset: Number(orbitHeightInput.value) || 0
             };
+        }
+        function readMouseTool() {
+            const requested = mouseToolSelect.value;
+            return requested === "orbit-camera" || requested === "move-group" || requested === "none" ? requested : "orbit-camera";
         }
         function readRowsPerTick() {
             return Math.max(1, Math.min(32, Number(rowsPerTickInput.value) || 4));
@@ -3570,6 +3895,9 @@ var Juggler;
         function readNumber(value, fallback) {
             const parsed = Number(value);
             return Number.isFinite(parsed) ? parsed : fallback;
+        }
+        function normalizeAngle(value) {
+            return ((value % 360) + 360) % 360;
         }
         function cameraPresetLabel(presetId) {
             return Juggler.Animation.CAMERA_PRESETS.find((preset) => preset.id === presetId)?.label ?? presetId;

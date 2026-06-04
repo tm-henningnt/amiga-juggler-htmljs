@@ -21,6 +21,7 @@
     "src/motion.ts",
     "src/ham.ts",
     "src/renderer.ts",
+    "src/transforms.ts",
     "src/preview.ts",
     "src/animation.ts",
     "src/tests.ts"

@@ -75,7 +75,7 @@ namespace Juggler.Scenes {
       const position: Vec3 = [
         center[0] - orbit.radius * Math.cos(angle),
         center[1] - orbit.radius * Math.sin(angle),
-        scene.observerPosition[2]
+        scene.observerPosition[2] + (orbit.heightOffset ?? 0)
       ];
       const direction = Math3.sub(center, position);
       const azimuthDeg = Math.atan2(direction[1], direction[0]) / RAD;

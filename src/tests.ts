@@ -182,6 +182,21 @@ namespace Juggler.Tests {
     }
   }
 
+  function testGroupTransforms(): void {
+    const scene = parse("robot");
+    const world = Scenes.buildWorld(scene);
+    const moved = Transforms.apply(world, { 3: [1, 2, 3] });
+    const originalHead = world.spheres.find((sphere) => sphere.groupIndex === 3)!;
+    const movedHead = moved.spheres.find((sphere) => sphere.groupIndex === 3)!;
+    const movedTorso = moved.spheres.find((sphere) => sphere.groupIndex === 8)!;
+    close(movedHead.position[0], originalHead.position[0] + 1, 1e-9, "group transform x");
+    close(movedHead.position[1], originalHead.position[1] + 2, 1e-9, "group transform y");
+    close(movedHead.position[2], originalHead.position[2] + 3, 1e-9, "group transform z");
+    close(world.spheres.find((sphere) => sphere.groupIndex === 3)!.position[0], originalHead.position[0], 1e-9, "group transform does not mutate source");
+    close(movedTorso.position[0], world.spheres.find((sphere) => sphere.groupIndex === 8)!.position[0], 1e-9, "unselected group stays put");
+    assert(Transforms.hasTransforms(Transforms.setOffset({}, 3, [0, 0, 0])) === false, "zero transform is removed");
+  }
+
   function testSceneMotion(): void {
     const robot = parse("robot");
     const robotWorld = Scenes.buildWorld(robot);
@@ -398,6 +413,7 @@ namespace Juggler.Tests {
     testAnimationPaths();
     testAnimationPresets();
     testPreviewProjection();
+    testGroupTransforms();
     testSceneMotion();
     testCustomKeyframes();
     testAnimationRendererQueue();

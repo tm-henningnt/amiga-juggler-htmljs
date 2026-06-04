@@ -582,3 +582,24 @@ npm run build:single
 ```
 
 Browser smoke verification opened the generated `index.html` directly from disk, switched to 160 x 100 wireframe and solid previews, confirmed both were nonblank, and found no console errors.
+
+## 2026-06-04: Mouse Camera And Group Transforms
+
+The second TODO ideas pass made preview mode interactive while keeping edits session-only.
+
+Implemented changes:
+
+- Added an `Interactive` control window with mouse tool selection, selected group facts, transform offsets, and reset controls.
+- Added mouse orbit control for preview modes, with wheel zoom and camera height offset support.
+- Added group picking in preview mode and selected-group highlighting.
+- Added session-only group transforms that apply after motion resolution and before preview, still renders, and animation frames.
+- Added a pure transform helper so original parsed scene data and base worlds are not mutated.
+
+Verification:
+
+```bash
+npm test
+npm run build:single
+```
+
+Browser smoke verification opened the generated `index.html` directly from disk, switched to solid preview, confirmed a nonblank canvas, used a wheel event to change orbit radius and redraw the preview, and found no console errors.

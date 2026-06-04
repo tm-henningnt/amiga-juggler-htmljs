@@ -5,6 +5,16 @@ namespace Juggler.App {
     world: World;
   }
 
+  interface PointerDrag {
+    tool: MouseTool;
+    startX: number;
+    startY: number;
+    startAngle: number;
+    startHeight: number;
+    startOffset: Vec3;
+    observer: Observer | null;
+  }
+
   const sceneSelect = document.getElementById("scene") as HTMLSelectElement;
   const fileInput = document.getElementById("file") as HTMLInputElement;
   const sceneMotionSelect = document.getElementById("sceneMotion") as HTMLSelectElement;
@@ -18,6 +28,14 @@ namespace Juggler.App {
   const orbitEnabledInput = document.getElementById("orbitEnabled") as HTMLInputElement;
   const orbitAngleInput = document.getElementById("orbitAngle") as HTMLInputElement;
   const orbitRadiusInput = document.getElementById("orbitRadius") as HTMLInputElement;
+  const orbitHeightInput = document.getElementById("orbitHeight") as HTMLInputElement;
+  const mouseToolSelect = document.getElementById("mouseTool") as HTMLSelectElement;
+  const selectionFacts = document.getElementById("selectionFacts") as HTMLElement;
+  const transformXInput = document.getElementById("transformX") as HTMLInputElement;
+  const transformYInput = document.getElementById("transformY") as HTMLInputElement;
+  const transformZInput = document.getElementById("transformZ") as HTMLInputElement;
+  const resetGroupTransformButton = document.getElementById("resetGroupTransform") as HTMLButtonElement;
+  const resetAllTransformsButton = document.getElementById("resetAllTransforms") as HTMLButtonElement;
   const renderButton = document.getElementById("render") as HTMLButtonElement;
   const abortButton = document.getElementById("abort") as HTMLButtonElement;
   const statusElement = document.getElementById("status") as HTMLSpanElement;
@@ -58,6 +76,9 @@ namespace Juggler.App {
   let animationFrames: RenderedFrame[] = [];
   let bufferedAnimationSettings: CameraPathSettings | null = null;
   let bufferedMotionSettings: SceneMotionSettings | null = null;
+  let groupTransforms: GroupTransformState = Transforms.empty();
+  let selectedGroupIndex: number | null = null;
+  let pointerDrag: PointerDrag | null = null;
   let playbackTimer = 0;
   let playbackIndex = 0;
 
@@ -83,6 +104,16 @@ namespace Juggler.App {
       option.value = mode.id;
       option.textContent = mode.label;
       previewModeSelect.appendChild(option);
+    }
+    for (const tool of [
+      { id: "orbit-camera" as MouseTool, label: "Orbit camera" },
+      { id: "move-group" as MouseTool, label: "Move group" },
+      { id: "none" as MouseTool, label: "None" }
+    ]) {
+      const option = document.createElement("option");
+      option.value = tool.id;
+      option.textContent = tool.label;
+      mouseToolSelect.appendChild(option);
     }
     for (const path of Animation.PATHS) {
       const option = document.createElement("option");
@@ -150,8 +181,20 @@ namespace Juggler.App {
     });
     animationCameraPresetSelect.addEventListener("change", applyAnimationCameraPreset);
     animationCyclePresetSelect.addEventListener("change", applyAnimationCyclePreset);
+    mouseToolSelect.value = "orbit-camera";
+    canvas.addEventListener("pointerdown", handleCanvasPointerDown);
+    canvas.addEventListener("pointermove", handleCanvasPointerMove);
+    canvas.addEventListener("pointerup", handleCanvasPointerUp);
+    canvas.addEventListener("pointerleave", handleCanvasPointerUp);
+    canvas.addEventListener("wheel", handleCanvasWheel, { passive: false });
+    for (const control of [transformXInput, transformYInput, transformZInput]) {
+      control.addEventListener("change", writeSelectedTransformFromInputs);
+      control.addEventListener("input", writeSelectedTransformFromInputs);
+    }
+    resetGroupTransformButton.addEventListener("click", resetSelectedTransform);
+    resetAllTransformsButton.addEventListener("click", resetAllTransforms);
 
-    for (const control of [orbitEnabledInput, orbitAngleInput, orbitRadiusInput, resolutionSelect]) {
+    for (const control of [orbitEnabledInput, orbitAngleInput, orbitRadiusInput, orbitHeightInput, resolutionSelect]) {
       control.addEventListener("change", refreshCameraFacts);
       control.addEventListener("input", refreshCameraFacts);
       control.addEventListener("change", refreshActiveView);
@@ -190,12 +233,15 @@ namespace Juggler.App {
       const world = Scenes.buildWorld(parsed);
       active = { source, parsed, world };
       resetAnimationBuffer();
+      groupTransforms = Transforms.empty();
+      selectedGroupIndex = null;
       refreshMotionOptions();
       writeDefaultCustomKeyframes();
       setStatus(`Loaded ${source.name}`);
       renderFacts();
       refreshCameraFacts();
       refreshAnimationFacts();
+      refreshSelectionFacts();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     }
@@ -232,7 +278,7 @@ namespace Juggler.App {
     const token = abortToken;
     const [width, height] = parseResolution();
     const motionSettings = readSceneMotionSettings();
-    const renderWorld = Motion.resolveWorld(active.parsed, active.world, motionSettings, motionSettings.sourceFrame);
+    const renderWorld = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
     const observer = Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
     const profile = Profiles.byId(profileSelect.value);
     const renderer = new Renderer.FrameRenderer(renderWorld, observer, readRenderOptions(profile));
@@ -289,12 +335,12 @@ namespace Juggler.App {
     abortWork();
     const [width, height] = parseResolution();
     const motionSettings = readSceneMotionSettings();
-    const renderWorld = Motion.resolveWorld(active.parsed, active.world, motionSettings, motionSettings.sourceFrame);
+    const renderWorld = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
     const observer = Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
     canvas.width = width;
     canvas.height = height;
     context.imageSmoothingEnabled = false;
-    Preview.draw(context, renderWorld, observer, mode);
+    Preview.draw(context, renderWorld, observer, mode, selectedGroupIndex);
     progressElement.value = 1;
     setStatus(
       `${previewModeLabel(mode)} preview: ${active.source.name}, ${Motion.motionSummary(active.parsed, motionSettings)}, ` +
@@ -306,6 +352,194 @@ namespace Juggler.App {
     if (readPreviewMode() !== "raytrace") {
       renderPreview();
     }
+  }
+
+  function resolvedDisplayWorld(motionSettings: SceneMotionSettings, sourceFrame: number): World {
+    return Transforms.apply(
+      Motion.resolveWorld(active.parsed, active.world, motionSettings, sourceFrame),
+      groupTransforms
+    );
+  }
+
+  function handleCanvasPointerDown(event: PointerEvent): void {
+    if (!active || readPreviewMode() === "raytrace") {
+      return;
+    }
+    const point = canvasPoint(event);
+    const tool = readMouseTool();
+    if (tool === "orbit-camera") {
+      orbitEnabledInput.checked = true;
+      pointerDrag = {
+        tool,
+        startX: point[0],
+        startY: point[1],
+        startAngle: readNumber(orbitAngleInput.value, 0),
+        startHeight: readNumber(orbitHeightInput.value, 0),
+        startOffset: [0, 0, 0],
+        observer: null
+      };
+      canvas.setPointerCapture(event.pointerId);
+      return;
+    }
+
+    if (tool === "move-group") {
+      const preview = previewWorldAndObserver();
+      const groupIndex = Preview.pickGroup(preview.world, preview.observer, point[0], point[1]);
+      if (groupIndex === null) {
+        setStatus("No group under pointer.");
+        return;
+      }
+      selectedGroupIndex = groupIndex;
+      const startOffset = Transforms.offsetFor(groupTransforms, groupIndex);
+      pointerDrag = {
+        tool,
+        startX: point[0],
+        startY: point[1],
+        startAngle: 0,
+        startHeight: 0,
+        startOffset,
+        observer: preview.observer
+      };
+      updateTransformInputs(startOffset);
+      refreshSelectionFacts();
+      renderPreview();
+      canvas.setPointerCapture(event.pointerId);
+    }
+  }
+
+  function handleCanvasPointerMove(event: PointerEvent): void {
+    if (!pointerDrag || readPreviewMode() === "raytrace") {
+      return;
+    }
+    const point = canvasPoint(event);
+    const dx = point[0] - pointerDrag.startX;
+    const dy = point[1] - pointerDrag.startY;
+
+    if (pointerDrag.tool === "orbit-camera") {
+      orbitEnabledInput.checked = true;
+      orbitAngleInput.value = String(normalizeAngle(pointerDrag.startAngle + dx * 0.5));
+      if (event.shiftKey) {
+        orbitHeightInput.value = String(clampNumber(pointerDrag.startHeight - dy * 0.04, -80, 80, 0).toFixed(2));
+      }
+      refreshCameraFacts();
+      renderPreview();
+      return;
+    }
+
+    if (pointerDrag.tool === "move-group" && selectedGroupIndex !== null && pointerDrag.observer) {
+      const scale = Math.max(0.01, readNumber(orbitRadiusInput.value, 10) / 320);
+      const planeMove = Math3.add(
+        Math3.mul(pointerDrag.observer.uhat, dx * scale),
+        Math3.mul(pointerDrag.observer.vhat, -dy * scale)
+      );
+      const nextOffset = Math3.add(pointerDrag.startOffset, planeMove);
+      setSelectedTransform(nextOffset);
+    }
+  }
+
+  function handleCanvasPointerUp(event: PointerEvent): void {
+    if (pointerDrag) {
+      try {
+        canvas.releasePointerCapture(event.pointerId);
+      } catch {
+        // Pointer capture may already be released after pointerleave.
+      }
+    }
+    pointerDrag = null;
+  }
+
+  function handleCanvasWheel(event: WheelEvent): void {
+    if (readPreviewMode() === "raytrace" || readMouseTool() !== "orbit-camera") {
+      return;
+    }
+    event.preventDefault();
+    orbitEnabledInput.checked = true;
+    const current = readNumber(orbitRadiusInput.value, 10);
+    const next = clampNumber(current + Math.sign(event.deltaY) * 0.5, 1, 120, 10);
+    orbitRadiusInput.value = String(next);
+    refreshCameraFacts();
+    renderPreview();
+  }
+
+  function previewWorldAndObserver(): { world: World; observer: Observer } {
+    const [width, height] = parseResolution();
+    const motionSettings = readSceneMotionSettings();
+    const world = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
+    const observer = Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
+    return { world, observer };
+  }
+
+  function canvasPoint(event: PointerEvent | WheelEvent): [number, number] {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / Math.max(1, rect.width);
+    const scaleY = canvas.height / Math.max(1, rect.height);
+    return [
+      (event.clientX - rect.left) * scaleX,
+      (event.clientY - rect.top) * scaleY
+    ];
+  }
+
+  function writeSelectedTransformFromInputs(): void {
+    if (selectedGroupIndex === null) {
+      refreshSelectionFacts();
+      return;
+    }
+    setSelectedTransform([
+      readNumber(transformXInput.value, 0),
+      readNumber(transformYInput.value, 0),
+      readNumber(transformZInput.value, 0)
+    ]);
+  }
+
+  function setSelectedTransform(offset: Vec3): void {
+    if (selectedGroupIndex === null) {
+      return;
+    }
+    groupTransforms = Transforms.setOffset(groupTransforms, selectedGroupIndex, offset);
+    updateTransformInputs(Transforms.offsetFor(groupTransforms, selectedGroupIndex));
+    resetAnimationBuffer();
+    refreshSelectionFacts();
+    refreshActiveView();
+  }
+
+  function resetSelectedTransform(): void {
+    if (selectedGroupIndex === null) {
+      return;
+    }
+    groupTransforms = Transforms.clearGroup(groupTransforms, selectedGroupIndex);
+    updateTransformInputs([0, 0, 0]);
+    resetAnimationBuffer();
+    refreshSelectionFacts();
+    refreshActiveView();
+  }
+
+  function resetAllTransforms(): void {
+    groupTransforms = Transforms.empty();
+    updateTransformInputs([0, 0, 0]);
+    resetAnimationBuffer();
+    refreshSelectionFacts();
+    refreshActiveView();
+    setStatus("All group transforms reset.");
+  }
+
+  function refreshSelectionFacts(): void {
+    const hasSelection = selectedGroupIndex !== null;
+    const offset = hasSelection ? Transforms.offsetFor(groupTransforms, selectedGroupIndex!) : [0, 0, 0] as Vec3;
+    transformXInput.disabled = !hasSelection;
+    transformYInput.disabled = !hasSelection;
+    transformZInput.disabled = !hasSelection;
+    resetGroupTransformButton.disabled = !hasSelection;
+    setFacts(selectionFacts, [
+      ["Selected", hasSelection ? `Group ${selectedGroupIndex}` : "none"],
+      ["Offset", Math3.formatVec(offset, 2)],
+      ["Transforms", String(Object.keys(groupTransforms).length)]
+    ]);
+  }
+
+  function updateTransformInputs(offset: Vec3): void {
+    transformXInput.value = offset[0].toFixed(2);
+    transformYInput.value = offset[1].toFixed(2);
+    transformZInput.value = offset[2].toFixed(2);
   }
 
   function renderAnimation(): void {
@@ -341,7 +575,8 @@ namespace Juggler.App {
       height,
       readRenderOptions(profile),
       settings,
-      motionSettings
+      motionSettings,
+      groupTransforms
     );
     const rowsPerTick = readRowsPerTick();
     canvas.width = width;
@@ -632,6 +867,7 @@ namespace Juggler.App {
       ["Position", Math3.formatVec(observer.position, 2)],
       ["Altitude", `${(observer.altitudeRad * 180 / Math.PI).toFixed(2)} deg`],
       ["Azimuth", `${(observer.azimuthRad * 180 / Math.PI).toFixed(2)} deg`],
+      ["Height", readNumber(orbitHeightInput.value, 0).toFixed(2)],
       ["Focal", observer.focalLength.toFixed(3)]
     ]);
   }
@@ -844,8 +1080,14 @@ namespace Juggler.App {
     return {
       enabled: orbitEnabledInput.checked,
       angleDeg: Number(orbitAngleInput.value) || 0,
-      radius: Number(orbitRadiusInput.value) || 10
+      radius: Number(orbitRadiusInput.value) || 10,
+      heightOffset: Number(orbitHeightInput.value) || 0
     };
+  }
+
+  function readMouseTool(): MouseTool {
+    const requested = mouseToolSelect.value as MouseTool;
+    return requested === "orbit-camera" || requested === "move-group" || requested === "none" ? requested : "orbit-camera";
   }
 
   function readRowsPerTick(): number {
@@ -912,6 +1154,10 @@ namespace Juggler.App {
   function readNumber(value: string, fallback: number): number {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  function normalizeAngle(value: number): number {
+    return ((value % 360) + 360) % 360;
   }
 
   function cameraPresetLabel(presetId: CameraPresetId): string {

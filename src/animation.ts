@@ -232,7 +232,8 @@ namespace Juggler.Animation {
       private readonly height: number,
       private readonly renderOptions: RenderOptions,
       private readonly pathSettings: CameraPathSettings,
-      private readonly motionSettings: SceneMotionSettings = { motionId: "static", sourceFrame: 0 }
+      private readonly motionSettings: SceneMotionSettings = { motionId: "static", sourceFrame: 0 },
+      private readonly groupTransforms: GroupTransformState = {}
     ) {
       this.frameIndex = rangeStart(pathSettings);
     }
@@ -246,7 +247,10 @@ namespace Juggler.Animation {
 
       if (!this.frameRenderer) {
         const sourceFrame = Motion.animationSampleFrame(this.motionSettings, this.frameIndex, totalFrameCount(this.pathSettings));
-        const frameWorld = Motion.resolveWorld(this.scene, this.world, this.motionSettings, sourceFrame);
+        const frameWorld = Transforms.apply(
+          Motion.resolveWorld(this.scene, this.world, this.motionSettings, sourceFrame),
+          this.groupTransforms
+        );
         this.currentPose = evaluateCameraPath(this.scene, this.world, this.pathSettings, this.frameIndex);
         this.currentClearance = Motion.frameBodyClearance(frameWorld);
         this.currentBallClearance = Motion.frameBallClearance(frameWorld);

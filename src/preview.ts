@@ -36,7 +36,25 @@ namespace Juggler.Preview {
       .sort((a, b) => b.depth - a.depth);
   }
 
-  export function draw(context: CanvasRenderingContext2D, world: World, observer: Observer, mode: PreviewMode): void {
+  export function pickGroup(world: World, observer: Observer, screenX: number, screenY: number): number | null {
+    const projected = projectedSpheres(world, observer).slice().sort((a, b) => a.depth - b.depth);
+    for (const item of projected) {
+      const dx = (screenX - item.x) / Math.max(0.5, item.rx);
+      const dy = (screenY - item.y) / Math.max(0.5, item.ry);
+      if (dx * dx + dy * dy <= 1) {
+        return item.sphere.groupIndex;
+      }
+    }
+    return null;
+  }
+
+  export function draw(
+    context: CanvasRenderingContext2D,
+    world: World,
+    observer: Observer,
+    mode: PreviewMode,
+    selectedGroupIndex: number | null = null
+  ): void {
     context.clearRect(0, 0, observer.nx, observer.ny);
     context.fillStyle = "#000000";
     context.fillRect(0, 0, observer.nx, observer.ny);
@@ -55,9 +73,10 @@ namespace Juggler.Preview {
         context.fill();
         context.globalAlpha = 1;
       }
+      const selected = selectedGroupIndex !== null && item.sphere.groupIndex === selectedGroupIndex;
       context.globalAlpha = mode === "wireframe" ? WIRE_ALPHA : 1;
-      context.strokeStyle = color.stroke;
-      context.lineWidth = item.sphere.type === MIRROR ? 2 : 1;
+      context.strokeStyle = selected ? "rgb(255,136,0)" : color.stroke;
+      context.lineWidth = selected ? 3 : item.sphere.type === MIRROR ? 2 : 1;
       context.stroke();
       context.globalAlpha = 1;
     }

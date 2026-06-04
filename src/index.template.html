@@ -128,7 +128,44 @@
             Orbit radius
             <input id="orbitRadius" type="number" min="1" max="120" value="10">
           </label>
+          <label>
+            Height offset
+            <input id="orbitHeight" type="number" min="-80" max="80" step="0.25" value="0">
+          </label>
           <dl id="cameraFacts" class="facts"></dl>
+        </div>
+      </section>
+
+      <section class="wb-window" data-collapsed="true" aria-labelledby="title-interactive">
+        <div class="wb-titlebar">
+          <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
+          <span class="wb-title-text" id="title-interactive">Interactive</span>
+          <span class="wb-gadget wb-gadget-depth" aria-hidden="true"></span>
+        </div>
+        <div class="wb-body">
+          <label>
+            Mouse tool
+            <select id="mouseTool"></select>
+          </label>
+          <dl id="selectionFacts" class="facts"></dl>
+          <div class="split-row">
+            <label>
+              Move X
+              <input id="transformX" type="number" step="0.1" value="0">
+            </label>
+            <label>
+              Move Y
+              <input id="transformY" type="number" step="0.1" value="0">
+            </label>
+          </div>
+          <label>
+            Move Z
+            <input id="transformZ" type="number" step="0.1" value="0">
+          </label>
+          <div class="button-row">
+            <button id="resetGroupTransform">Reset Group</button>
+            <button id="resetAllTransforms">Reset All</button>
+          </div>
         </div>
       </section>
 
