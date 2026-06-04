@@ -10,8 +10,8 @@ The goal is preservation first: keep the source scene data, HAM-style output pat
 - Expands the original interpolated sphere controls into renderable sphere lists.
 - Raytraces spheres, lamps, checkerboard ground, sky gradient, shadows, highlights, and recursive reflections.
 - Includes render profiles for source-like HAM output, modern RGB output, and the original reflection quirk study path.
-- Supports static renders, orbit/dolly/custom camera paths, animation rendering, playback, timeline scrubbing, PNG frame export, and browser-supported WebM/MP4 export.
-- Supports selected animation frame ranges while preserving absolute frame, source-frame, profile, render-time, camera-pose, and motion metadata.
+- Supports static renders, orbit/dolly/custom camera paths, named camera presets, animation rendering, playback, timeline scrubbing, PNG frame export, and browser-supported WebM/MP4 export.
+- Supports selected animation frame ranges, source-cycle presets, and phase-labeled source frames while preserving absolute frame, source-frame, profile, render-time, camera-pose, and motion metadata.
 - Reconstructs a 24-frame juggling motion cycle for the robot scene. The original `.dat` files do not contain animation tracks; the motion is fitted from historical rendered output, depth-corrected along the source camera rays, and kept explicit in `src/motion-data.ts` / `src/motion.ts`.
 - Produces a single-file `index.html` bundle with no backend and no local server requirement.
 
@@ -85,6 +85,7 @@ Manual browser verification should include:
 - Switch between static and reconstructed motion.
 - Render a short animation at 160 x 100 or 320 x 200.
 - Render a selected frame range and confirm exported frame numbers match the source timeline.
+- Apply a camera preset and source-cycle preset, then confirm the animation facts show the expected source range.
 - Scrub the timeline and confirm source-frame motion changes.
 - Export WebM/MP4 if supported by the current browser.
 

@@ -374,3 +374,26 @@ Browser smoke verification opened the generated `index.html` directly from disk,
 - Source frames advanced as 7/24, 10/24, and 13/24.
 - Each canvas frame was nonblank, and adjacent frames differed by thousands of pixels.
 - No runtime errors appeared in the console; the only warning came from verification-time canvas readbacks.
+
+## 2026-06-04: Camera And Cycle Presets
+
+The animation panel now has presets for inspection workflows that were previously manual combinations of path and range controls.
+
+Implemented changes:
+
+- Added named camera presets for the historical source camera, source-height orbit, left-catch arc, right-catch arc, overhead clearance orbit, and source-view dolly.
+- Added source-cycle presets for the full 24-frame cycle and the three major reconstructed motion phases: apex to left catch, left catch to right catch, and right catch to apex.
+- Added source-frame phase labels so statuses and facts can report frames as `apex`, `left catch`, `right catch`, or the in-between travel phases.
+- Animation facts now show the active camera preset, cycle preset, output range, and source range.
+- Editing camera or range controls marks the corresponding preset as custom and clears stale buffered animation frames.
+
+Verification:
+
+```bash
+npm test
+npm run build:single
+```
+
+The test suite now checks camera preset application, cycle preset ranges, source-frame labels, and source-range label formatting.
+
+Browser smoke verification opened the generated `index.html` from disk, applied the overhead clearance camera preset and apex-to-left source-cycle preset, then rendered a shortened 1-3 range at 160 x 100. Scrubbing confirmed source labels advanced from `1/24 apex` to `2/24 falling to left catch` and `3/24 falling to left catch`, each frame was nonblank, and adjacent frames differed by more than 7,800 pixels.

@@ -1,4 +1,21 @@
 namespace Juggler.Animation {
+  interface CameraPreset {
+    id: CameraPresetId;
+    label: string;
+    settings?: Partial<Pick<
+      CameraPathSettings,
+      "pathId" | "startAngleDeg" | "endAngleDeg" | "orbitRadius" | "orbitHeight" | "dollyStartRadius" | "dollyEndRadius"
+    >>;
+  }
+
+  interface MotionCyclePreset {
+    id: MotionCyclePresetId;
+    label: string;
+    frameCount?: number;
+    rangeStartFrame?: number;
+    rangeEndFrame?: number;
+  }
+
   export const PATHS: Array<{ id: CameraPathId; label: string }> = [
     { id: "static", label: "Static .dat camera" },
     { id: "orbit-360", label: "Orbit 360" },
@@ -6,6 +23,44 @@ namespace Juggler.Animation {
     { id: "dolly", label: "Dolly" },
     { id: "custom-keyframes", label: "Custom keyframes" }
   ];
+
+  export const CAMERA_PRESETS: CameraPreset[] = [
+    { id: "custom", label: "Custom camera" },
+    { id: "source-camera", label: "Historical source camera", settings: { pathId: "static" } },
+    { id: "source-orbit", label: "Source-height orbit", settings: { pathId: "orbit-360", startAngleDeg: 20, orbitRadius: 10, orbitHeight: 0 } },
+    { id: "left-catch-arc", label: "Left-catch inspection arc", settings: { pathId: "orbit-arc", startAngleDeg: -15, endAngleDeg: 55, orbitRadius: 10, orbitHeight: 0.5 } },
+    { id: "right-catch-arc", label: "Right-catch inspection arc", settings: { pathId: "orbit-arc", startAngleDeg: 55, endAngleDeg: -20, orbitRadius: 10, orbitHeight: 0.5 } },
+    { id: "overhead-clearance", label: "Overhead clearance orbit", settings: { pathId: "orbit-360", startAngleDeg: 20, orbitRadius: 12, orbitHeight: 4 } },
+    { id: "source-dolly", label: "Dolly into source view", settings: { pathId: "dolly", startAngleDeg: 20, endAngleDeg: 20, dollyStartRadius: 14, dollyEndRadius: 7, orbitHeight: 0 } }
+  ];
+
+  export const CYCLE_PRESETS: MotionCyclePreset[] = [
+    { id: "custom", label: "Custom range" },
+    { id: "full-cycle", label: "Full 24-frame cycle", frameCount: Motion.SOURCE_FRAME_COUNT, rangeStartFrame: 0, rangeEndFrame: 23 },
+    { id: "apex-to-left", label: "Apex to left catch", frameCount: Motion.SOURCE_FRAME_COUNT, rangeStartFrame: 0, rangeEndFrame: 8 },
+    { id: "left-to-right", label: "Left catch to right catch", frameCount: Motion.SOURCE_FRAME_COUNT, rangeStartFrame: 8, rangeEndFrame: 16 },
+    { id: "right-to-apex", label: "Right catch to apex", frameCount: Motion.SOURCE_FRAME_COUNT, rangeStartFrame: 16, rangeEndFrame: 23 }
+  ];
+
+  export function applyCameraPreset(settings: CameraPathSettings, presetId: CameraPresetId): CameraPathSettings {
+    const preset = CAMERA_PRESETS.find((candidate) => candidate.id === presetId);
+    return {
+      ...settings,
+      ...(preset?.settings ?? {}),
+      customKeyframes: [...settings.customKeyframes]
+    };
+  }
+
+  export function applyCyclePreset(settings: CameraPathSettings, presetId: MotionCyclePresetId): CameraPathSettings {
+    const preset = CYCLE_PRESETS.find((candidate) => candidate.id === presetId);
+    return {
+      ...settings,
+      frameCount: preset?.frameCount ?? settings.frameCount,
+      rangeStartFrame: preset?.rangeStartFrame ?? settings.rangeStartFrame,
+      rangeEndFrame: preset?.rangeEndFrame ?? settings.rangeEndFrame,
+      customKeyframes: [...settings.customKeyframes]
+    };
+  }
 
   export function sceneHasCameraPathData(_scene: ParsedScene): boolean {
     return false;

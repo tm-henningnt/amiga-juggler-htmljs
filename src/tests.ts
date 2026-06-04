@@ -143,6 +143,25 @@ namespace Juggler.Tests {
     close(dollyMiddle.position[0], target[0] - 9, 1e-9, "dolly middle radius");
   }
 
+  function testAnimationPresets(): void {
+    const settings = Animation.defaultSettings();
+    const sourceCamera = Animation.applyCameraPreset(settings, "source-camera");
+    assert(sourceCamera.pathId === "static", "source camera preset selects static path");
+    assert(settings.pathId === "orbit-360", "camera preset does not mutate input settings");
+
+    const overhead = Animation.applyCameraPreset(settings, "overhead-clearance");
+    assert(overhead.pathId === "orbit-360", "overhead preset uses orbit");
+    assert(overhead.orbitHeight > settings.orbitHeight, "overhead preset raises camera");
+
+    const leftCatch = Animation.applyCyclePreset(settings, "apex-to-left");
+    assert(leftCatch.frameCount === Motion.SOURCE_FRAME_COUNT, "cycle preset uses source frame count");
+    assert(leftCatch.rangeStartFrame === 0, "apex to left range start");
+    assert(leftCatch.rangeEndFrame === 8, "apex to left range end");
+    assert(Motion.sourceFrameLabel(0).includes("apex"), "source frame label includes apex phase");
+    assert(Motion.sourceFrameLabel(8).includes("left catch"), "source frame label includes left catch phase");
+    assert(Motion.sourceRangeLabel({ motionId: "juggler-reconstructed", sourceFrame: 0 }, 0, 8, 24).includes("->"), "source range label spans frames");
+  }
+
   function testSceneMotion(): void {
     const robot = parse("robot");
     const robotWorld = Scenes.buildWorld(robot);
@@ -315,6 +334,7 @@ namespace Juggler.Tests {
     testMathAndIntersections();
     testProfilesAndReflection();
     testAnimationPaths();
+    testAnimationPresets();
     testSceneMotion();
     testCustomKeyframes();
     testAnimationRendererQueue();

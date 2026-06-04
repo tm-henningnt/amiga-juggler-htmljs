@@ -50,6 +50,20 @@ namespace Juggler.Motion {
     return settings.sourceFrame + cycleT * SOURCE_FRAME_COUNT;
   }
 
+  export function sourceFrameLabel(sourceFrame: number): string {
+    const frame = Math.floor(mod(sourceFrame, SOURCE_FRAME_COUNT));
+    return `${frame + 1}/${SOURCE_FRAME_COUNT} ${sourceFramePhase(frame)}`;
+  }
+
+  export function sourceRangeLabel(settings: SceneMotionSettings, startFrame: number, endFrame: number, frameCount: number): string {
+    if (settings.motionId === "static") {
+      return "static";
+    }
+    const start = animationSampleFrame(settings, startFrame, frameCount);
+    const end = animationSampleFrame(settings, endFrame, frameCount);
+    return `${sourceFrameLabel(start)} -> ${sourceFrameLabel(end)}`;
+  }
+
   export function resolveWorld(
     scene: ParsedScene,
     baseWorld: World,
@@ -166,9 +180,28 @@ namespace Juggler.Motion {
 
   export function motionSummary(scene: ParsedScene, settings: SceneMotionSettings): string {
     if (settings.motionId === "juggler-reconstructed" && supportsJugglerMotion(scene)) {
-      return `source frame ${Math.floor(mod(settings.sourceFrame, SOURCE_FRAME_COUNT)) + 1}/${SOURCE_FRAME_COUNT}`;
+      return `source ${sourceFrameLabel(settings.sourceFrame)}`;
     }
     return "static source pose";
+  }
+
+  function sourceFramePhase(frame: number): string {
+    if (frame === 0) {
+      return "apex";
+    }
+    if (frame < LEFT_CONTACT_INDEX) {
+      return "falling to left catch";
+    }
+    if (frame === LEFT_CONTACT_INDEX) {
+      return "left catch";
+    }
+    if (frame < RIGHT_CONTACT_INDEX) {
+      return "crossing to right catch";
+    }
+    if (frame === RIGHT_CONTACT_INDEX) {
+      return "right catch";
+    }
+    return "rising to apex";
   }
 
   function supportsJugglerMotion(scene: ParsedScene): boolean {

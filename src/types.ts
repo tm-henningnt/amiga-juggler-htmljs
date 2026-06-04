@@ -5,6 +5,8 @@ namespace Juggler {
   export type ReflectionMode = "standard" | "source-quirk";
   export type RenderProfileId = "reference" | "wright-rgb" | "source-quirk";
   export type CameraPathId = "static" | "orbit-360" | "orbit-arc" | "dolly" | "custom-keyframes";
+  export type CameraPresetId = "custom" | "source-camera" | "source-orbit" | "left-catch-arc" | "right-catch-arc" | "overhead-clearance" | "source-dolly";
+  export type MotionCyclePresetId = "custom" | "full-cycle" | "apex-to-left" | "left-to-right" | "right-to-apex";
   export type SceneMotionId = "static" | "juggler-reconstructed";
 
   export const DULL: SurfaceType = 0;

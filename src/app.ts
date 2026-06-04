@@ -23,7 +23,9 @@ namespace Juggler.App {
   const sceneFacts = document.getElementById("sceneFacts") as HTMLElement;
   const cameraFacts = document.getElementById("cameraFacts") as HTMLElement;
   const animationFacts = document.getElementById("animationFacts") as HTMLElement;
+  const animationCameraPresetSelect = document.getElementById("animationCameraPreset") as HTMLSelectElement;
   const animationPathSelect = document.getElementById("animationPath") as HTMLSelectElement;
+  const animationCyclePresetSelect = document.getElementById("animationCyclePreset") as HTMLSelectElement;
   const animationFramesInput = document.getElementById("animationFrames") as HTMLInputElement;
   const animationRangeStartInput = document.getElementById("animationRangeStart") as HTMLInputElement;
   const animationRangeEndInput = document.getElementById("animationRangeEnd") as HTMLInputElement;
@@ -77,7 +79,21 @@ namespace Juggler.App {
       option.textContent = path.label;
       animationPathSelect.appendChild(option);
     }
+    for (const preset of Animation.CAMERA_PRESETS) {
+      const option = document.createElement("option");
+      option.value = preset.id;
+      option.textContent = preset.label;
+      animationCameraPresetSelect.appendChild(option);
+    }
+    for (const preset of Animation.CYCLE_PRESETS) {
+      const option = document.createElement("option");
+      option.value = preset.id;
+      option.textContent = preset.label;
+      animationCyclePresetSelect.appendChild(option);
+    }
     animationPathSelect.value = Animation.defaultSettings().pathId;
+    animationCameraPresetSelect.value = "custom";
+    animationCyclePresetSelect.value = "full-cycle";
 
     sceneSelect.addEventListener("change", () => {
       const source = sources.find((candidate) => candidate.id === sceneSelect.value) ?? sources[0];
@@ -109,6 +125,8 @@ namespace Juggler.App {
       pauseAnimation();
       showFrame(Number(timelineInput.value) || 0);
     });
+    animationCameraPresetSelect.addEventListener("change", applyAnimationCameraPreset);
+    animationCyclePresetSelect.addEventListener("change", applyAnimationCyclePreset);
 
     for (const control of [orbitEnabledInput, orbitAngleInput, orbitRadiusInput, resolutionSelect]) {
       control.addEventListener("change", refreshCameraFacts);
@@ -116,17 +134,22 @@ namespace Juggler.App {
     }
     for (const control of [
       animationPathSelect,
-      animationFramesInput,
-      animationRangeStartInput,
-      animationRangeEndInput,
-      animationFpsInput,
       animationStartAngleInput,
       animationEndAngleInput,
       animationOrbitRadiusInput,
       animationOrbitHeightInput,
       animationDollyStartInput,
-      animationDollyEndInput
+      animationDollyEndInput,
+      customKeyframesInput
     ]) {
+      control.addEventListener("change", markCameraPresetCustom);
+      control.addEventListener("input", markCameraPresetCustom);
+    }
+    for (const control of [animationFramesInput, animationRangeStartInput, animationRangeEndInput]) {
+      control.addEventListener("change", markCyclePresetCustom);
+      control.addEventListener("input", markCyclePresetCustom);
+    }
+    for (const control of [animationFpsInput]) {
       control.addEventListener("change", refreshAnimationFacts);
       control.addEventListener("input", refreshAnimationFacts);
     }
@@ -348,7 +371,7 @@ namespace Juggler.App {
     playbackIndex = safeIndex;
     const fps = readAnimationSettingsLenient().fps;
     const sourceFrame = frame.motionId === "juggler-reconstructed"
-      ? `, source frame ${Math.floor(frame.sceneFrame % Motion.SOURCE_FRAME_COUNT) + 1}/${Motion.SOURCE_FRAME_COUNT}`
+      ? `, source ${Motion.sourceFrameLabel(frame.sceneFrame)}`
       : "";
     const clearance = frame.motionClearance === null ? "" : `, clearance ${frame.motionClearance.toFixed(2)}`;
     setStatus(`Frame ${safeIndex + 1}/${animationFrames.length}, output ${frame.index + 1}${sourceFrame}${clearance} at ${fps} fps`);
@@ -536,7 +559,10 @@ namespace Juggler.App {
     setFacts(animationFacts, [
       ["Buffered frames", String(animationFrames.length)],
       ["Duration", `${seconds.toFixed(2)}s`],
+      ["Camera preset", cameraPresetLabel(animationCameraPresetSelect.value as CameraPresetId)],
+      ["Cycle preset", cyclePresetLabel(animationCyclePresetSelect.value as MotionCyclePresetId)],
       ["Range", `${settings.rangeStartFrame + 1}-${settings.rangeEndFrame + 1}`],
+      ["Source range", Motion.sourceRangeLabel(motionSettings, settings.rangeStartFrame, settings.rangeEndFrame, settings.frameCount)],
       ["Scene motion", Motion.labelFor(motionSettings.motionId)],
       ["Motion offset", Motion.motionSummary(active.parsed, motionSettings)],
       ["Min clearance", diagnostics ? diagnostics.minBodyClearance.toFixed(2) : "n/a"],
@@ -578,6 +604,51 @@ namespace Juggler.App {
       dollyEndRadius: clampNumber(Number(animationDollyEndInput.value), 1, 160, 7),
       customKeyframes: []
     };
+  }
+
+  function applyAnimationCameraPreset(): void {
+    const presetId = animationCameraPresetSelect.value as CameraPresetId;
+    const settings = Animation.applyCameraPreset(readAnimationSettingsLenient(), presetId);
+    writeAnimationSettings(settings);
+    writeDefaultCustomKeyframes();
+    resetAnimationBuffer();
+    refreshAnimationFacts();
+    setStatus(`${cameraPresetLabel(presetId)} preset applied.`);
+  }
+
+  function applyAnimationCyclePreset(): void {
+    const presetId = animationCyclePresetSelect.value as MotionCyclePresetId;
+    const settings = Animation.applyCyclePreset(readAnimationSettingsLenient(), presetId);
+    writeAnimationSettings(settings);
+    resetAnimationBuffer();
+    refreshAnimationFacts();
+    setStatus(`${cyclePresetLabel(presetId)} preset applied.`);
+  }
+
+  function writeAnimationSettings(settings: CameraPathSettings): void {
+    animationPathSelect.value = settings.pathId;
+    animationFramesInput.value = String(settings.frameCount);
+    animationRangeStartInput.value = String(settings.rangeStartFrame + 1);
+    animationRangeEndInput.value = String(settings.rangeEndFrame + 1);
+    animationFpsInput.value = String(settings.fps);
+    animationStartAngleInput.value = String(settings.startAngleDeg);
+    animationEndAngleInput.value = String(settings.endAngleDeg);
+    animationOrbitRadiusInput.value = String(settings.orbitRadius);
+    animationOrbitHeightInput.value = String(settings.orbitHeight);
+    animationDollyStartInput.value = String(settings.dollyStartRadius);
+    animationDollyEndInput.value = String(settings.dollyEndRadius);
+  }
+
+  function markCameraPresetCustom(): void {
+    animationCameraPresetSelect.value = "custom";
+    resetAnimationBuffer();
+    refreshAnimationFacts();
+  }
+
+  function markCyclePresetCustom(): void {
+    animationCyclePresetSelect.value = "custom";
+    resetAnimationBuffer();
+    refreshAnimationFacts();
   }
 
   function readSceneMotionSettings(): SceneMotionSettings {
@@ -721,6 +792,14 @@ namespace Juggler.App {
   function readNumber(value: string, fallback: number): number {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  function cameraPresetLabel(presetId: CameraPresetId): string {
+    return Animation.CAMERA_PRESETS.find((preset) => preset.id === presetId)?.label ?? presetId;
+  }
+
+  function cyclePresetLabel(presetId: MotionCyclePresetId): string {
+    return Animation.CYCLE_PRESETS.find((preset) => preset.id === presetId)?.label ?? presetId;
   }
 
   function setStatus(text: string): void {

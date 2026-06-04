@@ -6,7 +6,9 @@
 - Reconstructed ball positions now preserve source-frame projection while clearing the robot body/head in 3D.
 - Motion diagnostics now report ball/body clearance and hand-contact error.
 - Frame-range rendering/export is implemented with absolute output-frame metadata.
-- Tests now cover projection preservation, body clearance, hand contact, motion metadata, frame-range rendering, and unsupported-scene fallback.
+- Named camera and source-cycle presets are available for inspecting historical motion phases.
+- Source-frame labels now identify major cycle phases such as apex, left catch, and right catch.
+- Tests now cover projection preservation, body clearance, hand contact, motion metadata, frame-range rendering, presets, phase labels, and unsupported-scene fallback.
 
 ## Historical Accuracy
 
@@ -27,8 +29,6 @@
 
 ## Animation
 
-- Add named camera presets that reproduce useful historical inspection angles.
-- Improve frame-range UX with named cycle presets and clearer source-frame labels.
 - Add richer per-frame inspection/export metadata once a structured manifest format is added.
 - Add GIF export if a browser-compatible encoder is introduced.
 - Add batch PNG export packaging once archive/zip support is added.
@@ -64,3 +64,7 @@
 - Original HAM movie decoder in TypeScript.
 - Data-driven reconstruction of the original animation pipeline.
 - Additional historical scenes and comparison pages.
+
+## Ideas
+- Realtime preview / wireframe / solid rendering modes.
+-
