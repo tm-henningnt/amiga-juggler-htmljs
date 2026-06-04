@@ -9,6 +9,7 @@ The app is written in TypeScript and built into a single standalone `index.html`
 The standalone file contains:
 
 - Compiled JavaScript.
+- An inline worker script for background raytracing when browser support is available.
 - CSS for the Workbench-style interface and CRT display modes.
 - Embedded original `.dat` scene text.
 - Reconstructed motion data and browser UI code.
@@ -40,6 +41,7 @@ At a high level it supports:
 - Direct lighting, shadows, highlights, and mirror reflections.
 - BVH sphere acceleration for ray/sphere queries.
 - Tile and time-budget rendering for line-order-safe modes.
+- Worker-backed still rendering with main-thread fallback.
 - Source-like HAM output and modern RGB output paths.
 - Optional RGB, OCS 12-bit, Extra Half-Brite-style, and approximate HAM6 display constraints.
 - Render profiles that make historically relevant quirks explicit.
@@ -62,6 +64,7 @@ Rendered animation frames retain metadata for inspection and export, including s
 - `src/parser.ts` parses the original text `.dat` scene format.
 - `src/scenes.ts` expands parsed scenes into renderable worlds and creates observers.
 - `src/renderer.ts` implements the CPU raytracer.
+- `src/render-worker.ts` renders still frames in a Blob Worker embedded by the standalone build.
 - `src/ham.ts` implements the source-like HAM pixel encoding path.
 - `src/display.ts` applies post-render and preview display constraints.
 - `src/preview.ts` projects scene spheres into fast wireframe and solid canvas previews.

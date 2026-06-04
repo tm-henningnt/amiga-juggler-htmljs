@@ -80,6 +80,8 @@ namespace Juggler.App {
   let groupTransforms: GroupTransformState = Transforms.empty();
   let selectedGroupIndex: number | null = null;
   let pointerDrag: PointerDrag | null = null;
+  let activeRenderWorker: Worker | null = null;
+  let activeWorkerUrl: string | null = null;
   let playbackTimer = 0;
   let playbackIndex = 0;
 
@@ -291,13 +293,10 @@ namespace Juggler.App {
     const token = abortToken;
     const [width, height] = parseResolution();
     const motionSettings = readSceneMotionSettings();
-    const renderWorld = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
-    const observer = Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
     const profile = Profiles.byId(profileSelect.value);
     const displayConstraint = readDisplayConstraint();
-    const renderer = new Renderer.FrameRenderer(renderWorld, observer, readRenderOptions(profile));
+    const renderOptions = readRenderOptions(profile);
     const rowsPerTick = readRowsPerTick();
-    const image = new ImageData(renderer.data as ImageDataArray, width, height);
 
     canvas.width = width;
     canvas.height = height;
@@ -310,6 +309,14 @@ namespace Juggler.App {
       `${profile.label}, ${Display.labelFor(displayConstraint)} display`
     );
 
+    if (renderStillInWorker(token, width, height, motionSettings, renderOptions, profile, displayConstraint)) {
+      return;
+    }
+
+    const renderWorld = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
+    const observer = Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
+    const renderer = new Renderer.FrameRenderer(renderWorld, observer, renderOptions);
+    const image = new ImageData(renderer.data as ImageDataArray, width, height);
     const started = performance.now();
     const tick = (): void => {
       if (token !== abortToken) {
@@ -798,9 +805,127 @@ namespace Juggler.App {
 
   function abortWork(): void {
     abortToken += 1;
+    cleanupRenderWorker();
     clearPlaybackOnly();
     renderButton.disabled = false;
     updateAnimationButtons(false);
+  }
+
+  function renderStillInWorker(
+    token: number,
+    width: number,
+    height: number,
+    motionSettings: SceneMotionSettings,
+    renderOptions: RenderOptions,
+    profile: RenderProfile,
+    displayConstraint: DisplayConstraintId
+  ): boolean {
+    const worker = createRenderWorker();
+    if (!worker) {
+      return false;
+    }
+
+    activeRenderWorker = worker;
+    worker.onmessage = (event: MessageEvent<RenderWorkerMessage>) => {
+      const message = event.data;
+      if (message.id !== token || token !== abortToken) {
+        return;
+      }
+
+      if (message.type === "progress") {
+        progressElement.value = message.progress;
+        setStatus(
+          `Worker render ${Math.round(message.progress * 100)}%, ` +
+          `${message.stats.rays} rays, ${message.stats.sphereTests ?? 0} sphere tests`
+        );
+        return;
+      }
+
+      if (message.type === "error") {
+        cleanupRenderWorker();
+        renderButton.disabled = false;
+        setStatus(`Worker render failed: ${message.message}`);
+        return;
+      }
+
+      drawImageData(message.data, message.width, message.height);
+      progressElement.value = 1;
+      cleanupRenderWorker();
+      renderButton.disabled = false;
+      const seconds = message.renderMs / 1000;
+      setStatus(
+        `Done in ${seconds.toFixed(2)}s worker, ${profile.label}, ${active.world.spheres.length} spheres, ` +
+        `${Display.labelFor(displayConstraint)} display, ${Motion.motionSummary(active.parsed, motionSettings)}, ` +
+        `${message.stats.rays} rays, ${message.stats.sphereTests ?? 0} sphere tests`
+      );
+    };
+
+    worker.onerror = (event) => {
+      if (token !== abortToken) {
+        return;
+      }
+      cleanupRenderWorker();
+      renderButton.disabled = false;
+      setStatus(`Worker render failed: ${event.message}`);
+    };
+
+    const request: RenderWorkerRequest = {
+      id: token,
+      parsed: active.parsed,
+      world: active.world,
+      width,
+      height,
+      orbit: readOrbitSettings(),
+      motionSettings,
+      sourceFrame: motionSettings.sourceFrame,
+      groupTransforms: copyGroupTransforms(groupTransforms),
+      options: renderOptions,
+      budgetMs: 12
+    };
+    worker.postMessage(request);
+    setStatus(`Rendering ${active.source.name} in worker...`);
+    return true;
+  }
+
+  function createRenderWorker(): Worker | null {
+    if (typeof Worker === "undefined" || typeof Blob === "undefined" || typeof URL === "undefined") {
+      return null;
+    }
+    const source = document.getElementById("workerSource")?.textContent ?? "";
+    if (!source.trim()) {
+      return null;
+    }
+    try {
+      const blob = new Blob([source], { type: "text/javascript" });
+      activeWorkerUrl = URL.createObjectURL(blob);
+      return new Worker(activeWorkerUrl);
+    } catch {
+      if (activeWorkerUrl) {
+        URL.revokeObjectURL(activeWorkerUrl);
+        activeWorkerUrl = null;
+      }
+      return null;
+    }
+  }
+
+  function cleanupRenderWorker(): void {
+    if (activeRenderWorker) {
+      activeRenderWorker.terminate();
+      activeRenderWorker = null;
+    }
+    if (activeWorkerUrl) {
+      URL.revokeObjectURL(activeWorkerUrl);
+      activeWorkerUrl = null;
+    }
+  }
+
+  function copyGroupTransforms(transforms: GroupTransformState): GroupTransformState {
+    const copy: GroupTransformState = {};
+    for (const key of Object.keys(transforms)) {
+      const index = Number(key);
+      copy[index] = [...transforms[index]];
+    }
+    return copy;
   }
 
   function clearPlaybackOnly(): void {

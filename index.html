@@ -862,6 +862,1739 @@ button:disabled {
 
     </aside>
   </main>
+  <script id="workerSource" type="text/plain">"use strict";
+var Juggler;
+(function (Juggler) {
+    Juggler.DULL = 0;
+    Juggler.BRIGHT = 1;
+    Juggler.MIRROR = 2;
+    Juggler.BIG = 1.0e10;
+    Juggler.SOURCE_EPSILON = 1.0e-3;
+    Juggler.REFERENCE_EPSILON = 1.0e-5;
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var Math3;
+    (function (Math3) {
+        function vec(x = 0, y = 0, z = 0) {
+            return [x, y, z];
+        }
+        Math3.vec = vec;
+        function add(a, b) {
+            return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+        }
+        Math3.add = add;
+        function sub(a, b) {
+            return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+        }
+        Math3.sub = sub;
+        function mul(a, scalar) {
+            return [a[0] * scalar, a[1] * scalar, a[2] * scalar];
+        }
+        Math3.mul = mul;
+        function dot(a, b) {
+            return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        }
+        Math3.dot = dot;
+        function cross(a, b) {
+            return [
+                a[1] * b[2] - a[2] * b[1],
+                a[2] * b[0] - a[0] * b[2],
+                a[0] * b[1] - a[1] * b[0]
+            ];
+        }
+        Math3.cross = cross;
+        function length(a) {
+            return Math.sqrt(dot(a, a));
+        }
+        Math3.length = length;
+        function normalize(a) {
+            const len = length(a);
+            return len > 0 ? mul(a, 1 / len) : [0, 0, 0];
+        }
+        Math3.normalize = normalize;
+        function lerp(a, b, t) {
+            return a + (b - a) * t;
+        }
+        Math3.lerp = lerp;
+        function lerpVec(a, b, t) {
+            return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+        }
+        Math3.lerpVec = lerpVec;
+        function isFiniteVec(a) {
+            return Number.isFinite(a[0]) && Number.isFinite(a[1]) && Number.isFinite(a[2]);
+        }
+        Math3.isFiniteVec = isFiniteVec;
+        function clampByte(value) {
+            return Math.max(0, Math.min(255, Math.round(value)));
+        }
+        Math3.clampByte = clampByte;
+        function clampNibble(value) {
+            return Math.max(0, Math.min(15, Math.round(value)));
+        }
+        Math3.clampNibble = clampNibble;
+        function formatVec(a, places = 2) {
+            return `${a[0].toFixed(places)}, ${a[1].toFixed(places)}, ${a[2].toFixed(places)}`;
+        }
+        Math3.formatVec = formatVec;
+    })(Math3 = Juggler.Math3 || (Juggler.Math3 = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    Juggler.ORIGINAL_DAT = {
+        robot: `
+(-10,-4,5.5)
+[-10,20]
+35
+
+
+  <.9,.9,.9> 2  (-0.9,-2.1,5.3):0.6;
+  <.9,.9,.9> 2  (-1.1,1.9,5.9):0.6;
+  <.9,.9,.9> 2  (-0.4,-1.2,6.8):0.6;
+  <1,.7,.7>  1  (0,0,6.1):0.5;
+  <.2,.1,.1> 1  (0.02,0,6.12):0.5;
+  <.1,.1,1.> 1  (-0.4,0.2,6.1):0.15;
+  <.1,.1,1.> 1  (-0.4,-0.2,6.1):0.15;
+  <1,.7,.7>  1  (0,0,5.5):0.2;
+  <1,.1,.1>  1  (0,0,4.6):0.8 5 (0,0,3.3):0.6;
+  <1,.7,.7>  1  (0,0.6,2.9):0.2 6 (-0.6,0.6,1.6):0.2
+              7 (-0.4,0.6,0):0.1;
+  <1,.7,.7>  1  (0,-0.6,2.9):0.2 6 (0.2,-0.6,1.6):0.2
+              7 (0.4,-0.6,0):0.1;
+  <1,.7,.7>  1  (0,-0.7,5.1):0.2 6 (-0.2,-1.2,4.2):0.2
+              7 (-1.1,-2.0,4.1):0.1;
+  <1,.7,.7>  1  (0,0.7,5.1):0.2 6 (-0.2,1.2,4.2):0.2
+              7 (-1.0,1.9,4.8):0.1;;
+
+1
+   (-100,50,150):15 <1,1,1>
+
+<1.5,1.5,0>  <0,1.5,0> <.25,.25,.25> <.1,.1,1> <.7,.7,1>
+`,
+        ele: `
+(0,-22,3)
+[13,61]
+28
+
+<.7,.6,.7> 0
+   (1,-5,2):0.2 6 (1.7,-4.3,2.8):0.3
+                5 (2.0,-4,4.0):0.4
+                5 (2.3,-3.7,5.5):0.5
+                5 (2.7,-3.3,7.0):0.55
+                5 (3.0,-3.0,8.5):0.6
+                5 (4.,-2.0,10.0):0.65;
+
+<0.7,0.6,0.7> 0  (6.0,0,11.0):3.0;
+<1,0,0> 1        (3.0,0.0,12.0):0.5;
+<1,0,0> 1        (6.0,-3.0,12.0):0.5;
+
+<.7,.6,.7> 0   (11,0,8):3.5 4 (18,0,7.2):3.5
+             4 (25,0,8):3.5;
+
+<.7,.6,.7> 0 (28,0,10):0.2 4 (29,0,9.8):0.2
+                          4 (30,0,9.0):0.2
+                          4 (30,0,8.0):0.15;
+
+<.7,.6,.7> 0   (11,3,6):1 5 (9,4,3):1
+                        5 (9,4,0):1;
+
+<.7,.6,.7> 0  (11,-3,6):1 5 (12,-4,3):1
+                         5 (13,-4,0):1;
+
+<.7,.6,.7> 0  (25,3,6):1 5 (26,4,3):1
+                        5 (27,4,0):1;
+
+<.7,.6,.7> 0  (25,-3,6):1 5 (23,-4,3):1
+                          5 (23,-4,0):1;;
+
+
+
+1
+   (-15,-50,40):15 <1,1,1>
+
+<1.5,1.,0>  <1.5,1.,0> <.25,.25,.25> <.1,.1,1> <.7,.7,1>
+`,
+        dragon: `
+(-22,-44,11)
+[9,61]
+28
+
+<1.0,.7,.7> 1 (26,6,15):15;
+
+<0.2,1.0,0.2> 0
+   (-5,4.5,16):0.5      10
+   (-8,3,14):0.7        5
+   (-9.2,1,13.4):0.8    5
+   (-10,-2.5,13):0.9    5
+   (-9,-6,12.5):1.0     5
+   (-6,-9,12.5):1.1     5
+   (-2,-10.5,14):1.2    5
+   (3,-10,16):1.4       5
+   (9,-8.5,17.5):1.6    4
+   (13.5,-6,17):1.8     4
+   (15.5,-5,14.8):1.9   3
+   (16,-4,12):2.0       3
+   (14.9,-2.75,10):2.15 3
+   (13,-1.5,8):2.3      3
+   (7.5,0,6):3          2
+   (2,0,8):4.2          2
+   (0,0,12):6           1
+   (0,0,18):5           1
+   (0,0,23):3.5         1
+   (0,0,28):2.5         1
+   (-0.2,0,31):2        1
+   (-0.5,0,34):1.9      1
+   (-0.7,0,37.5):1.8    1
+   (-1.2,0,39):1.7      1
+   (-2.8,0,39.5):1.6    1
+   (-5,-.5,38.5):1.4    1
+   (-6.5,-2,36.5):1.2;
+
+<0.2,1.0,0.2> 0   (-1,-3.2,23):1  8 (-2,-4.4,18):0.9 8 (-8,-5,21):0.7;
+<0.2,1.0,0.2> 0   (-1,3.2,23):1  8 (-3,4.4,20):0.9 8 (-8,5,19):0.7;
+
+<0.2,1.0,0.2> 0   (-9.7,-2.2,34.5):2  5 (-5.9,-5.4,34.5):2;
+
+<1.0,0,0> 1       (-11.3,-2,34):1.5;
+<1.0,0,0> 1       (-5.4,-6.8,34):1.5;
+
+<0.2,1.0,0.2> 0   (-10.2,-4.3,32.5):1  5 (-15.1,-11.3,24.5):0.8;
+<0.2,1.0,0.2> 0   (-9.5,-4.9,32.5):1  5 (-15.0,-11.9,24.5):0.8;
+<0.2,1.0,0.2> 0   (-8.7,-5.7,32.5):1  5 (-14.4,-12.4,24.5):0.8;
+<0.2,1.0,0.2> 0   (-7.9,-6.3,32.5):1  5 (-13.8,-12.4,24.5):0.8;
+
+<0.2,0.2,1.0> 1   (-15.3,-12.8,24):0.5 7
+                  (-17,-13.6,22.5):0.5 7
+                  (-17.9,-14.6,21.5):0.5 7
+                  (-18.3,-15.6,20.5):0.3;
+
+<0.2,0.2,1.0> 1
+                  (-17.9,-14.6,21.5):0.5 7
+                  (-19,-15,20.5):0.3;
+
+
+<0.2,1.0,0.2> 0   (2,-4,10):3  5 (7,-6,4):2 7 (5,-6,0):1;
+
+<0.2,1.0,0.2> 0   (4,-6,0.5):0.5 5 (-1,-6,0.3):0.3;
+<0.2,1.0,0.2> 0   (4,-6,0.5):0.5 5 (-1,-4,0.3):0.3;
+<0.2,1.0,0.2> 0   (4,-6,0.5):0.5 5 (-1,-8,0.3):0.3;
+
+<0.2,1.0,0.2> 0   (2,4,10):3  5 (3,6,4):2 7 (2,6,0):1;
+
+<0.2,1.0,0.2> 0   (1,6,0.5):0.5 5 (-4,6,0.3):0.3;
+<0.2,1.0,0.2> 0   (1,6,0.5):0.5 5 (-4,4,0.3):0.3;
+<0.2,1.0,0.2> 0   (1,6,0.5):0.5 5 (-4,8,0.3):0.3;
+
+;
+
+1
+   (-45,-150,120):15 <1,1,1>
+
+<1.5,1.,0>  <1.5,1.,0> <.25,.25,.25> <.1,.1,1> <.7,.7,1>
+`
+    };
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var Scenes;
+    (function (Scenes) {
+        const RAD = Math.PI / 180;
+        function builtInSceneSources() {
+            return [
+                {
+                    id: "robot",
+                    name: "robot.dat humanoid",
+                    datText: Juggler.ORIGINAL_DAT.robot,
+                    sourcePath: "Raytracer_1987_Graham_Source_Code/robot.dat"
+                },
+                {
+                    id: "ele",
+                    name: "ele.dat elephant",
+                    datText: Juggler.ORIGINAL_DAT.ele,
+                    sourcePath: "Raytracer_1987_Graham_Source_Code/ele.dat"
+                },
+                {
+                    id: "dragon",
+                    name: "dragon.dat dragon",
+                    datText: Juggler.ORIGINAL_DAT.dragon,
+                    sourcePath: "Raytracer_1987_Graham_Source_Code/dragon.dat"
+                }
+            ];
+        }
+        Scenes.builtInSceneSources = builtInSceneSources;
+        function buildWorld(scene) {
+            const spheres = [];
+            scene.groups.forEach((group, groupIndex) => {
+                const expanded = expandControls(group.controls);
+                for (const control of expanded) {
+                    spheres.push({
+                        position: control.center,
+                        radius: control.radius,
+                        color: [...group.color],
+                        type: group.type,
+                        groupIndex
+                    });
+                }
+            });
+            const lamps = scene.lamps.map((lamp) => ({
+                position: [...lamp.position],
+                radius: lamp.radius,
+                color: [...lamp.color]
+            }));
+            const world = {
+                spheres,
+                lamps,
+                horizon: [
+                    { position: [0, 0, 0], normal: [0, 0, 1], color: [...scene.horizon[0]] },
+                    { position: [0, 0, 0], normal: [0, 0, 1], color: [...scene.horizon[1]] }
+                ],
+                illum: [...scene.illum],
+                skyZenith: [...scene.skyZenith],
+                skyHorizon: [...scene.skyHorizon],
+                lampExposure: 1
+            };
+            world.lampExposure = applySourceExposure(world);
+            return world;
+        }
+        Scenes.buildWorld = buildWorld;
+        function createObserver(scene, world, nx, ny, orbit) {
+            if (orbit.enabled) {
+                const center = sceneTarget(world);
+                const angle = orbit.angleDeg * RAD;
+                const position = [
+                    center[0] - orbit.radius * Math.cos(angle),
+                    center[1] - orbit.radius * Math.sin(angle),
+                    scene.observerPosition[2] + (orbit.heightOffset ?? 0)
+                ];
+                const direction = Juggler.Math3.sub(center, position);
+                const azimuthDeg = Math.atan2(direction[1], direction[0]) / RAD;
+                const altitudeDeg = Math.atan2(direction[2], Math.hypot(direction[0], direction[1])) / RAD;
+                return orientObserver(position, altitudeDeg, azimuthDeg, scene.focalLength, nx, ny);
+            }
+            return orientObserver(scene.observerPosition, scene.altitudeDeg, scene.azimuthDeg, scene.focalLength, nx, ny);
+        }
+        Scenes.createObserver = createObserver;
+        function createObserverFromPose(pose, nx, ny) {
+            const direction = Juggler.Math3.sub(pose.target, pose.position);
+            const azimuthDeg = Math.atan2(direction[1], direction[0]) / RAD;
+            const altitudeDeg = Math.atan2(direction[2], Math.hypot(direction[0], direction[1])) / RAD;
+            return orientObserver(pose.position, altitudeDeg, azimuthDeg, pose.focalLength, nx, ny);
+        }
+        Scenes.createObserverFromPose = createObserverFromPose;
+        function staticCameraPose(scene) {
+            const altitudeRad = scene.altitudeDeg * RAD;
+            const azimuthRad = scene.azimuthDeg * RAD;
+            const viewDir = [
+                Math.cos(azimuthRad) * Math.cos(altitudeRad),
+                Math.sin(azimuthRad) * Math.cos(altitudeRad),
+                Math.sin(altitudeRad)
+            ];
+            return {
+                position: [...scene.observerPosition],
+                target: Juggler.Math3.add(scene.observerPosition, viewDir),
+                focalLength: scene.focalLength
+            };
+        }
+        Scenes.staticCameraPose = staticCameraPose;
+        function sceneTarget(world) {
+            if (!world.spheres.length) {
+                return [0, 0, 0];
+            }
+            const min = [Juggler.BIG, Juggler.BIG, Juggler.BIG];
+            const max = [-Juggler.BIG, -Juggler.BIG, -Juggler.BIG];
+            for (const sphere of world.spheres) {
+                for (let axis = 0; axis < 3; axis += 1) {
+                    min[axis] = Math.min(min[axis], sphere.position[axis] - sphere.radius);
+                    max[axis] = Math.max(max[axis], sphere.position[axis] + sphere.radius);
+                }
+            }
+            return [
+                (min[0] + max[0]) * 0.5,
+                (min[1] + max[1]) * 0.5,
+                Math.min(5.2, (min[2] + max[2]) * 0.5)
+            ];
+        }
+        Scenes.sceneTarget = sceneTarget;
+        function summarizeControls(scene) {
+            let controls = 0;
+            let interpolatedSegments = 0;
+            for (const group of scene.groups) {
+                controls += group.controls.length;
+                interpolatedSegments += group.controls.filter((control) => control.interpolationFromPrevious !== null).length;
+            }
+            return { groups: scene.groups.length, controls, interpolatedSegments };
+        }
+        Scenes.summarizeControls = summarizeControls;
+        function expandControls(controls) {
+            if (!controls.length) {
+                return [];
+            }
+            const expanded = [{
+                    center: [...controls[0].center],
+                    radius: controls[0].radius,
+                    interpolationFromPrevious: null
+                }];
+            for (let i = 1; i < controls.length; i += 1) {
+                const previous = controls[i - 1];
+                const next = controls[i];
+                const steps = Math.max(1, Math.round(next.interpolationFromPrevious ?? 1));
+                for (let step = 1; step <= steps; step += 1) {
+                    const t = step / steps;
+                    expanded.push({
+                        center: Juggler.Math3.lerpVec(previous.center, next.center, t),
+                        radius: Juggler.Math3.lerp(previous.radius, next.radius, t),
+                        interpolationFromPrevious: step === steps ? next.interpolationFromPrevious : null
+                    });
+                }
+            }
+            return expanded;
+        }
+        function orientObserver(position, altitudeDeg, azimuthDeg, focalLength, nx, ny) {
+            const altitudeRad = altitudeDeg * RAD;
+            const azimuthRad = azimuthDeg * RAD;
+            return {
+                position: [...position],
+                viewDir: [
+                    Math.cos(azimuthRad) * Math.cos(altitudeRad),
+                    Math.sin(azimuthRad) * Math.cos(altitudeRad),
+                    Math.sin(altitudeRad)
+                ],
+                uhat: [Math.sin(azimuthRad), -Math.cos(azimuthRad), 0],
+                vhat: [
+                    -Math.cos(azimuthRad) * Math.sin(altitudeRad),
+                    -Math.sin(azimuthRad) * Math.sin(altitudeRad),
+                    Math.cos(altitudeRad)
+                ],
+                focalLength: 0.028 * focalLength,
+                px: 1 / nx,
+                py: 0.75 / ny,
+                nx,
+                ny,
+                altitudeRad,
+                azimuthRad
+            };
+        }
+        function applySourceExposure(world) {
+            let lampfac = Juggler.BIG;
+            for (const sphere of world.spheres) {
+                for (const lamp of world.lamps) {
+                    const delta = Juggler.Math3.sub(sphere.position, lamp.position);
+                    let radius = Math.sqrt(Juggler.Math3.dot(delta, delta));
+                    radius -= sphere.radius;
+                    for (let channel = 0; channel < 3; channel += 1) {
+                        const direct = sphere.color[channel] * lamp.color[channel] / (radius * radius);
+                        if (direct === 0) {
+                            continue;
+                        }
+                        const candidate = (1 - sphere.color[channel] * world.illum[channel]) / direct;
+                        if (candidate < lampfac) {
+                            lampfac = candidate;
+                        }
+                    }
+                }
+            }
+            if (!Number.isFinite(lampfac) || lampfac === Juggler.BIG) {
+                lampfac = 1;
+            }
+            for (const lamp of world.lamps) {
+                for (let channel = 0; channel < 3; channel += 1) {
+                    lamp.color[channel] *= lampfac;
+                }
+            }
+            return lampfac;
+        }
+    })(Scenes = Juggler.Scenes || (Juggler.Scenes = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var MotionData;
+    (function (MotionData) {
+        MotionData.BALL_PLANE_X = -2.0;
+        MotionData.LEFT_HAND_BALL_CENTER = [MotionData.BALL_PLANE_X, 1.45, 4.05];
+        MotionData.RIGHT_HAND_BALL_CENTER = [MotionData.BALL_PLANE_X, -1.45, 4.05];
+        MotionData.HIGH_ARC_APEX_Z = 7.0;
+        MotionData.LOW_ARC_APEX_Z = 4.85;
+        // These points came from the 24 manually labeled historical movie frames.
+        // They are kept as source-screen evidence. The rendered motion now uses the
+        // ballistic cascade constants above because the fixed-depth screen fit caused
+        // physical ball/body and ball/ball intersections.
+        MotionData.RAW_BALL_PATH = [
+            [-0.076, 0.641, 7.191],
+            [-0.148, 0.757, 7.033],
+            [-0.228, 0.834, 6.757],
+            [-0.308, 0.911, 6.482],
+            [-0.420, 0.977, 6.009],
+            [-0.539, 1.040, 5.497],
+            [-0.707, 1.156, 4.827],
+            [-0.820, 1.080, 4.079],
+            [-1.001, 1.191, 3.330],
+            [-0.880, 1.022, 3.645],
+            [-0.777, 0.882, 3.921],
+            [-0.688, 0.737, 4.118],
+            [-0.567, 0.426, 4.158],
+            [-0.494, 0.205, 4.118],
+            [-0.429, -0.055, 3.961],
+            [-0.413, -0.262, 3.645],
+            [-0.382, -0.570, 3.212],
+            [-0.258, -0.383, 4.236],
+            [-0.171, -0.174, 5.103],
+            [-0.101, -0.042, 5.733],
+            [-0.062, 0.114, 6.245],
+            [-0.022, 0.270, 6.757],
+            [-0.029, 0.410, 6.994],
+            [-0.043, 0.511, 7.112]
+        ];
+    })(MotionData = Juggler.MotionData || (Juggler.MotionData = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var Motion;
+    (function (Motion) {
+        Motion.SOURCE_FRAME_COUNT = 24;
+        Motion.MOTIONS = [
+            { id: "static", label: "Static .dat pose" },
+            { id: "juggler-reconstructed", label: "Reconstructed 24-frame juggling" }
+        ];
+        const BALL_GROUPS = [
+            { groupIndex: 0, arc: "high", offset: Motion.SOURCE_FRAME_COUNT },
+            { groupIndex: 1, arc: "low", offset: 0 },
+            { groupIndex: 2, arc: "high", offset: 0 }
+        ];
+        const HEAD_GROUP = 3;
+        const HAIR_GROUP = 4;
+        const LEFT_EYE_GROUP = 5;
+        const RIGHT_EYE_GROUP = 6;
+        const NECK_GROUP = 7;
+        const TORSO_GROUP = 8;
+        const LEFT_LEG_GROUP = 9;
+        const RIGHT_LEG_GROUP = 10;
+        const LEFT_ARM_GROUP = 12;
+        const RIGHT_ARM_GROUP = 11;
+        const BODY_COLLISION_GROUPS = [3, 4, 5, 6, 7, 8];
+        const LEFT_CONTACT_INDEX = 8;
+        const RIGHT_CONTACT_INDEX = 16;
+        const HIPS_MIN_Z = 3.18;
+        const HIPS_MAX_Z = 3.36;
+        const TORSO_LENGTH = 1.3;
+        const NECK_OFFSET = 2.2;
+        const HEAD_OFFSET = 2.78;
+        const HAIR_OFFSET = 2.8;
+        const SHOULDER_OFFSET = 1.8;
+        const SHOULDER_SIDE = 0.7;
+        const HIP_SOCKET_OFFSET = -0.4;
+        const LEG_SIDE = 0.6;
+        const ARM_UPPER_LENGTH = 1.25;
+        const ARM_LOWER_LENGTH = 1.35;
+        const LEG_UPPER_LENGTH = 1.43;
+        const LEG_LOWER_LENGTH = 1.62;
+        function availableMotions(scene) {
+            return Motion.MOTIONS.filter((motion) => motion.id === "static" || supportsJugglerMotion(scene));
+        }
+        Motion.availableMotions = availableMotions;
+        function supportsMotion(scene, motionId) {
+            return motionId === "static" || supportsJugglerMotion(scene);
+        }
+        Motion.supportsMotion = supportsMotion;
+        function sourceFrameCount(motionId) {
+            return motionId === "juggler-reconstructed" ? Motion.SOURCE_FRAME_COUNT : 1;
+        }
+        Motion.sourceFrameCount = sourceFrameCount;
+        function labelFor(motionId) {
+            return Motion.MOTIONS.find((motion) => motion.id === motionId)?.label ?? motionId;
+        }
+        Motion.labelFor = labelFor;
+        function animationSampleFrame(settings, frameIndex, frameCount) {
+            if (settings.motionId === "static") {
+                return 0;
+            }
+            const outputFrames = Math.max(1, Math.round(frameCount));
+            const cycleT = outputFrames === 1 ? 0 : frameIndex / outputFrames;
+            return settings.sourceFrame + cycleT * Motion.SOURCE_FRAME_COUNT;
+        }
+        Motion.animationSampleFrame = animationSampleFrame;
+        function sourceFrameLabel(sourceFrame) {
+            const frame = Math.floor(mod(sourceFrame, Motion.SOURCE_FRAME_COUNT));
+            return `${frame + 1}/${Motion.SOURCE_FRAME_COUNT} ${sourceFramePhase(frame)}`;
+        }
+        Motion.sourceFrameLabel = sourceFrameLabel;
+        function sourceRangeLabel(settings, startFrame, endFrame, frameCount) {
+            if (settings.motionId === "static") {
+                return "static";
+            }
+            const start = animationSampleFrame(settings, startFrame, frameCount);
+            const end = animationSampleFrame(settings, endFrame, frameCount);
+            return `${sourceFrameLabel(start)} -> ${sourceFrameLabel(end)}`;
+        }
+        Motion.sourceRangeLabel = sourceRangeLabel;
+        function resolveWorld(scene, baseWorld, settings, sourceFrame) {
+            if (settings.motionId !== "juggler-reconstructed" || !supportsJugglerMotion(scene)) {
+                return baseWorld;
+            }
+            const animated = cloneScene(scene);
+            const pose = bodyPose(sourceFrame);
+            for (const ball of BALL_GROUPS) {
+                const group = animated.groups[ball.groupIndex];
+                const source = scene.groups[ball.groupIndex];
+                if (!group || !source) {
+                    continue;
+                }
+                group.controls = [{
+                        center: sampleBall(ball.arc, ball.offset + sourceFrame),
+                        radius: source.controls[0]?.radius ?? 0.6,
+                        interpolationFromPrevious: null
+                    }];
+            }
+            applyBodyControls(animated, pose);
+            animated.groups[RIGHT_ARM_GROUP].controls = armControls(-1, sourceFrame, pose);
+            animated.groups[LEFT_ARM_GROUP].controls = armControls(1, sourceFrame, pose);
+            return Juggler.Scenes.buildWorld(animated);
+        }
+        Motion.resolveWorld = resolveWorld;
+        function sourcePathPoint(pathIndex) {
+            const frame = mod(pathIndex, Motion.SOURCE_FRAME_COUNT);
+            if (frame < LEFT_CONTACT_INDEX) {
+                return Juggler.Math3.lerpVec([Juggler.MotionData.BALL_PLANE_X, 0, Juggler.MotionData.HIGH_ARC_APEX_Z], Juggler.MotionData.LEFT_HAND_BALL_CENTER, frame / LEFT_CONTACT_INDEX);
+            }
+            if (frame < RIGHT_CONTACT_INDEX) {
+                return parabolicArc(Juggler.MotionData.LEFT_HAND_BALL_CENTER, Juggler.MotionData.RIGHT_HAND_BALL_CENTER, Juggler.MotionData.LOW_ARC_APEX_Z, (frame - LEFT_CONTACT_INDEX) / (RIGHT_CONTACT_INDEX - LEFT_CONTACT_INDEX));
+            }
+            return Juggler.Math3.lerpVec(Juggler.MotionData.RIGHT_HAND_BALL_CENTER, [Juggler.MotionData.BALL_PLANE_X, 0, Juggler.MotionData.HIGH_ARC_APEX_Z], (frame - RIGHT_CONTACT_INDEX) / (Motion.SOURCE_FRAME_COUNT - RIGHT_CONTACT_INDEX));
+        }
+        Motion.sourcePathPoint = sourcePathPoint;
+        function rawSourcePathPoint(pathIndex) {
+            const index = Math.floor(mod(pathIndex, Juggler.MotionData.RAW_BALL_PATH.length));
+            return [...Juggler.MotionData.RAW_BALL_PATH[index]];
+        }
+        Motion.rawSourcePathPoint = rawSourcePathPoint;
+        function projectToSourcePixel(scene, point) {
+            const observer = Juggler.Scenes.createObserver(scene, Juggler.Scenes.buildWorld(scene), 320, 200, {
+                enabled: false,
+                angleDeg: 0,
+                radius: 10
+            });
+            const delta = Juggler.Math3.sub(point, observer.position);
+            const forward = Juggler.Math3.dot(delta, observer.viewDir);
+            const x = Juggler.Math3.dot(delta, observer.uhat) * observer.focalLength / forward;
+            const y = Juggler.Math3.dot(delta, observer.vhat) * observer.focalLength / forward;
+            return [
+                x / observer.px + 0.5 * observer.nx,
+                0.5 * observer.ny - y / observer.py
+            ];
+        }
+        Motion.projectToSourcePixel = projectToSourcePixel;
+        function frameBodyClearance(world) {
+            const balls = world.spheres.filter((sphere) => BALL_GROUPS.some((ball) => ball.groupIndex === sphere.groupIndex));
+            const body = world.spheres.filter((sphere) => BODY_COLLISION_GROUPS.includes(sphere.groupIndex));
+            if (!balls.length || !body.length) {
+                return null;
+            }
+            let minClearance = Juggler.BIG;
+            for (const ball of balls) {
+                for (const bodySphere of body) {
+                    const distance = Juggler.Math3.length(Juggler.Math3.sub(ball.position, bodySphere.position));
+                    minClearance = Math.min(minClearance, distance - ball.radius - bodySphere.radius);
+                }
+            }
+            return minClearance;
+        }
+        Motion.frameBodyClearance = frameBodyClearance;
+        function frameBallClearance(world) {
+            const balls = world.spheres.filter((sphere) => BALL_GROUPS.some((ball) => ball.groupIndex === sphere.groupIndex));
+            if (balls.length < 2) {
+                return null;
+            }
+            let minClearance = Juggler.BIG;
+            for (let i = 0; i < balls.length; i += 1) {
+                for (let j = i + 1; j < balls.length; j += 1) {
+                    const distance = Juggler.Math3.length(Juggler.Math3.sub(balls[i].position, balls[j].position));
+                    minClearance = Math.min(minClearance, distance - balls[i].radius - balls[j].radius);
+                }
+            }
+            return minClearance;
+        }
+        Motion.frameBallClearance = frameBallClearance;
+        function frameBallSamples(world) {
+            return BALL_GROUPS.flatMap((ball, index) => {
+                const sphere = world.spheres.find((candidate) => candidate.groupIndex === ball.groupIndex);
+                return sphere ? [motionObjectSample(sphere, `ball ${index + 1} ${ball.arc} arc`)] : [];
+            });
+        }
+        Motion.frameBallSamples = frameBallSamples;
+        function frameHandSamples(world) {
+            const right = lastSphereForGroup(world, RIGHT_ARM_GROUP);
+            const left = lastSphereForGroup(world, LEFT_ARM_GROUP);
+            const samples = [];
+            if (right) {
+                samples.push(motionObjectSample(right, "right wrist"));
+            }
+            if (left) {
+                samples.push(motionObjectSample(left, "left wrist"));
+            }
+            return samples;
+        }
+        Motion.frameHandSamples = frameHandSamples;
+        function diagnostics(scene, baseWorld, settings) {
+            if (settings.motionId !== "juggler-reconstructed" || !supportsJugglerMotion(scene)) {
+                return null;
+            }
+            let minBodyClearance = Juggler.BIG;
+            let minBodyClearanceFrame = 0;
+            let minBodyClearanceBallGroup = -1;
+            let minBallClearance = Juggler.BIG;
+            let minBallClearanceFrame = 0;
+            let maxHandContactError = 0;
+            for (let frame = 0; frame < Motion.SOURCE_FRAME_COUNT; frame += 1) {
+                const world = resolveWorld(scene, baseWorld, settings, frame + settings.sourceFrame);
+                const ballClearance = frameBallClearance(world);
+                if (ballClearance !== null && ballClearance < minBallClearance) {
+                    minBallClearance = ballClearance;
+                    minBallClearanceFrame = frame;
+                }
+                const body = world.spheres.filter((sphere) => BODY_COLLISION_GROUPS.includes(sphere.groupIndex));
+                for (const ball of BALL_GROUPS) {
+                    const sphere = world.spheres.find((candidate) => candidate.groupIndex === ball.groupIndex);
+                    if (!sphere) {
+                        continue;
+                    }
+                    for (const bodySphere of body) {
+                        const distance = Juggler.Math3.length(Juggler.Math3.sub(sphere.position, bodySphere.position));
+                        const clearance = distance - sphere.radius - bodySphere.radius;
+                        if (clearance < minBodyClearance) {
+                            minBodyClearance = clearance;
+                            minBodyClearanceFrame = frame;
+                            minBodyClearanceBallGroup = ball.groupIndex;
+                        }
+                    }
+                }
+                if (contactPulse(frame + settings.sourceFrame) > 0.9) {
+                    maxHandContactError = Math.max(maxHandContactError, handContactError(world, LEFT_ARM_GROUP));
+                    maxHandContactError = Math.max(maxHandContactError, handContactError(world, RIGHT_ARM_GROUP));
+                }
+            }
+            return {
+                minBodyClearance,
+                minBodyClearanceFrame,
+                minBodyClearanceBallGroup,
+                minBallClearance,
+                minBallClearanceFrame,
+                maxHandContactError
+            };
+        }
+        Motion.diagnostics = diagnostics;
+        function motionSummary(scene, settings) {
+            if (settings.motionId === "juggler-reconstructed" && supportsJugglerMotion(scene)) {
+                return `source ${sourceFrameLabel(settings.sourceFrame)}`;
+            }
+            return "static source pose";
+        }
+        Motion.motionSummary = motionSummary;
+        function sourceFramePhase(frame) {
+            if (frame === 0) {
+                return "apex";
+            }
+            if (frame < LEFT_CONTACT_INDEX) {
+                return "falling to left catch";
+            }
+            if (frame === LEFT_CONTACT_INDEX) {
+                return "left catch";
+            }
+            if (frame < RIGHT_CONTACT_INDEX) {
+                return "crossing to right catch";
+            }
+            if (frame === RIGHT_CONTACT_INDEX) {
+                return "right catch";
+            }
+            return "rising to apex";
+        }
+        function supportsJugglerMotion(scene) {
+            if (scene.groups.length < 13) {
+                return false;
+            }
+            return BALL_GROUPS.every((ball) => {
+                const group = scene.groups[ball.groupIndex];
+                return group?.type === Juggler.MIRROR && group.controls.length === 1 && Math.abs(group.controls[0].radius - 0.6) < 0.01;
+            });
+        }
+        function sampleBall(arc, sampleFrame) {
+            return arc === "high" ? sampleHighArc(sampleFrame) : sampleLowArc(sampleFrame);
+        }
+        function applyBodyControls(scene, pose) {
+            scene.groups[TORSO_GROUP].controls = [
+                { center: bodyPoint(pose, TORSO_LENGTH, 0, 0), radius: 0.8, interpolationFromPrevious: null },
+                { center: pose.hips, radius: 0.6, interpolationFromPrevious: 5 }
+            ];
+            scene.groups[NECK_GROUP].controls = [
+                { center: bodyPoint(pose, NECK_OFFSET, 0, 0), radius: 0.2, interpolationFromPrevious: null }
+            ];
+            scene.groups[HEAD_GROUP].controls = [
+                { center: bodyPoint(pose, HEAD_OFFSET, 0, 0), radius: 0.5, interpolationFromPrevious: null }
+            ];
+            scene.groups[HAIR_GROUP].controls = [
+                { center: bodyPoint(pose, HAIR_OFFSET, 0, 0.02), radius: 0.5, interpolationFromPrevious: null }
+            ];
+            scene.groups[LEFT_EYE_GROUP].controls = [
+                { center: bodyPoint(pose, HEAD_OFFSET, 0.2, -0.4), radius: 0.15, interpolationFromPrevious: null }
+            ];
+            scene.groups[RIGHT_EYE_GROUP].controls = [
+                { center: bodyPoint(pose, HEAD_OFFSET, -0.2, -0.4), radius: 0.15, interpolationFromPrevious: null }
+            ];
+            scene.groups[LEFT_LEG_GROUP].controls = legControls(1, pose);
+            scene.groups[RIGHT_LEG_GROUP].controls = legControls(-1, pose);
+        }
+        function bodyPose(sourceFrame) {
+            const angle = 2 * Math.PI * mod(sourceFrame, Motion.SOURCE_FRAME_COUNT) / Motion.SOURCE_FRAME_COUNT;
+            const oscillation = 0.5 * (1 + Math.cos(angle));
+            const hipsZ = HIPS_MIN_Z + (HIPS_MAX_Z - HIPS_MIN_Z) * oscillation;
+            const lateralTilt = (HIPS_MIN_Z - HIPS_MAX_Z) * Math.sin(angle);
+            const vertical = Juggler.Math3.normalize([0, lateralTilt, TORSO_LENGTH]);
+            const side = Juggler.Math3.normalize([0, vertical[2], -vertical[1]]);
+            return {
+                hips: [0, 0, hipsZ],
+                vertical,
+                side,
+                oscillation
+            };
+        }
+        function bodyPoint(pose, verticalOffset, sideOffset, depthOffset) {
+            return Juggler.Math3.add(Juggler.Math3.add(pose.hips, Juggler.Math3.mul(pose.vertical, verticalOffset)), Juggler.Math3.add(Juggler.Math3.mul(pose.side, sideOffset), [depthOffset, 0, 0]));
+        }
+        function legControls(side, pose) {
+            const hip = bodyPoint(pose, HIP_SOCKET_OFFSET, side * LEG_SIDE, 0);
+            const foot = side > 0 ? [-0.4, 0.6, 0] : [0.4, -0.6, 0];
+            const knee = solveTwoBone(hip, foot, side > 0 ? [-1, 0, -0.2] : [1, 0, -0.2], LEG_UPPER_LENGTH, LEG_LOWER_LENGTH);
+            return [
+                { center: hip, radius: 0.2, interpolationFromPrevious: null },
+                { center: knee, radius: 0.2, interpolationFromPrevious: 6 },
+                { center: foot, radius: 0.1, interpolationFromPrevious: 7 }
+            ];
+        }
+        function armControls(side, sourceFrame, pose) {
+            const handCenter = side > 0 ? Juggler.MotionData.LEFT_HAND_BALL_CENTER : Juggler.MotionData.RIGHT_HAND_BALL_CENTER;
+            const contactBall = nearestBallToHand(sourceFrame, handCenter);
+            const pulse = handProximityPulse(contactBall, handCenter);
+            const contact = wristTarget(contactBall, side);
+            const shoulder = bodyPoint(pose, SHOULDER_OFFSET, side * SHOULDER_SIDE, 0);
+            const rest = bodyPoint(pose, 0.85 + 0.1 * pose.oscillation, side * 1.55, -1.05 - 0.15 * pose.oscillation);
+            const wrist = Juggler.Math3.lerpVec(rest, contact, pulse);
+            const elbow = solveTwoBone(shoulder, wrist, [-0.35, side * 0.7, -0.65], ARM_UPPER_LENGTH, ARM_LOWER_LENGTH);
+            return [
+                { center: shoulder, radius: 0.2, interpolationFromPrevious: null },
+                { center: elbow, radius: 0.2, interpolationFromPrevious: 6 },
+                { center: wrist, radius: 0.1, interpolationFromPrevious: 7 }
+            ];
+        }
+        function sampleHighArc(sampleFrame) {
+            const t = mod(sampleFrame, Motion.SOURCE_FRAME_COUNT * 2) / (Motion.SOURCE_FRAME_COUNT * 2);
+            return parabolicArc(Juggler.MotionData.RIGHT_HAND_BALL_CENTER, Juggler.MotionData.LEFT_HAND_BALL_CENTER, Juggler.MotionData.HIGH_ARC_APEX_Z, t);
+        }
+        function sampleLowArc(sampleFrame) {
+            const t = mod(sampleFrame, Motion.SOURCE_FRAME_COUNT) / Motion.SOURCE_FRAME_COUNT;
+            return parabolicArc(Juggler.MotionData.LEFT_HAND_BALL_CENTER, Juggler.MotionData.RIGHT_HAND_BALL_CENTER, Juggler.MotionData.LOW_ARC_APEX_Z, t);
+        }
+        function parabolicArc(start, end, apexZ, t) {
+            const clamped = Math.max(0, Math.min(1, t));
+            const center = Juggler.Math3.lerpVec(start, end, clamped);
+            const baseZ = Juggler.Math3.lerp(start[2], end[2], clamped);
+            center[2] = baseZ + 4 * (apexZ - baseZ) * clamped * (1 - clamped);
+            return center;
+        }
+        function wristTarget(ballCenter, side) {
+            return [ballCenter[0] + 0.08, ballCenter[1] + side * 0.16, ballCenter[2] - 0.56];
+        }
+        function nearestBallToHand(sourceFrame, handCenter) {
+            let best = sampleBall(BALL_GROUPS[0].arc, BALL_GROUPS[0].offset + sourceFrame);
+            let bestDistance = Juggler.Math3.length(Juggler.Math3.sub(best, handCenter));
+            for (let i = 1; i < BALL_GROUPS.length; i += 1) {
+                const candidate = sampleBall(BALL_GROUPS[i].arc, BALL_GROUPS[i].offset + sourceFrame);
+                const distance = Juggler.Math3.length(Juggler.Math3.sub(candidate, handCenter));
+                if (distance < bestDistance) {
+                    best = candidate;
+                    bestDistance = distance;
+                }
+            }
+            return best;
+        }
+        function solveTwoBone(start, end, bendHint, lengthA, lengthB) {
+            const toEnd = Juggler.Math3.sub(end, start);
+            const distance = Juggler.Math3.length(toEnd);
+            if (distance < 1e-6) {
+                return Juggler.Math3.add(start, Juggler.Math3.mul(Juggler.Math3.normalize(bendHint), lengthA));
+            }
+            const forward = Juggler.Math3.mul(toEnd, 1 / distance);
+            let bendAxis = Juggler.Math3.sub(bendHint, Juggler.Math3.mul(forward, Juggler.Math3.dot(bendHint, forward)));
+            if (Juggler.Math3.length(bendAxis) < 1e-6) {
+                bendAxis = Juggler.Math3.cross(forward, [0, 0, 1]);
+            }
+            if (Juggler.Math3.length(bendAxis) < 1e-6) {
+                bendAxis = Juggler.Math3.cross(forward, [0, 1, 0]);
+            }
+            bendAxis = Juggler.Math3.normalize(bendAxis);
+            const reachableDistance = Math.min(distance, Math.max(1e-6, lengthA + lengthB - 1e-6));
+            const base = (lengthA * lengthA - lengthB * lengthB + reachableDistance * reachableDistance) / (2 * reachableDistance);
+            const height = Math.sqrt(Math.max(0, lengthA * lengthA - base * base));
+            const distanceScale = distance / reachableDistance;
+            return Juggler.Math3.add(start, Juggler.Math3.add(Juggler.Math3.mul(forward, base * distanceScale), Juggler.Math3.mul(bendAxis, height)));
+        }
+        function handProximityPulse(ballCenter, handCenter) {
+            const distance = Juggler.Math3.length(Juggler.Math3.sub(ballCenter, handCenter));
+            const normalized = Math.max(0, 1 - distance / 1.35);
+            return normalized * normalized;
+        }
+        function handContactError(world, armGroup) {
+            const wrist = lastSphereForGroup(world, armGroup);
+            if (!wrist) {
+                return Juggler.BIG;
+            }
+            let best = Juggler.BIG;
+            for (const ball of BALL_GROUPS) {
+                const sphere = world.spheres.find((candidate) => candidate.groupIndex === ball.groupIndex);
+                if (!sphere) {
+                    continue;
+                }
+                const surfaceDistance = Math.abs(Juggler.Math3.length(Juggler.Math3.sub(sphere.position, wrist.position)) - sphere.radius - wrist.radius);
+                best = Math.min(best, surfaceDistance);
+            }
+            return best;
+        }
+        function motionObjectSample(sphere, label) {
+            return {
+                label,
+                groupIndex: sphere.groupIndex,
+                position: [...sphere.position],
+                radius: sphere.radius
+            };
+        }
+        function lastSphereForGroup(world, groupIndex) {
+            let match = null;
+            for (const sphere of world.spheres) {
+                if (sphere.groupIndex === groupIndex) {
+                    match = sphere;
+                }
+            }
+            return match;
+        }
+        function contactPulse(sourceFrame) {
+            return Math.max(handProximityPulse(nearestBallToHand(sourceFrame, Juggler.MotionData.LEFT_HAND_BALL_CENTER), Juggler.MotionData.LEFT_HAND_BALL_CENTER), handProximityPulse(nearestBallToHand(sourceFrame, Juggler.MotionData.RIGHT_HAND_BALL_CENTER), Juggler.MotionData.RIGHT_HAND_BALL_CENTER));
+        }
+        function cloneScene(scene) {
+            return {
+                sourceName: scene.sourceName,
+                observerPosition: [...scene.observerPosition],
+                altitudeDeg: scene.altitudeDeg,
+                azimuthDeg: scene.azimuthDeg,
+                focalLength: scene.focalLength,
+                groups: scene.groups.map((group) => ({
+                    color: [...group.color],
+                    type: group.type,
+                    sourceType: group.sourceType,
+                    controls: group.controls.map((control) => ({
+                        center: [...control.center],
+                        radius: control.radius,
+                        interpolationFromPrevious: control.interpolationFromPrevious
+                    }))
+                })),
+                lamps: scene.lamps.map((lamp) => ({
+                    position: [...lamp.position],
+                    radius: lamp.radius,
+                    color: [...lamp.color]
+                })),
+                horizon: [[...scene.horizon[0]], [...scene.horizon[1]]],
+                illum: [...scene.illum],
+                skyZenith: [...scene.skyZenith],
+                skyHorizon: [...scene.skyHorizon]
+            };
+        }
+        function mod(value, divisor) {
+            return ((value % divisor) + divisor) % divisor;
+        }
+    })(Motion = Juggler.Motion || (Juggler.Motion = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var Ham;
+    (function (Ham) {
+        class HamEncoder {
+            constructor() {
+                this.threshold = 4;
+                this.colorRegisters = [
+                    [0, 0, 0],
+                    [15, 15, 15],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0]
+                ];
+                this.allocated = 2;
+                this.previous = [0, 0, 0];
+            }
+            beginLine() {
+                this.previous = [0, 0, 0];
+            }
+            encodePixel(x, brightness) {
+                const pix = [
+                    Juggler.Math3.clampNibble(16 * brightness[0] + 0.5),
+                    Juggler.Math3.clampNibble(16 * brightness[1] + 0.5),
+                    Juggler.Math3.clampNibble(16 * brightness[2] + 0.5)
+                ];
+                const output = this.ham2(x, pix);
+                return [output[0] * 17, output[1] * 17, output[2] * 17];
+            }
+            ham2(x, pix) {
+                if (x === 0) {
+                    const nearest = this.nearestPaletteIndex(pix).index;
+                    this.previous = [...this.colorRegisters[nearest]];
+                    return [...this.previous];
+                }
+                const distanceIfHam = this.colorDistanceAfterWorstCorrection(pix, this.previous);
+                if (distanceIfHam !== 0) {
+                    const nearest = this.nearestPaletteIndex(pix);
+                    if (nearest.distance < distanceIfHam) {
+                        this.previous = [...this.colorRegisters[nearest.index]];
+                        return [...this.previous];
+                    }
+                }
+                let channel = 0;
+                let maxDifference = 0;
+                for (let k = 0; k < 3; k += 1) {
+                    const difference = Math.abs(pix[k] - this.previous[k]);
+                    if (difference > maxDifference) {
+                        maxDifference = difference;
+                        channel = k;
+                    }
+                }
+                this.previous[channel] = pix[channel];
+                return [...this.previous];
+            }
+            nearestPaletteIndex(color) {
+                let nearest = 0;
+                let minDistance = Number.POSITIVE_INFINITY;
+                for (let i = 0; i < this.allocated; i += 1) {
+                    const distance = this.colorDistance(color, this.colorRegisters[i]);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        nearest = i;
+                    }
+                }
+                if (minDistance > this.threshold && this.allocated < 16) {
+                    this.colorRegisters[this.allocated] = [...color];
+                    nearest = this.allocated;
+                    this.allocated += 1;
+                    minDistance = 0;
+                }
+                return { index: nearest, distance: minDistance };
+            }
+            colorDistanceAfterWorstCorrection(a, b) {
+                let result = 0;
+                let maximum = 0;
+                for (let k = 0; k < 3; k += 1) {
+                    const difference = Math.abs(a[k] - b[k]);
+                    result += difference;
+                    maximum = Math.max(maximum, difference);
+                }
+                return result - maximum;
+            }
+            colorDistance(a, b) {
+                return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+            }
+        }
+        Ham.HamEncoder = HamEncoder;
+    })(Ham = Juggler.Ham || (Juggler.Ham = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var Display;
+    (function (Display) {
+        Display.CONSTRAINTS = [
+            { id: "rgb", label: "RGB" },
+            { id: "ocs-12bit", label: "OCS 12-bit" },
+            { id: "ehb-64", label: "EHB 64" },
+            { id: "ham6-approx", label: "HAM6 approx" }
+        ];
+        class ConstraintEncoder {
+            constructor(id) {
+                this.id = id;
+                this.hamEncoder = null;
+                if (id === "ham6-approx") {
+                    this.hamEncoder = new Juggler.Ham.HamEncoder();
+                }
+            }
+            beginLine() {
+                this.hamEncoder?.beginLine();
+            }
+            encodePixel(x, rgb) {
+                if (this.hamEncoder) {
+                    return this.hamEncoder.encodePixel(x, [rgb[0] / 255, rgb[1] / 255, rgb[2] / 255]);
+                }
+                return constrainRgb(this.id, rgb);
+            }
+        }
+        Display.ConstraintEncoder = ConstraintEncoder;
+        function constrainRgb(id, rgb) {
+            switch (id) {
+                case "rgb":
+                    return rgb;
+                case "ocs-12bit":
+                case "ham6-approx":
+                    return rgb.map((channel) => quantize4(channel));
+                case "ehb-64":
+                    return extraHalfBrite(rgb);
+            }
+        }
+        Display.constrainRgb = constrainRgb;
+        function labelFor(id) {
+            return Display.CONSTRAINTS.find((constraint) => constraint.id === id)?.label ?? id;
+        }
+        Display.labelFor = labelFor;
+        function quantize4(value) {
+            return Juggler.Math3.clampByte(Math.round(Juggler.Math3.clampByte(value) / 17) * 17);
+        }
+        function extraHalfBrite(rgb) {
+            const brightness = Math.max(rgb[0], rgb[1], rgb[2]);
+            if (brightness < 128) {
+                return constrainRgb("ocs-12bit", Juggler.Math3.mul(rgb, 2)).map((channel) => Juggler.Math3.clampByte(channel * 0.5));
+            }
+            return constrainRgb("ocs-12bit", rgb);
+        }
+    })(Display = Juggler.Display || (Juggler.Display = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var Renderer;
+    (function (Renderer) {
+        class FrameRenderer {
+            constructor(world, observer, options) {
+                this.world = world;
+                this.observer = observer;
+                this.options = options;
+                this.stats = { rays: 0, mirrorFallbacks: 0 };
+                this.renderMode = null;
+                this.row = 0;
+                this.tileCursor = 0;
+                this.data = new Uint8ClampedArray(observer.nx * observer.ny * 4);
+                this.hamEncoder = options.outputMode === "source-ham" ? new Juggler.Ham.HamEncoder() : null;
+                this.displayEncoder = new Juggler.Display.ConstraintEncoder(options.displayConstraintId ?? "rgb");
+                this.sphereIndex = options.acceleration === "none" ? null : new SphereIndex(world.spheres);
+                this.tileSize = Math.max(4, Math.min(64, Math.round(options.tileSize ?? 16)));
+                this.tileColumns = Math.ceil(observer.nx / this.tileSize);
+                this.tileRows = Math.ceil(observer.ny / this.tileSize);
+            }
+            renderRows(count) {
+                if (this.renderMode === "tile") {
+                    return this.row;
+                }
+                this.renderMode = "row";
+                const limit = Math.min(this.observer.ny, this.row + count);
+                for (; this.row < limit; this.row += 1) {
+                    if (this.hamEncoder) {
+                        this.hamEncoder.beginLine();
+                    }
+                    this.displayEncoder.beginLine();
+                    for (let x = 0; x < this.observer.nx; x += 1) {
+                        this.renderPixel(x, this.row);
+                    }
+                }
+                return this.row;
+            }
+            renderBudget(milliseconds) {
+                const deadline = now() + Math.max(0, milliseconds);
+                if (this.requiresLineOrder()) {
+                    this.renderMode = "row";
+                    do {
+                        this.renderRows(1);
+                    } while (!this.done() && now() < deadline);
+                    return this.progress();
+                }
+                this.renderMode = "tile";
+                do {
+                    this.renderNextTile();
+                } while (!this.done() && now() < deadline);
+                return this.progress();
+            }
+            renderTiles(count) {
+                if (this.requiresLineOrder()) {
+                    return this.renderRows(count);
+                }
+                if (this.renderMode === "row") {
+                    return this.tileCursor;
+                }
+                this.renderMode = "tile";
+                const limit = Math.min(this.totalTiles(), this.tileCursor + Math.max(1, Math.round(count)));
+                while (this.tileCursor < limit) {
+                    this.renderNextTile();
+                }
+                return this.tileCursor;
+            }
+            done() {
+                if (this.renderMode === "tile") {
+                    return this.tileCursor >= this.totalTiles();
+                }
+                return this.row >= this.observer.ny;
+            }
+            progress() {
+                if (this.renderMode === "tile") {
+                    return this.tileCursor / this.totalTiles();
+                }
+                return this.row / this.observer.ny;
+            }
+            renderNextTile() {
+                if (this.tileCursor >= this.totalTiles()) {
+                    return;
+                }
+                const tileX = this.tileCursor % this.tileColumns;
+                const tileY = Math.floor(this.tileCursor / this.tileColumns);
+                const x0 = tileX * this.tileSize;
+                const y0 = tileY * this.tileSize;
+                const x1 = Math.min(this.observer.nx, x0 + this.tileSize);
+                const y1 = Math.min(this.observer.ny, y0 + this.tileSize);
+                for (let y = y0; y < y1; y += 1) {
+                    for (let x = x0; x < x1; x += 1) {
+                        this.renderPixel(x, y);
+                    }
+                }
+                this.tileCursor += 1;
+                incrementStat(this.stats, "tiles");
+            }
+            renderPixel(x, y) {
+                const brightness = trace(pixelRay(this.observer, x, y), this.world, this.options, this.stats, 0, this.sphereIndex);
+                const rgb = this.options.outputMode === "source-ham"
+                    ? this.hamEncoder.encodePixel(x, brightness)
+                    : modernRgb(brightness);
+                const constrained = this.displayEncoder.encodePixel(x, rgb);
+                const offset = (y * this.observer.nx + x) * 4;
+                this.data[offset] = Juggler.Math3.clampByte(constrained[0]);
+                this.data[offset + 1] = Juggler.Math3.clampByte(constrained[1]);
+                this.data[offset + 2] = Juggler.Math3.clampByte(constrained[2]);
+                this.data[offset + 3] = 255;
+                incrementStat(this.stats, "pixels");
+            }
+            requiresLineOrder() {
+                return this.options.outputMode === "source-ham" || this.options.displayConstraintId === "ham6-approx";
+            }
+            totalTiles() {
+                return this.tileColumns * this.tileRows;
+            }
+        }
+        Renderer.FrameRenderer = FrameRenderer;
+        function pixelRay(observer, i, j) {
+            const y = (0.5 * observer.ny - j) * observer.py;
+            const x = (i - 0.5 * observer.nx) * observer.px;
+            const target = Juggler.Math3.add(Juggler.Math3.add(Juggler.Math3.add(Juggler.Math3.mul(observer.viewDir, observer.focalLength), Juggler.Math3.mul(observer.vhat, y)), Juggler.Math3.mul(observer.uhat, x)), observer.position);
+            return { origin: observer.position, direction: Juggler.Math3.sub(target, observer.position) };
+        }
+        Renderer.pixelRay = pixelRay;
+        function trace(ray, world, options, stats, depth, sphereIndex = null) {
+            stats.rays += 1;
+            const nearest = sphereIndex
+                ? sphereIndex.nearest(ray, options.epsilon, stats)
+                : nearestSphere(ray, world.spheres, options.epsilon, stats);
+            let tMin = nearest?.t ?? Juggler.BIG;
+            const nearestSphereHit = nearest?.sphere ?? null;
+            for (const lamp of world.lamps) {
+                const t = intersectLamp(ray, lamp, options.epsilon);
+                if (t !== null && t < tMin) {
+                    return [
+                        lamp.color[0] / (lamp.radius * lamp.radius),
+                        lamp.color[1] / (lamp.radius * lamp.radius),
+                        lamp.color[2] / (lamp.radius * lamp.radius)
+                    ];
+                }
+            }
+            const groundT = intersectGround(ray, options.epsilon);
+            if (groundT !== null && groundT < tMin) {
+                const position = pointOnRay(ray, groundT);
+                const tile = gingham(position);
+                const patch = {
+                    position,
+                    normal: world.horizon[tile].normal,
+                    color: world.horizon[tile].color,
+                    sphere: null
+                };
+                return patchBrightness(patch, world, options, stats, sphereIndex);
+            }
+            if (nearestSphereHit) {
+                const position = pointOnRay(ray, tMin);
+                const normal = Juggler.Math3.mul(Juggler.Math3.sub(position, nearestSphereHit.position), 1 / nearestSphereHit.radius);
+                const patch = {
+                    position,
+                    normal,
+                    color: nearestSphereHit.color,
+                    sphere: nearestSphereHit
+                };
+                if (nearestSphereHit.type === Juggler.BRIGHT && glint(patch, world, ray, options, stats, sphereIndex)) {
+                    return [1, 1, 1];
+                }
+                if (nearestSphereHit.type === Juggler.MIRROR) {
+                    return mirrorBrightness(patch, world, ray, options, stats, depth, sphereIndex);
+                }
+                return patchBrightness(patch, world, options, stats, sphereIndex);
+            }
+            return skyBrightness(ray, world);
+        }
+        Renderer.trace = trace;
+        function intersectSphere(ray, sphere, epsilon = Juggler.SOURCE_EPSILON) {
+            const oc = Juggler.Math3.sub(ray.origin, sphere.position);
+            const a = Juggler.Math3.dot(ray.direction, ray.direction);
+            const b = 2 * Juggler.Math3.dot(oc, ray.direction);
+            const c = Juggler.Math3.dot(oc, oc) - sphere.radius * sphere.radius;
+            const d = b * b - 4 * a * c;
+            if (d <= 0) {
+                return null;
+            }
+            const root = Math.sqrt(d);
+            let t = -(b + root) / (a + a);
+            if (t < epsilon) {
+                t = (root - b) / (a + a);
+            }
+            return t > epsilon ? t : null;
+        }
+        Renderer.intersectSphere = intersectSphere;
+        function intersectGround(ray, epsilon = Juggler.SOURCE_EPSILON) {
+            if (ray.direction[2] === 0) {
+                return null;
+            }
+            const t = -ray.origin[2] / ray.direction[2];
+            return t > epsilon ? t : null;
+        }
+        Renderer.intersectGround = intersectGround;
+        function gingham(position) {
+            let x = position[0];
+            let y = position[1];
+            let kx = 0;
+            let ky = 0;
+            if (x < 0) {
+                x = -x;
+                kx += 1;
+            }
+            if (y < 0) {
+                y = -y;
+                ky += 1;
+            }
+            return (((Math.trunc(x) + kx) / 3 | 0) + ((Math.trunc(y) + ky) / 3 | 0)) % 2;
+        }
+        Renderer.gingham = gingham;
+        function intersectLamp(ray, lamp, epsilon) {
+            return intersectSphere(ray, {
+                position: lamp.position,
+                radius: lamp.radius,
+                color: lamp.color,
+                type: Juggler.BRIGHT,
+                groupIndex: -1
+            }, epsilon);
+        }
+        function pointOnRay(ray, t) {
+            return Juggler.Math3.add(ray.origin, Juggler.Math3.mul(ray.direction, t));
+        }
+        function skyBrightness(ray, world) {
+            const sin2 = ray.direction[2] * ray.direction[2] / Juggler.Math3.dot(ray.direction, ray.direction);
+            const cos2 = 1 - sin2;
+            return [
+                cos2 * world.skyHorizon[0] + sin2 * world.skyZenith[0],
+                cos2 * world.skyHorizon[1] + sin2 * world.skyZenith[1],
+                cos2 * world.skyHorizon[2] + sin2 * world.skyZenith[2]
+            ];
+        }
+        function patchBrightness(patch, world, options, stats, sphereIndex) {
+            const diffuse = (Juggler.Math3.dot([0, 0, 1], patch.normal) + 1.5) * 0.4;
+            const brightness = [
+                diffuse * world.illum[0] * patch.color[0],
+                diffuse * world.illum[1] * patch.color[1],
+                diffuse * world.illum[2] * patch.color[2]
+            ];
+            for (const lamp of world.lamps) {
+                const lampVector = Juggler.Math3.sub(lamp.position, patch.position);
+                const cosi = Juggler.Math3.dot(lampVector, patch.normal);
+                if (cosi <= 0) {
+                    continue;
+                }
+                const shadowRay = { origin: patch.position, direction: lampVector };
+                const shadowed = sphereIndex
+                    ? sphereIndex.anyHit(shadowRay, options.epsilon, stats, patch.sphere)
+                    : anySphereHit(shadowRay, world.spheres, options.epsilon, stats, patch.sphere);
+                if (shadowed) {
+                    continue;
+                }
+                const r = Math.sqrt(Juggler.Math3.dot(lampVector, lampVector));
+                const direct = cosi / (r * r * r);
+                for (let channel = 0; channel < 3; channel += 1) {
+                    brightness[channel] += direct * patch.color[channel] * lamp.color[channel];
+                }
+            }
+            return brightness;
+        }
+        function glint(patch, world, incident, options, stats, sphereIndex) {
+            let reflected = null;
+            let reflectedLength2 = 0;
+            for (const lamp of world.lamps) {
+                const lampVector = Juggler.Math3.sub(lamp.position, patch.position);
+                const cosi = Juggler.Math3.dot(lampVector, patch.normal);
+                if (cosi <= 0) {
+                    continue;
+                }
+                const shadowRay = { origin: patch.position, direction: lampVector };
+                const shadowed = sphereIndex
+                    ? sphereIndex.anyHit(shadowRay, options.epsilon, stats, patch.sphere)
+                    : anySphereHit(shadowRay, world.spheres, options.epsilon, stats, patch.sphere);
+                if (shadowed) {
+                    continue;
+                }
+                if (!reflected) {
+                    reflected = reflectVector(incident.direction, patch.normal, options.reflectionMode, options.epsilon, stats);
+                    reflectedLength2 = Juggler.Math3.dot(reflected, reflected);
+                }
+                const t = Juggler.Math3.dot(lampVector, reflected);
+                const highlight = t * t / (Juggler.Math3.dot(lampVector, lampVector) * reflectedLength2);
+                if (highlight > 0.95) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        function mirrorBrightness(patch, world, incident, options, stats, depth, sphereIndex) {
+            const normalDotIncident = Juggler.Math3.dot(patch.normal, incident.direction);
+            if (normalDotIncident >= 0) {
+                return [0, 0, 0];
+            }
+            if (depth >= options.maxDepth) {
+                return [0, 0, 0];
+            }
+            const reflected = reflectVector(incident.direction, patch.normal, options.reflectionMode, options.epsilon, stats);
+            const brightness = trace({ origin: patch.position, direction: reflected }, world, options, stats, depth + 1, sphereIndex);
+            return [
+                brightness[0] * patch.color[0],
+                brightness[1] * patch.color[1],
+                brightness[2] * patch.color[2]
+            ];
+        }
+        function reflectVector(direction, normal, mode, epsilon = Juggler.REFERENCE_EPSILON, stats = null) {
+            if (mode === "standard") {
+                return reflectPhysical(direction, normal);
+            }
+            return reflectSourceWithFallback(direction, normal, epsilon, stats);
+        }
+        Renderer.reflectVector = reflectVector;
+        function reflectSourceWithFallback(direction, normal, epsilon, stats) {
+            const u = Juggler.Math3.cross(direction, normal);
+            if (u[0] === 0 && u[1] === 0 && u[2] === 0) {
+                return [-direction[0], -direction[1], -direction[2]];
+            }
+            const v = Juggler.Math3.cross(u, normal);
+            const vv = Juggler.Math3.dot(v, v);
+            const xv = Juggler.Math3.dot(direction, v) / vv;
+            const xn = Juggler.Math3.dot(direction, normal);
+            const source = [
+                xv * v[0] / (xn * normal[0]),
+                xv * v[1] / (xn * normal[1]),
+                xv * v[2] / (xn * normal[2])
+            ];
+            if (Juggler.Math3.isFiniteVec(source) && Juggler.Math3.dot(source, source) > epsilon * epsilon) {
+                return source;
+            }
+            if (stats) {
+                stats.mirrorFallbacks += 1;
+            }
+            return reflectPhysical(direction, normal);
+        }
+        function reflectPhysical(direction, normal) {
+            return Juggler.Math3.sub(direction, Juggler.Math3.mul(normal, 2 * Juggler.Math3.dot(direction, normal)));
+        }
+        function modernRgb(brightness) {
+            return [
+                Juggler.Math3.clampByte(Math.pow(Math.max(0, brightness[0]), 0.82) * 255),
+                Juggler.Math3.clampByte(Math.pow(Math.max(0, brightness[1]), 0.82) * 255),
+                Juggler.Math3.clampByte(Math.pow(Math.max(0, brightness[2]), 0.82) * 255)
+            ];
+        }
+        class SphereIndex {
+            constructor(spheres) {
+                this.root = spheres.length ? buildNode(spheres) : null;
+            }
+            nearest(ray, epsilon, stats) {
+                if (!this.root) {
+                    return null;
+                }
+                let nearest = null;
+                const stack = [this.root];
+                while (stack.length) {
+                    const node = stack.pop();
+                    incrementStat(stats, "bvhNodeTests");
+                    if (!intersectBounds(ray, node.bounds, epsilon, nearest?.t ?? Juggler.BIG)) {
+                        continue;
+                    }
+                    if (node.spheres.length) {
+                        for (const sphere of node.spheres) {
+                            const t = intersectSphereCounted(ray, sphere, epsilon, stats);
+                            if (t !== null && t < (nearest?.t ?? Juggler.BIG)) {
+                                nearest = { sphere, t };
+                            }
+                        }
+                        continue;
+                    }
+                    if (node.left) {
+                        stack.push(node.left);
+                    }
+                    if (node.right) {
+                        stack.push(node.right);
+                    }
+                }
+                return nearest;
+            }
+            anyHit(ray, epsilon, stats, excludedSphere) {
+                if (!this.root) {
+                    return false;
+                }
+                const stack = [this.root];
+                while (stack.length) {
+                    const node = stack.pop();
+                    incrementStat(stats, "bvhNodeTests");
+                    if (!intersectBounds(ray, node.bounds, epsilon, Juggler.BIG)) {
+                        continue;
+                    }
+                    if (node.spheres.length) {
+                        for (const sphere of node.spheres) {
+                            if (sphere === excludedSphere) {
+                                continue;
+                            }
+                            if (intersectSphereCounted(ray, sphere, epsilon, stats) !== null) {
+                                return true;
+                            }
+                        }
+                        continue;
+                    }
+                    if (node.left) {
+                        stack.push(node.left);
+                    }
+                    if (node.right) {
+                        stack.push(node.right);
+                    }
+                }
+                return false;
+            }
+        }
+        Renderer.SphereIndex = SphereIndex;
+        function nearestSphere(ray, spheres, epsilon, stats) {
+            let nearest = null;
+            for (const sphere of spheres) {
+                const t = intersectSphereCounted(ray, sphere, epsilon, stats);
+                if (t !== null && t < (nearest?.t ?? Juggler.BIG)) {
+                    nearest = { sphere, t };
+                }
+            }
+            return nearest;
+        }
+        function anySphereHit(ray, spheres, epsilon, stats, excludedSphere) {
+            for (const sphere of spheres) {
+                if (sphere === excludedSphere) {
+                    continue;
+                }
+                if (intersectSphereCounted(ray, sphere, epsilon, stats) !== null) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        function intersectSphereCounted(ray, sphere, epsilon, stats) {
+            incrementStat(stats, "sphereTests");
+            return intersectSphere(ray, sphere, epsilon);
+        }
+        function buildNode(spheres) {
+            const bounds = boundsForSpheres(spheres);
+            if (spheres.length <= 6) {
+                return { bounds, left: null, right: null, spheres };
+            }
+            const axis = widestAxis(bounds);
+            const sorted = spheres.slice().sort((a, b) => a.position[axis] - b.position[axis]);
+            const middle = Math.floor(sorted.length / 2);
+            return {
+                bounds,
+                left: buildNode(sorted.slice(0, middle)),
+                right: buildNode(sorted.slice(middle)),
+                spheres: []
+            };
+        }
+        function boundsForSpheres(spheres) {
+            const min = [Juggler.BIG, Juggler.BIG, Juggler.BIG];
+            const max = [-Juggler.BIG, -Juggler.BIG, -Juggler.BIG];
+            for (const sphere of spheres) {
+                for (let axis = 0; axis < 3; axis += 1) {
+                    min[axis] = Math.min(min[axis], sphere.position[axis] - sphere.radius);
+                    max[axis] = Math.max(max[axis], sphere.position[axis] + sphere.radius);
+                }
+            }
+            return { min, max };
+        }
+        function widestAxis(bounds) {
+            const x = bounds.max[0] - bounds.min[0];
+            const y = bounds.max[1] - bounds.min[1];
+            const z = bounds.max[2] - bounds.min[2];
+            if (x >= y && x >= z) {
+                return 0;
+            }
+            return y >= z ? 1 : 2;
+        }
+        function intersectBounds(ray, bounds, epsilon, maximum) {
+            let tMin = epsilon;
+            let tMax = maximum;
+            for (let axis = 0; axis < 3; axis += 1) {
+                const origin = ray.origin[axis];
+                const direction = ray.direction[axis];
+                if (Math.abs(direction) < 1e-12) {
+                    if (origin < bounds.min[axis] || origin > bounds.max[axis]) {
+                        return false;
+                    }
+                    continue;
+                }
+                const inv = 1 / direction;
+                let t0 = (bounds.min[axis] - origin) * inv;
+                let t1 = (bounds.max[axis] - origin) * inv;
+                if (t0 > t1) {
+                    const swap = t0;
+                    t0 = t1;
+                    t1 = swap;
+                }
+                tMin = Math.max(tMin, t0);
+                tMax = Math.min(tMax, t1);
+                if (tMax < tMin) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        function incrementStat(stats, key) {
+            stats[key] = (stats[key] ?? 0) + 1;
+        }
+        function now() {
+            return typeof performance !== "undefined" ? performance.now() : Date.now();
+        }
+    })(Renderer = Juggler.Renderer || (Juggler.Renderer = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var Transforms;
+    (function (Transforms) {
+        function empty() {
+            return {};
+        }
+        Transforms.empty = empty;
+        function hasTransforms(transforms) {
+            return Object.keys(transforms).length > 0;
+        }
+        Transforms.hasTransforms = hasTransforms;
+        function offsetFor(transforms, groupIndex) {
+            const offset = transforms[groupIndex];
+            return offset ? [...offset] : [0, 0, 0];
+        }
+        Transforms.offsetFor = offsetFor;
+        function setOffset(transforms, groupIndex, offset) {
+            const next = { ...transforms };
+            if (Juggler.Math3.length(offset) < 1e-9) {
+                delete next[groupIndex];
+            }
+            else {
+                next[groupIndex] = [...offset];
+            }
+            return next;
+        }
+        Transforms.setOffset = setOffset;
+        function clearGroup(transforms, groupIndex) {
+            const next = { ...transforms };
+            delete next[groupIndex];
+            return next;
+        }
+        Transforms.clearGroup = clearGroup;
+        function apply(world, transforms) {
+            if (!hasTransforms(transforms)) {
+                return world;
+            }
+            return {
+                spheres: world.spheres.map((sphere) => {
+                    const offset = transforms[sphere.groupIndex];
+                    return {
+                        ...sphere,
+                        position: offset ? Juggler.Math3.add(sphere.position, offset) : [...sphere.position],
+                        color: [...sphere.color]
+                    };
+                }),
+                lamps: world.lamps.map((lamp) => ({
+                    position: [...lamp.position],
+                    radius: lamp.radius,
+                    color: [...lamp.color]
+                })),
+                horizon: [
+                    { ...world.horizon[0], position: [...world.horizon[0].position], normal: [...world.horizon[0].normal], color: [...world.horizon[0].color] },
+                    { ...world.horizon[1], position: [...world.horizon[1].position], normal: [...world.horizon[1].normal], color: [...world.horizon[1].color] }
+                ],
+                illum: [...world.illum],
+                skyZenith: [...world.skyZenith],
+                skyHorizon: [...world.skyHorizon],
+                lampExposure: world.lampExposure
+            };
+        }
+        Transforms.apply = apply;
+    })(Transforms = Juggler.Transforms || (Juggler.Transforms = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var RenderWorker;
+    (function (RenderWorker) {
+        const scope = self;
+        scope.onmessage = (event) => {
+            const request = event.data;
+            try {
+                render(request);
+            }
+            catch (error) {
+                post({
+                    type: "error",
+                    id: request.id,
+                    message: error instanceof Error ? error.message : String(error)
+                });
+            }
+        };
+        function render(request) {
+            const started = now();
+            const renderWorld = Juggler.Transforms.apply(Juggler.Motion.resolveWorld(request.parsed, request.world, request.motionSettings, request.sourceFrame), request.groupTransforms);
+            const observer = Juggler.Scenes.createObserver(request.parsed, request.world, request.width, request.height, request.orbit);
+            const renderer = new Juggler.Renderer.FrameRenderer(renderWorld, observer, request.options);
+            const budgetMs = Math.max(1, request.budgetMs);
+            const tick = () => {
+                renderer.renderBudget(budgetMs);
+                if (!renderer.done()) {
+                    post({ type: "progress", id: request.id, progress: renderer.progress(), stats: { ...renderer.stats } });
+                    scope.setTimeout(tick, 0);
+                    return;
+                }
+                const message = {
+                    type: "done",
+                    id: request.id,
+                    width: request.width,
+                    height: request.height,
+                    data: renderer.data,
+                    stats: { ...renderer.stats },
+                    renderMs: now() - started
+                };
+                scope.postMessage(message, [renderer.data.buffer]);
+            };
+            tick();
+        }
+        function post(message) {
+            scope.postMessage(message);
+        }
+        function now() {
+            return typeof performance !== "undefined" ? performance.now() : Date.now();
+        }
+    })(RenderWorker = Juggler.RenderWorker || (Juggler.RenderWorker = {}));
+})(Juggler || (Juggler = {}));
+</script>
   <script>
 "use strict";
 var Juggler;
@@ -3231,6 +4964,8 @@ var Juggler;
         let groupTransforms = Juggler.Transforms.empty();
         let selectedGroupIndex = null;
         let pointerDrag = null;
+        let activeRenderWorker = null;
+        let activeWorkerUrl = null;
         let playbackTimer = 0;
         let playbackIndex = 0;
         function start() {
@@ -3435,13 +5170,10 @@ var Juggler;
             const token = abortToken;
             const [width, height] = parseResolution();
             const motionSettings = readSceneMotionSettings();
-            const renderWorld = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
-            const observer = Juggler.Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
             const profile = Juggler.Profiles.byId(profileSelect.value);
             const displayConstraint = readDisplayConstraint();
-            const renderer = new Juggler.Renderer.FrameRenderer(renderWorld, observer, readRenderOptions(profile));
+            const renderOptions = readRenderOptions(profile);
             const rowsPerTick = readRowsPerTick();
-            const image = new ImageData(renderer.data, width, height);
             canvas.width = width;
             canvas.height = height;
             context.imageSmoothingEnabled = false;
@@ -3450,6 +5182,13 @@ var Juggler;
             setStatus(`Rendering ${active.source.name}, ${Juggler.Motion.labelFor(motionSettings.motionId)} ` +
                 `(${Juggler.Motion.motionSummary(active.parsed, motionSettings)}) at ${width} x ${height} with ` +
                 `${profile.label}, ${Juggler.Display.labelFor(displayConstraint)} display`);
+            if (renderStillInWorker(token, width, height, motionSettings, renderOptions, profile, displayConstraint)) {
+                return;
+            }
+            const renderWorld = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
+            const observer = Juggler.Scenes.createObserver(active.parsed, active.world, width, height, readOrbitSettings());
+            const renderer = new Juggler.Renderer.FrameRenderer(renderWorld, observer, renderOptions);
+            const image = new ImageData(renderer.data, width, height);
             const started = performance.now();
             const tick = () => {
                 if (token !== abortToken) {
@@ -3862,9 +5601,106 @@ var Juggler;
         }
         function abortWork() {
             abortToken += 1;
+            cleanupRenderWorker();
             clearPlaybackOnly();
             renderButton.disabled = false;
             updateAnimationButtons(false);
+        }
+        function renderStillInWorker(token, width, height, motionSettings, renderOptions, profile, displayConstraint) {
+            const worker = createRenderWorker();
+            if (!worker) {
+                return false;
+            }
+            activeRenderWorker = worker;
+            worker.onmessage = (event) => {
+                const message = event.data;
+                if (message.id !== token || token !== abortToken) {
+                    return;
+                }
+                if (message.type === "progress") {
+                    progressElement.value = message.progress;
+                    setStatus(`Worker render ${Math.round(message.progress * 100)}%, ` +
+                        `${message.stats.rays} rays, ${message.stats.sphereTests ?? 0} sphere tests`);
+                    return;
+                }
+                if (message.type === "error") {
+                    cleanupRenderWorker();
+                    renderButton.disabled = false;
+                    setStatus(`Worker render failed: ${message.message}`);
+                    return;
+                }
+                drawImageData(message.data, message.width, message.height);
+                progressElement.value = 1;
+                cleanupRenderWorker();
+                renderButton.disabled = false;
+                const seconds = message.renderMs / 1000;
+                setStatus(`Done in ${seconds.toFixed(2)}s worker, ${profile.label}, ${active.world.spheres.length} spheres, ` +
+                    `${Juggler.Display.labelFor(displayConstraint)} display, ${Juggler.Motion.motionSummary(active.parsed, motionSettings)}, ` +
+                    `${message.stats.rays} rays, ${message.stats.sphereTests ?? 0} sphere tests`);
+            };
+            worker.onerror = (event) => {
+                if (token !== abortToken) {
+                    return;
+                }
+                cleanupRenderWorker();
+                renderButton.disabled = false;
+                setStatus(`Worker render failed: ${event.message}`);
+            };
+            const request = {
+                id: token,
+                parsed: active.parsed,
+                world: active.world,
+                width,
+                height,
+                orbit: readOrbitSettings(),
+                motionSettings,
+                sourceFrame: motionSettings.sourceFrame,
+                groupTransforms: copyGroupTransforms(groupTransforms),
+                options: renderOptions,
+                budgetMs: 12
+            };
+            worker.postMessage(request);
+            setStatus(`Rendering ${active.source.name} in worker...`);
+            return true;
+        }
+        function createRenderWorker() {
+            if (typeof Worker === "undefined" || typeof Blob === "undefined" || typeof URL === "undefined") {
+                return null;
+            }
+            const source = document.getElementById("workerSource")?.textContent ?? "";
+            if (!source.trim()) {
+                return null;
+            }
+            try {
+                const blob = new Blob([source], { type: "text/javascript" });
+                activeWorkerUrl = URL.createObjectURL(blob);
+                return new Worker(activeWorkerUrl);
+            }
+            catch {
+                if (activeWorkerUrl) {
+                    URL.revokeObjectURL(activeWorkerUrl);
+                    activeWorkerUrl = null;
+                }
+                return null;
+            }
+        }
+        function cleanupRenderWorker() {
+            if (activeRenderWorker) {
+                activeRenderWorker.terminate();
+                activeRenderWorker = null;
+            }
+            if (activeWorkerUrl) {
+                URL.revokeObjectURL(activeWorkerUrl);
+                activeWorkerUrl = null;
+            }
+        }
+        function copyGroupTransforms(transforms) {
+            const copy = {};
+            for (const key of Object.keys(transforms)) {
+                const index = Number(key);
+                copy[index] = [...transforms[index]];
+            }
+            return copy;
         }
         function clearPlaybackOnly() {
             if (playbackTimer) {

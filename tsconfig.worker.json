@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outFile": "dist/juggler-worker.js"
+  },
+  "files": [
+    "src/types.ts",
+    "src/math.ts",
+    "src/original-data.ts",
+    "src/scenes.ts",
+    "src/motion-data.ts",
+    "src/motion.ts",
+    "src/ham.ts",
+    "src/display.ts",
+    "src/renderer.ts",
+    "src/transforms.ts",
+    "src/render-worker.ts"
+  ]
+}

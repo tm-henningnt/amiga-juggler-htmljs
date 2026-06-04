@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "build:single": "tsc -p tsconfig.json && node scripts/build-single.mjs",
+    "build:single": "tsc -p tsconfig.json && tsc -p tsconfig.worker.json && node scripts/build-single.mjs",
     "test": "tsc -p tsconfig.test.json && node dist-test/tests.js"
   }
 }

@@ -652,3 +652,30 @@ npm test
 ```
 
 The test suite now renders the same modern RGB frame through brute-force rows, BVH rows, and BVH tiles, then asserts the pixel buffers match exactly while BVH performs fewer sphere tests.
+
+## 2026-06-04: Standalone Worker Rendering
+
+The second modern rendering pass moved still raytraces off the main thread when browser support is available, while preserving the file-loadable standalone HTML workflow.
+
+Implemented changes:
+
+- Added a dedicated TypeScript worker entrypoint that uses the existing parser-free scene state, motion resolver, transforms, observer setup, and `FrameRenderer`.
+- Added a worker build output and inlined it into `index.html` as text during `npm run build:single`.
+- Added app-side worker creation through a Blob URL, with automatic fallback to the existing main-thread renderer when workers are unavailable.
+- Added abort cleanup so stale worker jobs terminate before later renders can write to the canvas.
+- Kept worker rendering single-file compatible; no backend, dev server, or external worker file is required.
+- Updated TODO and technical notes to mark standalone worker still rendering as completed foundation work.
+
+Verification:
+
+```bash
+npm test
+npm run build:single
+```
+
+Browser smoke verification opened the generated `index.html` directly from disk, rendered a 160 x 100 still frame through the worker, and confirmed:
+
+- The status reported `Done ... worker`.
+- The canvas was nonblank.
+- The inline worker source was embedded in the standalone file.
+- No runtime errors appeared in the console; the only warning came from verification-time canvas readbacks.

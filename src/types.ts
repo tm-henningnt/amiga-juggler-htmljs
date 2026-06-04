@@ -267,4 +267,23 @@ namespace Juggler {
     pixels?: number;
     tiles?: number;
   }
+
+  export interface RenderWorkerRequest {
+    id: number;
+    parsed: ParsedScene;
+    world: World;
+    width: number;
+    height: number;
+    orbit: OrbitSettings;
+    motionSettings: SceneMotionSettings;
+    sourceFrame: number;
+    groupTransforms: GroupTransformState;
+    options: RenderOptions;
+    budgetMs: number;
+  }
+
+  export type RenderWorkerMessage =
+    | { type: "progress"; id: number; progress: number; stats: RenderStats }
+    | { type: "done"; id: number; width: number; height: number; data: Uint8ClampedArray; stats: RenderStats; renderMs: number }
+    | { type: "error"; id: number; message: string };
 }
