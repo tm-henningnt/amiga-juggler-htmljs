@@ -8,9 +8,11 @@
 - Frame-range rendering/export is implemented with absolute output-frame metadata.
 - Named camera and source-cycle presets are available for inspecting historical motion phases.
 - Source-frame labels now identify major cycle phases such as apex, left catch, and right catch.
+- Animation frames now carry ball, wrist, clearance, camera, render-stat, and source-frame metadata.
+- Animation JSON manifest export is available from the standalone browser UI.
 - Render profiles now expose source-like, modern, and source-quirk mode indicators in the UI.
 - CRT emulation now cycles between off, scanline, slot-mask, and soft-glow modes.
-- Tests now cover physical cascade anchors, body clearance, ball spacing, hand contact, motion metadata, frame-range rendering, presets, phase labels, and unsupported-scene fallback.
+- Tests now cover physical cascade anchors, body clearance, ball spacing, hand contact, motion metadata, JSON manifests, frame-range rendering, presets, phase labels, and unsupported-scene fallback.
 
 ## Historical Accuracy
 
@@ -31,7 +33,7 @@
 
 ## Animation
 
-- Add richer per-frame inspection/export metadata once a structured manifest format is added.
+- Use structured manifests to drive future source-frame comparison and motion-fitting tools.
 - Add GIF export if a browser-compatible encoder is introduced.
 - Add batch PNG export packaging once archive/zip support is added.
 

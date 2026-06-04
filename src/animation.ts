@@ -165,6 +165,54 @@ namespace Juggler.Animation {
     ];
   }
 
+  export function createManifest(
+    sceneSource: SceneSource,
+    world: World,
+    pathSettings: CameraPathSettings,
+    motionSettings: SceneMotionSettings,
+    diagnostics: Motion.MotionDiagnostics | null,
+    frames: RenderedFrame[],
+    exportedAt = new Date().toISOString()
+  ): AnimationManifest {
+    const first = frames[0];
+    return {
+      format: "amiga-juggler-animation-manifest",
+      version: 1,
+      exportedAt,
+      scene: {
+        id: sceneSource.id,
+        name: sceneSource.name,
+        sourcePath: sceneSource.sourcePath,
+        sphereCount: world.spheres.length
+      },
+      render: {
+        width: first?.width ?? 0,
+        height: first?.height ?? 0,
+        profileId: first?.profileId ?? "reference"
+      },
+      animation: copyPathSettings(pathSettings),
+      motion: { ...motionSettings },
+      diagnostics: diagnostics ? { ...diagnostics } : null,
+      frames: frames.map((frame, bufferIndex) => ({
+        bufferIndex,
+        outputFrame: frame.index,
+        outputFrameNumber: frame.index + 1,
+        sourceFrame: frame.sceneFrame,
+        sourceFrameLabel: frame.motionId === "juggler-reconstructed" ? Motion.sourceFrameLabel(frame.sceneFrame) : "static",
+        renderMs: frame.renderMs,
+        camera: copyCameraPose(frame.pose),
+        stats: { ...frame.stats },
+        motion: {
+          id: frame.motionId,
+          bodyClearance: frame.motionClearance,
+          ballClearance: frame.motionBallClearance,
+          balls: copyMotionSamples(frame.motionBalls),
+          hands: copyMotionSamples(frame.motionHands)
+        }
+      }))
+    };
+  }
+
   export class AnimationRenderer {
     readonly frames: RenderedFrame[] = [];
     private frameIndex: number;
@@ -174,6 +222,8 @@ namespace Juggler.Animation {
     private currentPose: CameraPose | null = null;
     private currentClearance: number | null = null;
     private currentBallClearance: number | null = null;
+    private currentBallSamples: MotionObjectSample[] = [];
+    private currentHandSamples: MotionObjectSample[] = [];
 
     constructor(
       private readonly scene: ParsedScene,
@@ -200,6 +250,8 @@ namespace Juggler.Animation {
         this.currentPose = evaluateCameraPath(this.scene, this.world, this.pathSettings, this.frameIndex);
         this.currentClearance = Motion.frameBodyClearance(frameWorld);
         this.currentBallClearance = Motion.frameBallClearance(frameWorld);
+        this.currentBallSamples = Motion.frameBallSamples(frameWorld);
+        this.currentHandSamples = Motion.frameHandSamples(frameWorld);
         const observer = Scenes.createObserverFromPose(this.currentPose, this.width, this.height);
         this.frameRenderer = new Renderer.FrameRenderer(frameWorld, observer, this.renderOptions);
         this.frameStarted = now();
@@ -220,6 +272,8 @@ namespace Juggler.Animation {
           motionId: this.motionSettings.motionId,
           motionClearance: this.currentClearance,
           motionBallClearance: this.currentBallClearance,
+          motionBalls: copyMotionSamples(this.currentBallSamples),
+          motionHands: copyMotionSamples(this.currentHandSamples),
           profileId: this.renderOptions.profileId
         };
         this.frames.push(completedFrame);
@@ -229,6 +283,8 @@ namespace Juggler.Animation {
         this.currentPose = null;
         this.currentClearance = null;
         this.currentBallClearance = null;
+        this.currentBallSamples = [];
+        this.currentHandSamples = [];
       }
 
       return this.progress(completedFrame, this.renderedIndex >= outputFrameCount);
@@ -306,6 +362,35 @@ namespace Juggler.Animation {
       throw new Error(`${label} must contain finite numbers`);
     }
     return [vec[0], vec[1], vec[2]];
+  }
+
+  function copyPathSettings(settings: CameraPathSettings): CameraPathSettings {
+    return {
+      ...settings,
+      customKeyframes: settings.customKeyframes.map((keyframe) => ({
+        t: keyframe.t,
+        position: [...keyframe.position],
+        target: [...keyframe.target],
+        focalLength: keyframe.focalLength
+      }))
+    };
+  }
+
+  function copyCameraPose(pose: CameraPose): CameraPose {
+    return {
+      position: [...pose.position],
+      target: [...pose.target],
+      focalLength: pose.focalLength
+    };
+  }
+
+  function copyMotionSamples(samples: MotionObjectSample[]): MotionObjectSample[] {
+    return samples.map((sample) => ({
+      label: sample.label,
+      groupIndex: sample.groupIndex,
+      position: [...sample.position],
+      radius: sample.radius
+    }));
   }
 
   function now(): number {

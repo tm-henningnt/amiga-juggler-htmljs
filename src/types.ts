@@ -149,6 +149,13 @@ namespace Juggler {
     sourceFrame: number;
   }
 
+  export interface MotionObjectSample {
+    label: string;
+    groupIndex: number;
+    position: Vec3;
+    radius: number;
+  }
+
   export interface RenderedFrame {
     index: number;
     width: number;
@@ -161,7 +168,57 @@ namespace Juggler {
     motionId: SceneMotionId;
     motionClearance: number | null;
     motionBallClearance: number | null;
+    motionBalls: MotionObjectSample[];
+    motionHands: MotionObjectSample[];
     profileId: RenderProfileId;
+  }
+
+  export interface AnimationManifestDiagnostics {
+    minBodyClearance: number;
+    minBodyClearanceFrame: number;
+    minBodyClearanceBallGroup: number;
+    minBallClearance: number;
+    minBallClearanceFrame: number;
+    maxHandContactError: number;
+  }
+
+  export interface AnimationManifestFrame {
+    bufferIndex: number;
+    outputFrame: number;
+    outputFrameNumber: number;
+    sourceFrame: number;
+    sourceFrameLabel: string;
+    renderMs: number;
+    camera: CameraPose;
+    stats: RenderStats;
+    motion: {
+      id: SceneMotionId;
+      bodyClearance: number | null;
+      ballClearance: number | null;
+      balls: MotionObjectSample[];
+      hands: MotionObjectSample[];
+    };
+  }
+
+  export interface AnimationManifest {
+    format: "amiga-juggler-animation-manifest";
+    version: 1;
+    exportedAt: string;
+    scene: {
+      id: string;
+      name: string;
+      sourcePath: string;
+      sphereCount: number;
+    };
+    render: {
+      width: number;
+      height: number;
+      profileId: RenderProfileId;
+    };
+    animation: CameraPathSettings;
+    motion: SceneMotionSettings;
+    diagnostics: AnimationManifestDiagnostics | null;
+    frames: AnimationManifestFrame[];
   }
 
   export interface AnimationProgress {

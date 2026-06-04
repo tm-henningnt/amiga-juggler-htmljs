@@ -10,8 +10,8 @@ The goal is preservation first: keep the source scene data, HAM-style output pat
 - Expands the original interpolated sphere controls into renderable sphere lists.
 - Raytraces spheres, lamps, checkerboard ground, sky gradient, shadows, highlights, and recursive reflections.
 - Includes render profiles and visible mode indicators for source-like HAM output, modern RGB output, and the original reflection quirk study path.
-- Supports static renders, orbit/dolly/custom camera paths, named camera presets, animation rendering, playback, timeline scrubbing, PNG frame export, and browser-supported WebM/MP4 export.
-- Supports selected animation frame ranges, source-cycle presets, and phase-labeled source frames while preserving absolute frame, source-frame, profile, render-time, camera-pose, and motion metadata.
+- Supports static renders, orbit/dolly/custom camera paths, named camera presets, animation rendering, playback, timeline scrubbing, PNG frame export, JSON manifest export, and browser-supported WebM/MP4 export.
+- Supports selected animation frame ranges, source-cycle presets, and phase-labeled source frames while preserving absolute frame, source-frame, profile, render-time, camera-pose, ball, hand, and clearance metadata.
 - Reconstructs a 24-frame juggling motion cycle for the robot scene. The original `.dat` files do not contain animation tracks; the motion is fitted from historical rendered output, then reconciled with a ballistic cascade model so the balls remain solid and clear the juggler.
 - Produces a single-file `index.html` bundle with no backend and no local server requirement.
 - Includes browser-side CRT emulation modes: off, scanlines, slot mask, and soft glow.
@@ -69,7 +69,7 @@ Generated `dist/` and `dist-test/` files are ignored. The standalone `index.html
 - `src/scenes.ts` expands parsed scene controls into renderable worlds and creates observers.
 - `src/renderer.ts` implements the CPU raytracer.
 - `src/ham.ts` implements the source-like HAM pixel encoding path.
-- `src/animation.ts` resolves camera paths and queues frame rendering.
+- `src/animation.ts` resolves camera paths, queues frame rendering, and builds structured animation manifests.
 - `src/motion-data.ts` stores the physical cascade constants and reference-derived screen anchors.
 - `src/motion.ts` resolves reconstructed source-frame scene motion and diagnostics for the juggler.
 - `src/app.ts` wires the browser UI, rendering loop, playback, and export tools.
@@ -90,6 +90,7 @@ Manual browser verification should include:
 - Render a selected frame range and confirm exported frame numbers match the source timeline.
 - Apply a camera preset and source-cycle preset, then confirm the animation facts show the expected source range.
 - Scrub the timeline and confirm source-frame motion changes.
+- Export the JSON manifest and confirm it contains frame-level camera, source-frame, ball, hand, clearance, and render-stat records.
 - Export WebM/MP4 if supported by the current browser.
 
 ## License And Attribution

@@ -364,7 +364,34 @@ npm test
 npm run build:single
 ```
 
-Browser smoke verification opened the generated `index.html` from disk and confirmed the screen-bar button cycles through `scanlines`, `slot-mask`, `soft-glow`, `off`, then back to `scanlines`, with matching button labels and active states.
+## 2026-06-04: Animation Manifest Export
+
+The next animation slice added structured metadata export so future motion-fitting work can inspect the exact rendered frames without reverse-engineering state from the UI.
+
+Implemented changes:
+
+- Added `MotionObjectSample` metadata for reconstructed ball positions and wrist endpoints.
+- Stored per-frame ball samples, hand samples, body clearance, ball spacing, camera pose, render profile, render timing, and ray stats on rendered animation frames.
+- Added `Animation.createManifest()` with a stable `amiga-juggler-animation-manifest` format identifier and version.
+- Added a `JSON` export button to the Animation panel, enabled alongside PNG/video exports once frames are buffered.
+- Updated the README and TODO to treat manifest export as completed foundation work.
+
+Verification:
+
+```bash
+npm test
+npm run build:single
+```
+
+The test suite now checks that animation frames record three ball samples and two wrist samples, and that generated manifests contain source-frame labels, render profile data, motion samples, and defensive copies of sampled positions.
+
+Browser smoke verification opened the generated `index.html` directly from disk, rendered a three-frame 160 x 100 source-camera animation, and confirmed:
+
+- The UI reported `Animation ready: 3 frames`.
+- The `JSON` export button became enabled after rendering.
+- Animation facts reported `JSON manifest available`.
+- The rendered canvas was nonblank.
+- No console errors appeared.
 
 ## 2026-06-04: Ballistic Cascade And Ball Spacing
 
@@ -420,6 +447,8 @@ Verification:
 npm test
 npm run build:single
 ```
+
+Browser smoke verification opened the generated `index.html` from disk and confirmed the screen-bar button cycles through `scanlines`, `slot-mask`, `soft-glow`, `off`, then back to `scanlines`, with matching button labels and active states.
 
 The test suite now checks camera preset application, cycle preset ranges, source-frame labels, and source-range label formatting.
 

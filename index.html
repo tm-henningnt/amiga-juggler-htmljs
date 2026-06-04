@@ -403,6 +403,10 @@ input[type="checkbox"] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.button-row.four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .button-row:last-child {
   margin-bottom: 0;
 }
@@ -783,10 +787,11 @@ button:disabled {
             <button id="pauseAnimation" disabled>Pause</button>
             <button id="stopAnimation" disabled>Stop</button>
           </div>
-          <div class="button-row three">
+          <div class="button-row four">
             <button id="exportWebm" disabled>WebM</button>
             <button id="exportMp4" disabled>MP4</button>
             <button id="exportPng" disabled>PNG</button>
+            <button id="exportManifest" disabled>JSON</button>
           </div>
           <dl id="animationFacts" class="facts"></dl>
         </div>
@@ -1620,6 +1625,26 @@ var Juggler;
             return minClearance;
         }
         Motion.frameBallClearance = frameBallClearance;
+        function frameBallSamples(world) {
+            return BALL_GROUPS.flatMap((ball, index) => {
+                const sphere = world.spheres.find((candidate) => candidate.groupIndex === ball.groupIndex);
+                return sphere ? [motionObjectSample(sphere, `ball ${index + 1} ${ball.arc} arc`)] : [];
+            });
+        }
+        Motion.frameBallSamples = frameBallSamples;
+        function frameHandSamples(world) {
+            const right = lastSphereForGroup(world, RIGHT_ARM_GROUP);
+            const left = lastSphereForGroup(world, LEFT_ARM_GROUP);
+            const samples = [];
+            if (right) {
+                samples.push(motionObjectSample(right, "right wrist"));
+            }
+            if (left) {
+                samples.push(motionObjectSample(left, "left wrist"));
+            }
+            return samples;
+        }
+        Motion.frameHandSamples = frameHandSamples;
         function diagnostics(scene, baseWorld, settings) {
             if (settings.motionId !== "juggler-reconstructed" || !supportsJugglerMotion(scene)) {
                 return null;
@@ -1780,6 +1805,14 @@ var Juggler;
                 best = Math.min(best, surfaceDistance);
             }
             return best;
+        }
+        function motionObjectSample(sphere, label) {
+            return {
+                label,
+                groupIndex: sphere.groupIndex,
+                position: [...sphere.position],
+                radius: sphere.radius
+            };
         }
         function lastSphereForGroup(world, groupIndex) {
             let match = null;
@@ -2348,6 +2381,46 @@ var Juggler;
             ];
         }
         Animation.defaultCustomKeyframes = defaultCustomKeyframes;
+        function createManifest(sceneSource, world, pathSettings, motionSettings, diagnostics, frames, exportedAt = new Date().toISOString()) {
+            const first = frames[0];
+            return {
+                format: "amiga-juggler-animation-manifest",
+                version: 1,
+                exportedAt,
+                scene: {
+                    id: sceneSource.id,
+                    name: sceneSource.name,
+                    sourcePath: sceneSource.sourcePath,
+                    sphereCount: world.spheres.length
+                },
+                render: {
+                    width: first?.width ?? 0,
+                    height: first?.height ?? 0,
+                    profileId: first?.profileId ?? "reference"
+                },
+                animation: copyPathSettings(pathSettings),
+                motion: { ...motionSettings },
+                diagnostics: diagnostics ? { ...diagnostics } : null,
+                frames: frames.map((frame, bufferIndex) => ({
+                    bufferIndex,
+                    outputFrame: frame.index,
+                    outputFrameNumber: frame.index + 1,
+                    sourceFrame: frame.sceneFrame,
+                    sourceFrameLabel: frame.motionId === "juggler-reconstructed" ? Juggler.Motion.sourceFrameLabel(frame.sceneFrame) : "static",
+                    renderMs: frame.renderMs,
+                    camera: copyCameraPose(frame.pose),
+                    stats: { ...frame.stats },
+                    motion: {
+                        id: frame.motionId,
+                        bodyClearance: frame.motionClearance,
+                        ballClearance: frame.motionBallClearance,
+                        balls: copyMotionSamples(frame.motionBalls),
+                        hands: copyMotionSamples(frame.motionHands)
+                    }
+                }))
+            };
+        }
+        Animation.createManifest = createManifest;
         class AnimationRenderer {
             constructor(scene, world, width, height, renderOptions, pathSettings, motionSettings = { motionId: "static", sourceFrame: 0 }) {
                 this.scene = scene;
@@ -2364,6 +2437,8 @@ var Juggler;
                 this.currentPose = null;
                 this.currentClearance = null;
                 this.currentBallClearance = null;
+                this.currentBallSamples = [];
+                this.currentHandSamples = [];
                 this.frameIndex = rangeStart(pathSettings);
             }
             step(rowsPerTick) {
@@ -2378,6 +2453,8 @@ var Juggler;
                     this.currentPose = evaluateCameraPath(this.scene, this.world, this.pathSettings, this.frameIndex);
                     this.currentClearance = Juggler.Motion.frameBodyClearance(frameWorld);
                     this.currentBallClearance = Juggler.Motion.frameBallClearance(frameWorld);
+                    this.currentBallSamples = Juggler.Motion.frameBallSamples(frameWorld);
+                    this.currentHandSamples = Juggler.Motion.frameHandSamples(frameWorld);
                     const observer = Juggler.Scenes.createObserverFromPose(this.currentPose, this.width, this.height);
                     this.frameRenderer = new Juggler.Renderer.FrameRenderer(frameWorld, observer, this.renderOptions);
                     this.frameStarted = now();
@@ -2397,6 +2474,8 @@ var Juggler;
                         motionId: this.motionSettings.motionId,
                         motionClearance: this.currentClearance,
                         motionBallClearance: this.currentBallClearance,
+                        motionBalls: copyMotionSamples(this.currentBallSamples),
+                        motionHands: copyMotionSamples(this.currentHandSamples),
                         profileId: this.renderOptions.profileId
                     };
                     this.frames.push(completedFrame);
@@ -2406,6 +2485,8 @@ var Juggler;
                     this.currentPose = null;
                     this.currentClearance = null;
                     this.currentBallClearance = null;
+                    this.currentBallSamples = [];
+                    this.currentHandSamples = [];
                 }
                 return this.progress(completedFrame, this.renderedIndex >= outputFrameCount);
             }
@@ -2476,6 +2557,32 @@ var Juggler;
             }
             return [vec[0], vec[1], vec[2]];
         }
+        function copyPathSettings(settings) {
+            return {
+                ...settings,
+                customKeyframes: settings.customKeyframes.map((keyframe) => ({
+                    t: keyframe.t,
+                    position: [...keyframe.position],
+                    target: [...keyframe.target],
+                    focalLength: keyframe.focalLength
+                }))
+            };
+        }
+        function copyCameraPose(pose) {
+            return {
+                position: [...pose.position],
+                target: [...pose.target],
+                focalLength: pose.focalLength
+            };
+        }
+        function copyMotionSamples(samples) {
+            return samples.map((sample) => ({
+                label: sample.label,
+                groupIndex: sample.groupIndex,
+                position: [...sample.position],
+                radius: sample.radius
+            }));
+        }
         function now() {
             return typeof performance !== "undefined" ? performance.now() : Date.now();
         }
@@ -2527,12 +2634,15 @@ var Juggler;
         const exportWebmButton = document.getElementById("exportWebm");
         const exportMp4Button = document.getElementById("exportMp4");
         const exportPngButton = document.getElementById("exportPng");
+        const exportManifestButton = document.getElementById("exportManifest");
         const canvas = document.getElementById("frame");
         const context = canvas.getContext("2d");
         const sources = Juggler.Scenes.builtInSceneSources();
         let active;
         let abortToken = 0;
         let animationFrames = [];
+        let bufferedAnimationSettings = null;
+        let bufferedMotionSettings = null;
         let playbackTimer = 0;
         let playbackIndex = 0;
         function start() {
@@ -2603,6 +2713,7 @@ var Juggler;
             exportWebmButton.addEventListener("click", () => exportVideo("webm"));
             exportMp4Button.addEventListener("click", () => exportVideo("mp4"));
             exportPngButton.addEventListener("click", () => exportPngFrames());
+            exportManifestButton.addEventListener("click", () => exportManifest());
             timelineInput.addEventListener("input", () => {
                 pauseAnimation();
                 showFrame(Number(timelineInput.value) || 0);
@@ -2737,6 +2848,8 @@ var Juggler;
             const [width, height] = parseResolution();
             const profile = Juggler.Profiles.byId(profileSelect.value);
             const motionSettings = readSceneMotionSettings();
+            bufferedAnimationSettings = copyAnimationSettings(settings);
+            bufferedMotionSettings = { ...motionSettings };
             const renderer = new Juggler.Animation.AnimationRenderer(active.parsed, active.world, width, height, readRenderOptions(profile), settings, motionSettings);
             const rowsPerTick = readRowsPerTick();
             canvas.width = width;
@@ -2894,6 +3007,20 @@ var Juggler;
             }
             setStatus(`Exported ${animationFrames.length} PNG frames.`);
         }
+        function exportManifest() {
+            if (!active || !animationFrames.length) {
+                return;
+            }
+            pauseAnimation();
+            const settings = bufferedAnimationSettings ?? readAnimationSettingsLenient();
+            const motionSettings = bufferedMotionSettings ?? readSceneMotionSettings();
+            const diagnostics = Juggler.Motion.diagnostics(active.parsed, active.world, motionSettings);
+            const manifest = Juggler.Animation.createManifest(active.source, active.world, settings, motionSettings, diagnostics, animationFrames);
+            const text = JSON.stringify(manifest, null, 2);
+            const blob = new Blob([text], { type: "application/json" });
+            downloadBlob(blob, `${active.source.id}-${animationFrames[0].index + 1}-${animationFrames[animationFrames.length - 1].index + 1}-manifest.json`);
+            setStatus(`Exported JSON manifest (${formatBytes(blob.size)})`);
+        }
         function abortWork() {
             abortToken += 1;
             clearPlaybackOnly();
@@ -2915,6 +3042,7 @@ var Juggler;
             exportWebmButton.disabled = rendering || !animationFrames.length || !pickVideoMimeType("webm");
             exportMp4Button.disabled = rendering || !animationFrames.length || !pickVideoMimeType("mp4");
             exportPngButton.disabled = rendering || !animationFrames.length;
+            exportManifestButton.disabled = rendering || !animationFrames.length;
         }
         function refreshMotionOptions() {
             const previous = sceneMotionSelect.value;
@@ -2998,7 +3126,8 @@ var Juggler;
                 ["Min clearance", diagnostics ? diagnostics.minBodyClearance.toFixed(2) : "n/a"],
                 ["Min ball spacing", diagnostics ? diagnostics.minBallClearance.toFixed(2) : "n/a"],
                 ["WebM", pickVideoMimeType("webm") ? "available" : "unavailable"],
-                ["MP4", pickVideoMimeType("mp4") ? "available" : "unavailable"]
+                ["MP4", pickVideoMimeType("mp4") ? "available" : "unavailable"],
+                ["JSON manifest", animationFrames.length ? "available" : "render frames first"]
             ]);
             updateAnimationButtons(false);
         }
@@ -3103,6 +3232,8 @@ var Juggler;
         function resetAnimationBuffer() {
             clearPlaybackOnly();
             animationFrames = [];
+            bufferedAnimationSettings = null;
+            bufferedMotionSettings = null;
             playbackIndex = 0;
             timelineInput.max = "0";
             timelineInput.value = "0";
@@ -3117,6 +3248,17 @@ var Juggler;
                 node.textContent = tag.label;
                 profileIndicators.appendChild(node);
             }
+        }
+        function copyAnimationSettings(settings) {
+            return {
+                ...settings,
+                customKeyframes: settings.customKeyframes.map((keyframe) => ({
+                    t: keyframe.t,
+                    position: [...keyframe.position],
+                    target: [...keyframe.target],
+                    focalLength: keyframe.focalLength
+                }))
+            };
         }
         function drawImageData(data, width, height) {
             if (!context) {

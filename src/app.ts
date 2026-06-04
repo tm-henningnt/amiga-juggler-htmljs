@@ -47,6 +47,7 @@ namespace Juggler.App {
   const exportWebmButton = document.getElementById("exportWebm") as HTMLButtonElement;
   const exportMp4Button = document.getElementById("exportMp4") as HTMLButtonElement;
   const exportPngButton = document.getElementById("exportPng") as HTMLButtonElement;
+  const exportManifestButton = document.getElementById("exportManifest") as HTMLButtonElement;
   const canvas = document.getElementById("frame") as HTMLCanvasElement;
   const context = canvas.getContext("2d");
 
@@ -54,6 +55,8 @@ namespace Juggler.App {
   let active: ActiveScene;
   let abortToken = 0;
   let animationFrames: RenderedFrame[] = [];
+  let bufferedAnimationSettings: CameraPathSettings | null = null;
+  let bufferedMotionSettings: SceneMotionSettings | null = null;
   let playbackTimer = 0;
   let playbackIndex = 0;
 
@@ -127,6 +130,7 @@ namespace Juggler.App {
     exportWebmButton.addEventListener("click", () => exportVideo("webm"));
     exportMp4Button.addEventListener("click", () => exportVideo("mp4"));
     exportPngButton.addEventListener("click", () => exportPngFrames());
+    exportManifestButton.addEventListener("click", () => exportManifest());
     timelineInput.addEventListener("input", () => {
       pauseAnimation();
       showFrame(Number(timelineInput.value) || 0);
@@ -278,6 +282,8 @@ namespace Juggler.App {
     const [width, height] = parseResolution();
     const profile = Profiles.byId(profileSelect.value);
     const motionSettings = readSceneMotionSettings();
+    bufferedAnimationSettings = copyAnimationSettings(settings);
+    bufferedMotionSettings = { ...motionSettings };
     const renderer = new Animation.AnimationRenderer(
       active.parsed,
       active.world,
@@ -466,6 +472,29 @@ namespace Juggler.App {
     setStatus(`Exported ${animationFrames.length} PNG frames.`);
   }
 
+  function exportManifest(): void {
+    if (!active || !animationFrames.length) {
+      return;
+    }
+
+    pauseAnimation();
+    const settings = bufferedAnimationSettings ?? readAnimationSettingsLenient();
+    const motionSettings = bufferedMotionSettings ?? readSceneMotionSettings();
+    const diagnostics = Motion.diagnostics(active.parsed, active.world, motionSettings);
+    const manifest = Animation.createManifest(
+      active.source,
+      active.world,
+      settings,
+      motionSettings,
+      diagnostics,
+      animationFrames
+    );
+    const text = JSON.stringify(manifest, null, 2);
+    const blob = new Blob([text], { type: "application/json" });
+    downloadBlob(blob, `${active.source.id}-${animationFrames[0].index + 1}-${animationFrames[animationFrames.length - 1].index + 1}-manifest.json`);
+    setStatus(`Exported JSON manifest (${formatBytes(blob.size)})`);
+  }
+
   function abortWork(): void {
     abortToken += 1;
     clearPlaybackOnly();
@@ -489,6 +518,7 @@ namespace Juggler.App {
     exportWebmButton.disabled = rendering || !animationFrames.length || !pickVideoMimeType("webm");
     exportMp4Button.disabled = rendering || !animationFrames.length || !pickVideoMimeType("mp4");
     exportPngButton.disabled = rendering || !animationFrames.length;
+    exportManifestButton.disabled = rendering || !animationFrames.length;
   }
 
   function refreshMotionOptions(): void {
@@ -577,7 +607,8 @@ namespace Juggler.App {
       ["Min clearance", diagnostics ? diagnostics.minBodyClearance.toFixed(2) : "n/a"],
       ["Min ball spacing", diagnostics ? diagnostics.minBallClearance.toFixed(2) : "n/a"],
       ["WebM", pickVideoMimeType("webm") ? "available" : "unavailable"],
-      ["MP4", pickVideoMimeType("mp4") ? "available" : "unavailable"]
+      ["MP4", pickVideoMimeType("mp4") ? "available" : "unavailable"],
+      ["JSON manifest", animationFrames.length ? "available" : "render frames first"]
     ]);
     updateAnimationButtons(false);
   }
@@ -693,6 +724,8 @@ namespace Juggler.App {
   function resetAnimationBuffer(): void {
     clearPlaybackOnly();
     animationFrames = [];
+    bufferedAnimationSettings = null;
+    bufferedMotionSettings = null;
     playbackIndex = 0;
     timelineInput.max = "0";
     timelineInput.value = "0";
@@ -708,6 +741,18 @@ namespace Juggler.App {
       node.textContent = tag.label;
       profileIndicators.appendChild(node);
     }
+  }
+
+  function copyAnimationSettings(settings: CameraPathSettings): CameraPathSettings {
+    return {
+      ...settings,
+      customKeyframes: settings.customKeyframes.map((keyframe) => ({
+        t: keyframe.t,
+        position: [...keyframe.position],
+        target: [...keyframe.target],
+        focalLength: keyframe.focalLength
+      }))
+    };
   }
 
   function drawImageData(data: Uint8ClampedArray, width: number, height: number): void {

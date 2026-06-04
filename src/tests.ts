@@ -264,7 +264,35 @@ namespace Juggler.Tests {
     assert(renderer.frames.every((frame) => frame.profileId === "reference"), "animation frames record render profile");
     assert(renderer.frames.every((frame) => frame.motionClearance !== null), "animation frames record motion clearance");
     assert(renderer.frames.every((frame) => frame.motionBallClearance !== null), "animation frames record ball spacing");
+    assert(renderer.frames.every((frame) => frame.motionBalls.length === 3), "animation frames record ball samples");
+    assert(renderer.frames.every((frame) => frame.motionHands.length === 2), "animation frames record wrist samples");
     assert(renderer.frames[1].sceneFrame > renderer.frames[0].sceneFrame, "animation frames advance scene source frame");
+
+    const sceneSource: SceneSource = {
+      id: "robot",
+      name: "robot.dat",
+      datText: ORIGINAL_DAT.robot,
+      sourcePath: "src/original/robot.dat"
+    };
+    const diagnostics = Motion.diagnostics(scene, world, { motionId: "juggler-reconstructed", sourceFrame: 0 });
+    const manifest = Animation.createManifest(
+      sceneSource,
+      world,
+      settings,
+      { motionId: "juggler-reconstructed", sourceFrame: 0 },
+      diagnostics,
+      renderer.frames,
+      "2026-06-04T00:00:00.000Z"
+    );
+    assert(manifest.format === "amiga-juggler-animation-manifest", "manifest format id");
+    assert(manifest.version === 1, "manifest version");
+    assert(manifest.render.profileId === "reference", "manifest records render profile");
+    assert(manifest.frames.length === renderer.frames.length, "manifest frame count");
+    assert(manifest.frames[0].sourceFrameLabel.includes("apex"), "manifest source frame label");
+    assert(manifest.frames[0].motion.balls.length === 3, "manifest records ball samples");
+    assert(manifest.frames[0].motion.hands.some((sample) => sample.label === "left wrist"), "manifest records hand samples");
+    manifest.frames[0].motion.balls[0].position[0] = 999;
+    assert(renderer.frames[0].motionBalls[0].position[0] !== 999, "manifest samples are defensive copies");
 
     const rangeSettings = Animation.defaultSettings();
     rangeSettings.pathId = "static";

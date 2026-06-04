@@ -174,6 +174,26 @@ namespace Juggler.Motion {
     return minClearance;
   }
 
+  export function frameBallSamples(world: World): MotionObjectSample[] {
+    return BALL_GROUPS.flatMap((ball, index) => {
+      const sphere = world.spheres.find((candidate) => candidate.groupIndex === ball.groupIndex);
+      return sphere ? [motionObjectSample(sphere, `ball ${index + 1} ${ball.arc} arc`)] : [];
+    });
+  }
+
+  export function frameHandSamples(world: World): MotionObjectSample[] {
+    const right = lastSphereForGroup(world, RIGHT_ARM_GROUP);
+    const left = lastSphereForGroup(world, LEFT_ARM_GROUP);
+    const samples: MotionObjectSample[] = [];
+    if (right) {
+      samples.push(motionObjectSample(right, "right wrist"));
+    }
+    if (left) {
+      samples.push(motionObjectSample(left, "left wrist"));
+    }
+    return samples;
+  }
+
   export function diagnostics(scene: ParsedScene, baseWorld: World, settings: SceneMotionSettings): MotionDiagnostics | null {
     if (settings.motionId !== "juggler-reconstructed" || !supportsJugglerMotion(scene)) {
       return null;
@@ -358,6 +378,15 @@ namespace Juggler.Motion {
       best = Math.min(best, surfaceDistance);
     }
     return best;
+  }
+
+  function motionObjectSample(sphere: Sphere, label: string): MotionObjectSample {
+    return {
+      label,
+      groupIndex: sphere.groupIndex,
+      position: [...sphere.position],
+      radius: sphere.radius
+    };
   }
 
   function lastSphereForGroup(world: World, groupIndex: number): Sphere | null {

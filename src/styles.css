@@ -393,6 +393,10 @@ input[type="checkbox"] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.button-row.four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .button-row:last-child {
   margin-bottom: 0;
 }
