@@ -479,8 +479,8 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 
-/* ─── Source note ───────────────────────────────────── */
-.source-note p {
+/* ─── About note ────────────────────────────────────── */
+.about-note p {
   font-size: 14px;
   line-height: 1.45;
   color: var(--wb-black);

@@ -545,3 +545,19 @@ Verification:
 ```bash
 git diff --check
 ```
+
+## 2026-06-04: About Panel Copy
+
+The collapsed GUI source note was renamed to `About` and rewritten to match the current source-truth story.
+
+Implemented changes:
+
+- Renamed the `Source` panel to `About`.
+- Updated the copy to credit AlphaPixel's GitHub archive of Eric Graham's 1987 source.
+- Clarified that the original `.dat` files provide static scene data, while juggler motion is reconstructed from historical movie output, Ernie Wright's notes, and Meatfighter's Java reimplementation.
+
+Verification:
+
+```bash
+npm run build:single
+```
