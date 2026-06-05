@@ -1,79 +1,45 @@
 # TODO
 
-## Completed Foundations
+This file is a forward-looking backlog. Completed foundations belong in `LOG.md`; stable architecture and usage facts belong in `TECHNICAL.md` and `README.md`.
 
-- Reference screen anchors and physical cascade constants are committed in `src/motion-data.ts`.
-- Reconstructed ball positions now use a Meatfighter-inspired ballistic cascade so the balls clear the body/head and each other in 3D.
-- Reconstructed juggler motion now includes Meatfighter-inspired hips, torso, head, eyes, hair, legs, shoulders, and IK arms.
-- Motion diagnostics now report ball/body clearance, ball/ball spacing, and hand-contact error.
-- Frame-range rendering/export is implemented with absolute output-frame metadata.
-- Named camera and source-cycle presets are available for inspecting historical motion phases.
-- Source-frame labels now identify major cycle phases such as apex, left catch, and right catch.
-- Animation frames now carry ball, wrist, clearance, camera, render-stat, and source-frame metadata.
-- Animation JSON manifest export is available from the standalone browser UI.
-- Render profiles now expose source-like, modern, and source-quirk mode indicators in the UI.
-- Realtime wireframe and solid preview modes are available alongside the raytrace view.
-- Preview mode supports mouse orbit, wheel zoom, camera height adjustment, group picking, and session-only group transforms.
-- Display constraints now include RGB, OCS 12-bit, Extra Half-Brite-style 64-color, and approximate HAM6 modes.
-- CPU rendering now has BVH sphere acceleration, tile/time-budget rendering for line-order-safe modes, and expanded render stats.
-- Standalone worker rendering now runs still raytraces off the main thread when browser support is available.
-- Modern quality mode now provides opt-in ordered and adaptive 2x anti-aliasing while Legacy remains AA-off.
-- Live Raytrace view and Free camera mode now support session-only free movement with adaptive interactive rendering.
-- CRT emulation now cycles between off, scanline, slot-mask, and soft-glow modes.
-- Classic Source and Modern Studio experience presets now switch the main render/view/profile/camera/CRT/effects defaults while preserving advanced Custom overrides.
-- Modern Studio exposes opt-in deterministic soft shadows, contact ambient occlusion, depth of field, and live motion-blur accumulation as explicitly non-source render modes.
-- Canvas controls now use standard viewport behavior: drag orbit, Shift/right-drag pan, wheel dolly, plus explicit Scene Edit selection and depth movement.
-- Live Raytrace playback now advances reconstructed source frames at the selected FPS and skips stale frames when rendering falls behind.
-- Tests now cover physical cascade anchors, animated body pose, planted feet, body clearance, ball spacing, hand contact, motion metadata, JSON manifests, frame-range rendering, presets, phase labels, and unsupported-scene fallback.
+## Near-Term Priorities
+
+- Browser-smoke the Modern Studio pass once browser automation is available again:
+  - Load standalone `index.html` directly from disk.
+  - Apply Classic Source and verify a source-like still render is nonblank.
+  - Apply Modern Studio and verify Live Raytrace renders with modern indicators.
+  - Test drag orbit, Shift/right-drag pan, wheel dolly, Scene Edit movement, Scene Edit depth movement, and reset camera.
+  - Start Live playback and confirm reconstructed source frames advance with nonblank frames.
+  - Confirm buffered animation render/export still works.
+- Improve long animation progress reporting so frame index, source frame, elapsed time, and expected remaining time are clear during renders.
+- Add a side-by-side or overlay comparison mode for rendered frames versus historical reference frames.
+- Add material and lighting inspection controls without making source-like defaults ambiguous.
 
 ## Historical Accuracy
 
 - Decode or document the `movie.data` and `movie2.data` compressed HAM movie formats.
 - Extract the full 24-frame historical movie sequence into a committed test/reference fixture if licensing and bundle size remain acceptable.
-- Continue fitting the reconstructed juggling motion frame-by-frame against the historical frames.
+- Continue fitting the reconstructed juggling motion frame-by-frame against historical frames.
 - Continue refining robot body pose, hand timing, and ball arcs until key frames match the source output more closely.
-- Add a side-by-side or overlay comparison mode for rendered frames versus historical reference frames.
-- Preserve evidence for every source-truth decision in code comments or documentation.
+- Preserve evidence for every source-truth decision in code comments, documentation, or reference fixtures.
 
-## Rendering
+## Rendering Fidelity And Performance
 
 - Continue validating camera setup, sphere hierarchy, material IDs, lighting, and reflections against known original frames.
-- Continue improving measured frame latency and deeper render telemetry.
-- Continue tuning non-source soft shadows, contact AO, depth of field, and motion blur against browser performance budgets.
-- Investigate a WASM or direct C-port path for stricter renderer parity.
+- Add measured render latency telemetry for still renders, live renders, and animation renders.
+- Tune non-source soft shadows, contact AO, depth of field, and motion blur against browser performance budgets.
+- Investigate a WASM or direct C-port path only if stricter renderer parity becomes more valuable than TypeScript maintainability.
 
-## Animation
+## Animation, Export, And Data
 
 - Use structured manifests to drive future source-frame comparison and motion-fitting tools.
-- Add GIF export if a browser-compatible encoder is introduced.
-- Add batch PNG export packaging once archive/zip support is added.
+- Define a future JSON scene format only after there is a concrete import/export workflow that needs it.
+- Add import/export tools for reconstructed motion keyframes if motion fitting starts happening outside source code.
+- Add validation errors that explain malformed `.dat` scene or motion data.
 
-## Scene And Data Formats
+## Deferred Or Probably Not Worth It Yet
 
-- Keep supporting original `.dat` files.
-- Define a future JSON scene format for explicit geometry, materials, lamps, cameras, and animation tracks.
-- Add import/export tools for reconstructed motion keyframes.
-- Add validation errors that explain malformed scene or motion data.
-
-## UI
-
-- Add material and lighting inspection controls without making source-like defaults ambiguous.
-- Improve progress reporting for long animation renders.
-- Keep the standalone file-load workflow intact.
-
-## Validation Targets
-
-- Match a known original Juggler frame visually at 320 x 200.
-- Render a 24-frame juggling cycle without crashes.
-- Render a 360-frame orbit animation without crashes.
-- Export browser-supported WebM successfully.
-- Keep `npm test` passing after every source change.
-- Keep `npm run build:single` producing a file-loadable `index.html`.
-
-## Longer-Term Research
-
-- WebGPU renderer.
-- Full forensic port of the original Amiga/C/BASIC render path.
-- Original HAM movie decoder in TypeScript.
-- Data-driven reconstruction of the original animation pipeline.
-- Additional historical scenes and comparison pages.
+- GIF export: defer unless a browser-compatible encoder is introduced and users need GIF specifically.
+- Batch PNG zip packaging: defer until archive/zip support is already present for another reason.
+- WebGPU renderer: research only after CPU/WASM parity and UX work stop being higher leverage.
+- Additional historical scenes and comparison pages: keep as a later content project, not core reconstruction work.

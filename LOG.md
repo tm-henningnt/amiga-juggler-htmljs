@@ -760,3 +760,13 @@ npm run build:single
 ```
 
 Browser smoke verification was attempted against the generated standalone `index.html`, but browser automation was unavailable in this execution environment. No workaround browser path was used.
+
+## 2026-06-05: TODO Triage And Documentation Split
+
+The TODO file had become a mix of completed history, architecture notes, validation habits, and actual future work. This pass split those concerns back into the project docs:
+
+- Moved the current capability snapshot into `README.md`.
+- Added the experience preset and canvas-control model to `TECHNICAL.md`.
+- Removed completed foundations from `TODO.md`.
+- Reframed TODO as a forward-looking backlog with near-term priorities, historical accuracy work, rendering/performance work, animation/data work, and deferred ideas.
+- Marked GIF export, batch PNG zip packaging, WebGPU, and additional content pages as deferred until there is a stronger reason to prioritize them.

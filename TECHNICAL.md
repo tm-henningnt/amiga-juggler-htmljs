@@ -66,6 +66,28 @@ Live Raytrace playback is separate from buffered animation playback. It advances
 
 Modern effects are explicit non-source metadata. Classic Source applies disabled effect settings; Modern Studio enables conservative soft shadow and contact AO defaults while keeping DOF and motion blur available as advanced opt-ins.
 
+## UI And Experience Model
+
+The UI keeps a Workbench 1.3 inspired shell while separating the first-run flow from dense render controls.
+
+The primary command strip exposes:
+
+- Experience preset.
+- View mode.
+- Live playback.
+- Still render.
+- Abort.
+
+Detailed controls are grouped into collapsible Workbench windows for Scene, Camera, Render Details, Modern Effects, Animation, and Diagnostics.
+
+Experience presets are high-level defaults, not locked modes:
+
+- Classic Source selects still Raytrace, the reference/source-like profile, legacy quality, AA off, source camera, scanline CRT, and disabled modern effects.
+- Modern Studio selects Live Raytrace, modern RGB output, modern quality, adaptive AA, editable orbit/free camera behavior, soft-glow CRT, and conservative non-source effects.
+- Any manual advanced edit marks the experience as Custom.
+
+Canvas interaction follows a standard viewport model. Normal mode uses drag to orbit, Shift/right-drag to pan, and wheel to dolly. Scene Edit mode uses click/drag for group movement in the view plane and Shift-drag for view-depth movement.
+
 ## Module Layout
 
 - `src/types.ts` defines shared scene, render, camera, animation, and motion contracts.

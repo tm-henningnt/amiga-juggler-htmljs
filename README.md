@@ -31,12 +31,25 @@ The file is self-contained. It can be loaded directly from disk and does not req
 From the browser UI you can:
 
 - Render the recovered Juggler, elephant, and dragon scenes.
-- Switch between source-like and modern render profiles.
+- Switch between Classic Source, Modern Studio, and Custom experience settings.
+- Choose source-like HAM output, modern RGB output, display constraints, render quality, and CRT display modes.
 - Inspect the reconstructed juggling motion frame by frame.
+- Use Live Raytrace playback for reconstructed source-frame animation without pre-rendering buffered frames.
+- Orbit, pan, dolly, and temporarily edit scene groups from the canvas.
 - Render still frames or animation ranges.
 - Play back buffered animation frames.
 - Export frames, video where the browser supports it, and structured animation metadata.
 - Load another compatible `.dat` scene file from disk.
+
+## Current Capabilities
+
+- Original `robot.dat`, `ele.dat`, and `dragon.dat` scene parsing and standalone loading.
+- Source-like and modern render profiles, including explicit source-quirk study mode.
+- Reconstructed 24-frame juggling motion with ball, wrist, clearance, and source-frame metadata.
+- Camera paths, source-cycle presets, timeline scrubbing, and animation manifests.
+- BVH-accelerated CPU raytracing, worker-backed still renders, live raytraced previews, and modern AA.
+- Optional non-source soft shadows, contact ambient occlusion, depth of field, and live motion blur.
+- Workbench 1.3 inspired UI with collapsible control windows and a compact command strip.
 
 ## Documentation
 
