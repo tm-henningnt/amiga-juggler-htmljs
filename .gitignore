@@ -3,6 +3,7 @@ dist/
 dist-test/
 dist-calibration/
 tmp/
+reference/
 CLAUDE.md
 .impeccable.md
 .playwright-cli/

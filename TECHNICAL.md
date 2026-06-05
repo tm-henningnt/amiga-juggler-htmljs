@@ -29,6 +29,8 @@ The original recovered scene descriptions are static. Juggler motion is reconstr
 
 The project keeps source-derived constants and reconstruction notes close to the motion code so future fitting work can be audited.
 
+The optional local `reference/` directory is ignored. It is intended for archival source/media checkouts used by the analysis scripts, while checked-in fixtures such as `src/reference-frames.ts` keep the standalone app reproducible without committing third-party archive contents.
+
 `scripts/extract-reference-frames.mjs` extracts the first 24 frames from the best local historical movie source and writes `src/reference-frames.ts` as embedded PNG data URLs. It prefers `reference/Eric-Graham-1987-Juggler-Raytracer-1.0/media/juggler.avi`, the archived 320 x 200 AVI conversion, then falls back to local MP4 copies. The generated fixture is checked in so the standalone HTML can compare against historical frames without fetching external assets.
 
 `scripts/probe-movie-data.mjs` verifies recovered `movie.data` and `movie2.data` headers when the local `reference/` archive is present. Both payloads report 24 frames at 320 x 200 with the same 16-entry raw 4-bit RGB palette. The script intentionally stops at header/palette/payload-size inspection; decoding the compressed HAM frame payload remains future work.
