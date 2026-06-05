@@ -17,6 +17,17 @@ namespace Juggler.Tests {
     return world.spheres.filter((sphere) => sphere.groupIndex === groupIndex);
   }
 
+  function legBendDistance(world: World, groupIndex: number): number {
+    const spheres = groupSpheres(world, groupIndex);
+    const hip = spheres[0].position;
+    const knee = spheres[6].position;
+    const foot = spheres[spheres.length - 1].position;
+    const hipToFoot = Math3.sub(foot, hip);
+    const t = Math.max(0, Math.min(1, Math3.dot(Math3.sub(knee, hip), hipToFoot) / Math3.dot(hipToFoot, hipToFoot)));
+    const onStraightLeg = Math3.add(hip, Math3.mul(hipToFoot, t));
+    return Math3.length(Math3.sub(knee, onStraightLeg));
+  }
+
   function testRobotParser(): void {
     const scene = parse("robot");
     const world = Scenes.buildWorld(scene);
@@ -275,10 +286,11 @@ namespace Juggler.Tests {
     assert(Math.abs(groupSpheres(frame6, 3)[0].position[1] - groupSpheres(frame0, 3)[0].position[1]) > 0.15, "head sways with animated hips");
     assert(Math.abs(groupSpheres(frame12, 8)[0].position[2] - groupSpheres(frame0, 8)[0].position[2]) > 0.12, "torso bobs over the cycle");
     assert(Math3.length(Math3.sub(groupSpheres(frame6, 12)[0].position, groupSpheres(frame0, 12)[0].position)) > 0.1, "left shoulder follows torso pose");
-    assert(Math3.length(Math3.sub(groupSpheres(frame12, 9)[0].position, groupSpheres(frame0, 9)[0].position)) > 0.1, "left hip follows torso pose");
-    const leftFoot0 = groupSpheres(frame0, 9)[groupSpheres(frame0, 9).length - 1];
-    const leftFoot6 = groupSpheres(frame6, 9)[groupSpheres(frame6, 9).length - 1];
-    close(Math3.length(Math3.sub(leftFoot6.position, leftFoot0.position)), 0, 1e-9, "left foot remains planted");
+    assert(Math3.length(Math3.sub(groupSpheres(frame12, 9)[0].position, groupSpheres(frame0, 9)[0].position)) > 0.1, "character right hip follows torso pose");
+    const characterRightFoot0 = groupSpheres(frame0, 9)[groupSpheres(frame0, 9).length - 1];
+    const characterRightFoot6 = groupSpheres(frame6, 9)[groupSpheres(frame6, 9).length - 1];
+    close(Math3.length(Math3.sub(characterRightFoot6.position, characterRightFoot0.position)), 0, 1e-9, "character right foot remains planted");
+    assert(legBendDistance(frame12, 10) < legBendDistance(frame12, 9) * 0.5, "character left leg stays straighter than right leg at hip dip");
 
     const rawPoint = Motion.rawSourcePathPoint(0);
     const renderedPoint = Motion.sourcePathPoint(0);

@@ -18,8 +18,8 @@ namespace Juggler.Motion {
   const RIGHT_EYE_GROUP = 6;
   const NECK_GROUP = 7;
   const TORSO_GROUP = 8;
-  const LEFT_LEG_GROUP = 9;
-  const RIGHT_LEG_GROUP = 10;
+  const CHARACTER_RIGHT_LEG_GROUP = 9;
+  const CHARACTER_LEFT_LEG_GROUP = 10;
   const LEFT_ARM_GROUP = 12;
   const RIGHT_ARM_GROUP = 11;
   const BODY_COLLISION_GROUPS = [3, 4, 5, 6, 7, 8];
@@ -38,8 +38,10 @@ namespace Juggler.Motion {
   const LEG_SIDE = 0.6;
   const ARM_UPPER_LENGTH = 1.25;
   const ARM_LOWER_LENGTH = 1.35;
-  const LEG_UPPER_LENGTH = 1.43;
-  const LEG_LOWER_LENGTH = 1.62;
+  const CHARACTER_RIGHT_LEG_UPPER_LENGTH = 1.43;
+  const CHARACTER_RIGHT_LEG_LOWER_LENGTH = 1.62;
+  const CHARACTER_LEFT_LEG_UPPER_LENGTH = 1.2;
+  const CHARACTER_LEFT_LEG_LOWER_LENGTH = 1.55;
 
   type BallArc = "high" | "low";
 
@@ -339,8 +341,8 @@ namespace Juggler.Motion {
     scene.groups[RIGHT_EYE_GROUP].controls = [
       { center: bodyPoint(pose, HEAD_OFFSET, -0.2, -0.4), radius: 0.15, interpolationFromPrevious: null }
     ];
-    scene.groups[LEFT_LEG_GROUP].controls = legControls(1, pose);
-    scene.groups[RIGHT_LEG_GROUP].controls = legControls(-1, pose);
+    scene.groups[CHARACTER_RIGHT_LEG_GROUP].controls = legControls(1, pose);
+    scene.groups[CHARACTER_LEFT_LEG_GROUP].controls = legControls(-1, pose);
   }
 
   function bodyPose(sourceFrame: number): BodyPose {
@@ -368,7 +370,12 @@ namespace Juggler.Motion {
   function legControls(side: -1 | 1, pose: BodyPose): SphereControl[] {
     const hip = bodyPoint(pose, HIP_SOCKET_OFFSET, side * LEG_SIDE, 0);
     const foot: Vec3 = side > 0 ? [-0.4, 0.6, 0] : [0.4, -0.6, 0];
-    const knee = solveTwoBone(hip, foot, side > 0 ? [-1, 0, -0.2] : [1, 0, -0.2], LEG_UPPER_LENGTH, LEG_LOWER_LENGTH);
+    const upperLength = side > 0 ? CHARACTER_RIGHT_LEG_UPPER_LENGTH : CHARACTER_LEFT_LEG_UPPER_LENGTH;
+    const lowerLength = side > 0 ? CHARACTER_RIGHT_LEG_LOWER_LENGTH : CHARACTER_LEFT_LEG_LOWER_LENGTH;
+    // The source-facing character's left leg is the screen-right leg. Meatfighter's
+    // reconstruction notes call it almost straight, so keep that planted leg from
+    // taking the same visible knee bend as the character's right leg.
+    const knee = solveTwoBone(hip, foot, side > 0 ? [-1, 0, -0.2] : [1, 0, -0.2], upperLength, lowerLength);
     return [
       { center: hip, radius: 0.2, interpolationFromPrevious: null },
       { center: knee, radius: 0.2, interpolationFromPrevious: 6 },

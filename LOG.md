@@ -660,6 +660,7 @@ Verification:
 
 ```bash
 npm test
+npm run build:single
 ```
 
 The test suite now renders the same modern RGB frame through brute-force rows, BVH rows, and BVH tiles, then asserts the pixel buffers match exactly while BVH performs fewer sphere tests.
@@ -823,4 +824,27 @@ Verification:
 
 ```bash
 npm test
+npm run build:single
+```
+
+## 2026-06-05: Anatomical Left-Leg Pose Correction
+
+The screen-right leg is the character's anatomical left leg because the robot faces the source camera. A visual review showed that this leg read as bending backward during the reconstructed hip bob.
+
+Source validation:
+
+- `robot.dat` group 10 is the screen-right planted leg.
+- Meatfighter's reconstruction notes describe the juggler as standing with his right foot forward and left foot back, with the left leg almost straight while the right knee is slightly bent.
+
+Implemented changes:
+
+- Renamed the animated leg constants around anatomical right/left instead of misleading internal screen names.
+- Gave the anatomical-left/screen-right leg separate effective IK lengths so it remains nearly straight during the hip bob.
+- Added a regression test asserting the anatomical left leg stays much straighter than the anatomical right leg at the mid-cycle hip dip.
+
+Verification:
+
+```bash
+npm test
+npm run build:single
 ```
