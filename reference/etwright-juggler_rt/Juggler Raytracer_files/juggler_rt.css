@@ -1,0 +1,32 @@
+#header {
+   line-height: 1.0em;
+   font-size: 1.0em;
+   background: #d8d8d8 url(images/kickstart2.jpg) no-repeat right top;
+}
+
+#canvas_div {
+   width: 640px;
+   height: 480px;
+   margin-left: auto;
+   margin-right: auto;
+   background-color: #f0f0f0;
+   line-height: 1.0em;
+}
+
+body {
+   min-width: 1040px;
+}
+
+#img_diffscene {
+   float: right;
+   width: 276px;
+   margin-left: 10px;
+   margin-top: 0.5em;
+}
+
+#img_shadow {
+   float: right;
+   width: 400px;
+   margin-left: 10px;
+   margin-top: 0.5em;
+}

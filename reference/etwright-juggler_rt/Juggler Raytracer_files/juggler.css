@@ -1,0 +1,242 @@
+body {
+   font-family: Georgia, Utopia, 'Liberation Serif', serif;
+   background-color: #fff;
+   color: #444;
+   text-decoration: none;
+   word-spacing: normal;
+   text-align: left;
+   letter-spacing: 0;
+   line-height: 1.4em;
+   font-size: 1em;
+   margin: 0;
+   padding: 0;
+}
+
+a:link, a:visited, a:hover, a:active {
+   text-decoration: none;
+   border-bottom: 1px dotted;
+}
+
+a:link {
+   color: #601;
+}
+
+a:visited {
+   color: #281;
+}
+
+a:hover {
+   color: #000;
+   background-color: #ffa;
+}
+
+#header {
+   font-family: Georgia, Utopia, 'Liberation Serif', serif;
+   color: #000;
+   word-spacing: 0.05em;
+   text-align: left;
+   letter-spacing: -0.05em;
+   line-height: 1.1em;
+   font-size: 1.4em;
+   padding-left: 10%;
+   padding-right: 400px;
+   padding-top: 0.25em;
+   padding-bottom: 0.25em;
+   background: #d8d8d8 url(images/kickstart.jpg) no-repeat right top;
+}
+
+#main {
+   margin-left: 10%;
+   margin-right: 30%;
+}
+
+#nav {
+   float: right;
+   width: 15%;
+   margin-top: 7em;
+   margin-right: 10%;
+   padding-left: 16px;
+   padding-right: 16px;
+   border-style: solid;
+   border-width: 1px;
+   border-color: #bbb;
+}
+
+#nav ul {
+   list-style: none;
+   margin-left: 0;
+   padding-left: 0;
+   padding-bottom: 1em;
+   border-bottom-style: dashed;
+   border-color: #bbb;
+   border-width: 1px;
+}
+
+#nav li {
+   padding-bottom: 0.5em;
+}
+
+#nav_global {
+   font-variant: small-caps;
+   letter-spacing: 1px;
+}
+
+.imgflt {
+   font-family: Arial, Helvetica, 'Nimbus Sans L', sans-serif;
+   text-align: center;
+   font-size: 0.75em;
+   line-height: 1.4em;
+}
+   
+h1 {
+   font-family: Georgia, Utopia, 'Liberation Serif', serif;
+   font-weight: normal;
+   color: #000;
+   line-height: 1.5em;
+   font-size: 2em;
+   text-align: center;
+}
+
+h2 {
+   font-family: Arial, Helvetica, 'Nimbus Sans L', sans-serif;
+   font-weight: bold;
+   color: #000;
+   text-align: left;
+   line-height: 1.1em;
+   font-size: 1em;
+   padding-top: 1em;
+}
+
+#img_amigaworld {
+   float: left;
+   width: 200px;
+   margin-right: 10px;
+   margin-top: 0.5em;
+}
+
+#img_whitted {
+   float: right;
+   width: 200px;
+   margin-left: 10px;
+   margin-top: 4px;
+}
+
+#img_adam {
+   float: left;
+   width: 160px;
+   margin-right: 10px;
+   margin-top: 4px;
+}
+
+#img_friden {
+   float: left;
+   width: 100px;
+   margin-right: 10px;
+   margin-top: 4px;
+}
+
+#img_friden a {
+   text-decoration: none;
+   border: 0 none;
+}
+
+#player_wrapper {
+   float: left;
+   width: 276px;
+   margin-right: 10px;
+   margin-top: 4px;
+   margin-bottom: 4px;
+}
+
+#email blockquote {
+   color: #222;
+   background: #e8f4ff url(images/at.png) no-repeat right top;
+   padding-left: 1em;
+   padding-right: 1em;
+   padding-top: 0.5em;
+   padding-bottom: 0.5em;
+   margin: 0;
+}
+
+#readme pre {
+   color: #000;
+   background: #f0f0f0 url(images/juglicon.gif) no-repeat right top;
+   line-height: 1.25em;
+}
+
+#introscr pre {
+   color: #ddd;
+   background-color: #35a;
+   line-height: 1.25em;
+}
+
+.redbit {
+   color: #f00;
+   font-weight: bold;
+}
+
+.filetable th, td {
+   padding-left: 2em;
+   padding-right: 2em;
+}
+
+#hamtable {
+   width: 80%;
+   margin-left: auto;
+   margin-right: auto;
+}
+
+#hamtable th, td {
+   padding-right: 2em;
+}
+
+#img_delta {
+   float: right;
+   width: 180px;
+   margin-left: 10px;
+   margin-top: 4px;
+}
+
+.dblbuf {
+   float: left;
+   width: 140px;
+   height: 284px;
+   margin: 10px;
+   padding-right: 120px;
+   padding-top: 4px;
+   padding-left: 8px;
+   font-family: Arial, Helvetica, 'Nimbus Sans L', sans-serif;
+   text-align: left;
+   font-size: 0.75em;
+   line-height: 1.4em;
+   border-left-style: solid;
+   border-right-style: none;
+   border-top-style: solid;
+   border-bottom-style: none;
+   border-color: #ddd;
+   border-width: 1px;
+}
+
+#dblbuf1 {
+   background: #fff url(images/dblbuf1.jpg) no-repeat right top;
+}
+
+#dblbuf2 {
+   background: #fff url(images/dblbuf2.jpg) no-repeat right top;
+}
+
+#dblbuf3 {
+   background: #fff url(images/dblbuf3.jpg) no-repeat right top;
+}
+
+#dblbuf4 {
+   background: #fff url(images/dblbuf4.jpg) no-repeat right top;
+}
+
+#copyright {
+   padding-top: 2em;
+   text-align: center;
+   font-size: 0.75em;
+}
+
+
