@@ -274,7 +274,7 @@ namespace Juggler.App {
       animationCyclePresetSelect.appendChild(option);
     }
     animationPathSelect.value = Animation.defaultSettings().pathId;
-    animationCameraPresetSelect.value = "custom";
+    animationCameraPresetSelect.value = "source-camera";
     animationCyclePresetSelect.value = "full-cycle";
     referenceFrameInput.min = "1";
     referenceFrameInput.max = String(ReferenceFrames.COUNT);
@@ -505,9 +505,12 @@ namespace Juggler.App {
     if (preset.useSourceCamera) {
       freeCameraPose = null;
     }
-    if (preset.id === "modern-studio" && active && Motion.supportsMotion(active.parsed, "juggler-reconstructed")) {
+    if (active && Motion.supportsMotion(active.parsed, "juggler-reconstructed")) {
       sceneMotionSelect.value = "juggler-reconstructed";
       refreshMotionFrameBounds();
+    }
+    if (preset.id === "classic-source") {
+      applyClassicAnimationDefaults();
     }
     sceneEditModeInput.checked = false;
     setFlyMode(false, false);
@@ -2168,6 +2171,16 @@ namespace Juggler.App {
     resetAnimationBuffer();
     refreshAnimationFacts();
     setStatus(`${cyclePresetLabel(presetId)} preset applied.`);
+  }
+
+  function applyClassicAnimationDefaults(): void {
+    const settings = Animation.applyCyclePreset(
+      Animation.applyCameraPreset(Animation.defaultSettings(), "source-camera"),
+      "full-cycle"
+    );
+    writeAnimationSettings(settings);
+    animationCameraPresetSelect.value = "source-camera";
+    animationCyclePresetSelect.value = "full-cycle";
   }
 
   function writeAnimationSettings(settings: CameraPathSettings): void {

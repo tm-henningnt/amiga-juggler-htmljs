@@ -1576,10 +1576,13 @@ var Juggler;
     var MotionData;
     (function (MotionData) {
         MotionData.BALL_PLANE_X = -2.0;
-        MotionData.LEFT_HAND_BALL_CENTER = [MotionData.BALL_PLANE_X, 1.45, 4.05];
-        MotionData.RIGHT_HAND_BALL_CENTER = [MotionData.BALL_PLANE_X, -1.45, 4.05];
-        MotionData.HIGH_ARC_APEX_Z = 7.0;
-        MotionData.LOW_ARC_APEX_Z = 4.85;
+        // Tuned with scripts/classic-calibration.mjs against the archival 320 x 200
+        // juggler.avi. The constrained fit lowers the cascade while preserving
+        // positive ball/body and ball/ball clearance.
+        MotionData.LEFT_HAND_BALL_CENTER = [MotionData.BALL_PLANE_X, 1.45, 3.75];
+        MotionData.RIGHT_HAND_BALL_CENTER = [MotionData.BALL_PLANE_X, -1.45, 3.75];
+        MotionData.HIGH_ARC_APEX_Z = 6.475;
+        MotionData.LOW_ARC_APEX_Z = 4.325;
         // These points came from the 24 manually labeled historical movie frames.
         // They are kept as source-screen evidence. The rendered motion now uses the
         // ballistic cascade constants above because the fixed-depth screen fit caused
@@ -3408,7 +3411,7 @@ var Juggler;
                 label: "Classic Source",
                 previewMode: "raytrace",
                 profileId: "reference",
-                displayConstraintId: "ham6-approx",
+                displayConstraintId: "rgb",
                 qualityId: "legacy",
                 antiAliasMode: "off",
                 maxDepth: 4,
@@ -4279,10 +4282,13 @@ var Juggler;
     var MotionData;
     (function (MotionData) {
         MotionData.BALL_PLANE_X = -2.0;
-        MotionData.LEFT_HAND_BALL_CENTER = [MotionData.BALL_PLANE_X, 1.45, 4.05];
-        MotionData.RIGHT_HAND_BALL_CENTER = [MotionData.BALL_PLANE_X, -1.45, 4.05];
-        MotionData.HIGH_ARC_APEX_Z = 7.0;
-        MotionData.LOW_ARC_APEX_Z = 4.85;
+        // Tuned with scripts/classic-calibration.mjs against the archival 320 x 200
+        // juggler.avi. The constrained fit lowers the cascade while preserving
+        // positive ball/body and ball/ball clearance.
+        MotionData.LEFT_HAND_BALL_CENTER = [MotionData.BALL_PLANE_X, 1.45, 3.75];
+        MotionData.RIGHT_HAND_BALL_CENTER = [MotionData.BALL_PLANE_X, -1.45, 3.75];
+        MotionData.HIGH_ARC_APEX_Z = 6.475;
+        MotionData.LOW_ARC_APEX_Z = 4.325;
         // These points came from the 24 manually labeled historical movie frames.
         // They are kept as source-screen evidence. The rendered motion now uses the
         // ballistic cascade constants above because the fixed-depth screen fit caused
@@ -6272,13 +6278,13 @@ var Juggler;
         Animation.sceneHasCameraPathData = sceneHasCameraPathData;
         function defaultSettings() {
             return {
-                pathId: "orbit-360",
+                pathId: "static",
                 frameCount: 24,
                 rangeStartFrame: 0,
                 rangeEndFrame: 23,
                 fps: 12,
-                startAngleDeg: 0,
-                endAngleDeg: 360,
+                startAngleDeg: 20,
+                endAngleDeg: 20,
                 orbitRadius: 10,
                 orbitHeight: 0,
                 dollyStartRadius: 14,
@@ -6369,7 +6375,8 @@ var Juggler;
                     displayConstraintId: first?.displayConstraintId ?? "rgb",
                     qualityId: first?.qualityId ?? "legacy",
                     antiAliasMode: first?.antiAliasMode ?? "off",
-                    modernEffects: Juggler.Experience.copyModernEffects(first?.modernEffects)
+                    modernEffects: Juggler.Experience.copyModernEffects(first?.modernEffects),
+                    classicCalibrationReference: isClassicCalibrationFrame(first) ? "juggler-avi-320x200" : null
                 },
                 animation: copyPathSettings(pathSettings),
                 motion: { ...motionSettings },
@@ -6569,10 +6576,166 @@ var Juggler;
                 radius: sample.radius
             }));
         }
+        function isClassicCalibrationFrame(frame) {
+            if (!frame) {
+                return false;
+            }
+            const effects = frame.modernEffects ?? Juggler.Experience.disabledModernEffects();
+            return frame.profileId === "reference" &&
+                frame.displayConstraintId === "rgb" &&
+                frame.qualityId === "legacy" &&
+                frame.antiAliasMode === "off" &&
+                !effects.softShadows.enabled &&
+                !effects.ambientOcclusion.enabled &&
+                !effects.depthOfField.enabled &&
+                !effects.motionBlur.enabled;
+        }
         function now() {
             return typeof performance !== "undefined" ? performance.now() : Date.now();
         }
     })(Animation = Juggler.Animation || (Juggler.Animation = {}));
+})(Juggler || (Juggler = {}));
+var Juggler;
+(function (Juggler) {
+    var Calibration;
+    (function (Calibration) {
+        Calibration.CLASSIC_REFERENCE = "juggler-avi-320x200";
+        Calibration.CLASSIC_WIDTH = 320;
+        Calibration.CLASSIC_HEIGHT = 200;
+        function sourceEquivalentPixelRay(observer, i, j) {
+            const y = (0.5 * observer.ny - j) * observer.py;
+            const x = (i - 0.5 * observer.nx) * observer.px;
+            const target = Juggler.Math3.add(Juggler.Math3.add(Juggler.Math3.add(Juggler.Math3.mul(observer.viewDir, observer.focalLength), Juggler.Math3.mul(observer.vhat, y)), Juggler.Math3.mul(observer.uhat, x)), observer.position);
+            return { origin: [...observer.position], direction: Juggler.Math3.sub(target, observer.position) };
+        }
+        Calibration.sourceEquivalentPixelRay = sourceEquivalentPixelRay;
+        function classicRenderOptions(overrides = {}) {
+            return {
+                profileId: "reference",
+                outputMode: "source-ham",
+                reflectionMode: "standard",
+                epsilon: Juggler.REFERENCE_EPSILON,
+                maxDepth: 4,
+                displayConstraintId: "rgb",
+                qualityId: "legacy",
+                antiAliasMode: "off",
+                modernEffects: Juggler.Experience.disabledModernEffects(),
+                acceleration: "bvh",
+                tileSize: 12,
+                ...overrides
+            };
+        }
+        Calibration.classicRenderOptions = classicRenderOptions;
+        function renderClassicFrame(scene, baseWorld, sourceFrame, options = classicRenderOptions()) {
+            const motionSettings = Juggler.Motion.supportsMotion(scene, "juggler-reconstructed")
+                ? { motionId: "juggler-reconstructed", sourceFrame: 0 }
+                : { motionId: "static", sourceFrame: 0 };
+            const world = Juggler.Motion.resolveWorld(scene, baseWorld, motionSettings, sourceFrame);
+            const observer = Juggler.Scenes.createObserver(scene, baseWorld, Calibration.CLASSIC_WIDTH, Calibration.CLASSIC_HEIGHT, {
+                enabled: false,
+                angleDeg: 0,
+                radius: 10
+            });
+            const renderer = new Juggler.Renderer.FrameRenderer(world, observer, options);
+            while (!renderer.done()) {
+                renderer.renderRows(1);
+            }
+            return {
+                data: new Uint8ClampedArray(renderer.data),
+                stats: { ...renderer.stats },
+                sourceFit: Juggler.Motion.sourceFitFrame(scene, world, sourceFrame)
+            };
+        }
+        Calibration.renderClassicFrame = renderClassicFrame;
+        function compareClassicFrame(rendered, reference, width, height, sourceFrame, sourceFit = null) {
+            const pixelCount = width * height;
+            let absolute = 0;
+            let squared = 0;
+            const renderMask = maskStats(rendered, width, height);
+            const referenceMask = maskStats(reference, width, height);
+            let intersection = 0;
+            let union = 0;
+            for (let pixel = 0; pixel < pixelCount; pixel += 1) {
+                const offset = pixel * 4;
+                for (let channel = 0; channel < 3; channel += 1) {
+                    const delta = rendered[offset + channel] - reference[offset + channel];
+                    absolute += Math.abs(delta);
+                    squared += delta * delta;
+                }
+                const renderForeground = renderMask.mask[pixel];
+                const referenceForeground = referenceMask.mask[pixel];
+                if (renderForeground && referenceForeground) {
+                    intersection += 1;
+                }
+                if (renderForeground || referenceForeground) {
+                    union += 1;
+                }
+            }
+            return {
+                sourceFrame,
+                meanAbsoluteError: absolute / Math.max(1, pixelCount * 3),
+                rootMeanSquareError: Math.sqrt(squared / Math.max(1, pixelCount * 3)),
+                foregroundOverlap: union ? intersection / union : 1,
+                framingError: centroidDistance(renderMask, referenceMask),
+                meanBallPixelError: sourceFit?.meanBallPixelError ?? null,
+                maxBallPixelError: sourceFit?.maxBallPixelError ?? null
+            };
+        }
+        Calibration.compareClassicFrame = compareClassicFrame;
+        function summarizeClassicFit(frames) {
+            const frameCount = frames.length;
+            const meanBallFrames = frames.filter((frame) => frame.meanBallPixelError !== null);
+            const maxBallFrames = frames.filter((frame) => frame.maxBallPixelError !== null);
+            return {
+                reference: Calibration.CLASSIC_REFERENCE,
+                frameCount,
+                meanAbsoluteError: mean(frames.map((frame) => frame.meanAbsoluteError)),
+                rootMeanSquareError: mean(frames.map((frame) => frame.rootMeanSquareError)),
+                foregroundOverlap: mean(frames.map((frame) => frame.foregroundOverlap)),
+                framingError: mean(frames.map((frame) => frame.framingError)),
+                meanBallPixelError: meanBallFrames.length ? mean(meanBallFrames.map((frame) => frame.meanBallPixelError ?? 0)) : null,
+                maxBallPixelError: maxBallFrames.length ? Math.max(...maxBallFrames.map((frame) => frame.maxBallPixelError ?? 0)) : null
+            };
+        }
+        Calibration.summarizeClassicFit = summarizeClassicFit;
+        function maskStats(data, width, height) {
+            const background = [data[0] ?? 0, data[1] ?? 0, data[2] ?? 0];
+            const mask = [];
+            let count = 0;
+            let sumX = 0;
+            let sumY = 0;
+            for (let y = 0; y < height; y += 1) {
+                for (let x = 0; x < width; x += 1) {
+                    const offset = (y * width + x) * 4;
+                    const distance = Math.abs(data[offset] - background[0]) +
+                        Math.abs(data[offset + 1] - background[1]) +
+                        Math.abs(data[offset + 2] - background[2]);
+                    const foreground = distance > 48;
+                    mask.push(foreground);
+                    if (foreground) {
+                        count += 1;
+                        sumX += x;
+                        sumY += y;
+                    }
+                }
+            }
+            return {
+                mask,
+                count,
+                centerX: count ? sumX / count : width / 2,
+                centerY: count ? sumY / count : height / 2
+            };
+        }
+        function centroidDistance(a, b) {
+            return Math.hypot(a.centerX - b.centerX, a.centerY - b.centerY);
+        }
+        function mean(values) {
+            if (!values.length) {
+                return 0;
+            }
+            return values.reduce((sum, value) => sum + value, 0) / values.length;
+        }
+    })(Calibration = Juggler.Calibration || (Juggler.Calibration = {}));
 })(Juggler || (Juggler = {}));
 var Juggler;
 (function (Juggler) {
@@ -6795,7 +6958,7 @@ var Juggler;
                 animationCyclePresetSelect.appendChild(option);
             }
             animationPathSelect.value = Juggler.Animation.defaultSettings().pathId;
-            animationCameraPresetSelect.value = "custom";
+            animationCameraPresetSelect.value = "source-camera";
             animationCyclePresetSelect.value = "full-cycle";
             referenceFrameInput.min = "1";
             referenceFrameInput.max = String(Juggler.ReferenceFrames.COUNT);
@@ -7023,9 +7186,12 @@ var Juggler;
             if (preset.useSourceCamera) {
                 freeCameraPose = null;
             }
-            if (preset.id === "modern-studio" && active && Juggler.Motion.supportsMotion(active.parsed, "juggler-reconstructed")) {
+            if (active && Juggler.Motion.supportsMotion(active.parsed, "juggler-reconstructed")) {
                 sceneMotionSelect.value = "juggler-reconstructed";
                 refreshMotionFrameBounds();
+            }
+            if (preset.id === "classic-source") {
+                applyClassicAnimationDefaults();
             }
             sceneEditModeInput.checked = false;
             setFlyMode(false, false);
@@ -8491,6 +8657,12 @@ var Juggler;
             resetAnimationBuffer();
             refreshAnimationFacts();
             setStatus(`${cyclePresetLabel(presetId)} preset applied.`);
+        }
+        function applyClassicAnimationDefaults() {
+            const settings = Juggler.Animation.applyCyclePreset(Juggler.Animation.applyCameraPreset(Juggler.Animation.defaultSettings(), "source-camera"), "full-cycle");
+            writeAnimationSettings(settings);
+            animationCameraPresetSelect.value = "source-camera";
+            animationCyclePresetSelect.value = "full-cycle";
         }
         function writeAnimationSettings(settings) {
             animationPathSelect.value = settings.pathId;

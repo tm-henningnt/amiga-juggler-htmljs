@@ -1,9 +1,12 @@
 namespace Juggler.MotionData {
   export const BALL_PLANE_X = -2.0;
-  export const LEFT_HAND_BALL_CENTER: Vec3 = [BALL_PLANE_X, 1.45, 4.05];
-  export const RIGHT_HAND_BALL_CENTER: Vec3 = [BALL_PLANE_X, -1.45, 4.05];
-  export const HIGH_ARC_APEX_Z = 7.0;
-  export const LOW_ARC_APEX_Z = 4.85;
+  // Tuned with scripts/classic-calibration.mjs against the archival 320 x 200
+  // juggler.avi. The constrained fit lowers the cascade while preserving
+  // positive ball/body and ball/ball clearance.
+  export const LEFT_HAND_BALL_CENTER: Vec3 = [BALL_PLANE_X, 1.45, 3.75];
+  export const RIGHT_HAND_BALL_CENTER: Vec3 = [BALL_PLANE_X, -1.45, 3.75];
+  export const HIGH_ARC_APEX_Z = 6.475;
+  export const LOW_ARC_APEX_Z = 4.325;
 
   // These points came from the 24 manually labeled historical movie frames.
   // They are kept as source-screen evidence. The rendered motion now uses the

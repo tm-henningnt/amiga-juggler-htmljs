@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "none",
-    "outFile": "dist-test/tests.js",
+    "outFile": "dist-calibration/juggler-calibration.js",
     "rootDir": "src",
     "ignoreDeprecations": "6.0",
     "strict": true,
@@ -29,7 +29,6 @@
     "src/viewport.ts",
     "src/live-playback.ts",
     "src/animation.ts",
-    "src/calibration.ts",
-    "src/tests.ts"
+    "src/calibration.ts"
   ]
 }

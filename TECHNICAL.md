@@ -33,6 +33,8 @@ The project keeps source-derived constants and reconstruction notes close to the
 
 `scripts/probe-movie-data.mjs` verifies recovered `movie.data` and `movie2.data` headers when the local `reference/` archive is present. Both payloads report 24 frames at 320 x 200 with the same 16-entry raw 4-bit RGB palette. The script intentionally stops at header/palette/payload-size inspection; decoding the compressed HAM frame payload remains future work.
 
+`scripts/classic-calibration.mjs` builds a small non-UI bundle, decodes the preferred archival movie with `ffmpeg`, renders the reconstructed 24-frame Juggler cycle at 320 x 200 through the Classic Source path, and prints per-frame comparison metrics. The harness is used to tune source-frame camera defaults, cascade ball height, source-fit bounds, and future renderer/lighting corrections against `juggler.avi`.
+
 Source-fit diagnostics are evidence-guided, not pixel-perfect. The reference movie frames have passed through conversion and recompression, so the app reports projected pixel error against the reference-derived ball anchors, camera/focal/aperture facts, physical clearance, hand contact, and leg-bend sanity instead of treating the encoded movie as an exact oracle. Ball error uses a best-assignment match between the three rendered balls and the three source anchors for each frame, avoiding false error spikes from arbitrary ball identity swaps in the image-derived reference.
 
 ## Rendering Pipeline
@@ -49,6 +51,7 @@ At a high level it supports:
 - Tile and time-budget rendering for line-order-safe modes.
 - Worker-backed still rendering with main-thread fallback.
 - Source-like HAM output and modern RGB output paths.
+- Classic Source uses the source-HAM render profile with a neutral RGB display constraint. This avoids applying an approximate HAM display pass on top of pixels that have already gone through the source-like HAM renderer.
 - Opt-in modern quality anti-aliasing.
 - Deterministic non-source soft shadows, contact ambient occlusion, and depth of field through `ModernEffectsSettings`.
 - Live motion-blur accumulation for source-frame playback.
@@ -66,7 +69,7 @@ Animation resolves two things for each frame:
 - Camera pose.
 - Scene pose.
 
-Camera motion can use static, orbit, dolly, arc, or custom keyframe paths. Scene motion for the juggler is reconstructed from source-frame phase data, ballistic ball arcs, Meatfighter-style body motion, and limb posing.
+Camera motion can use static, orbit, dolly, arc, or custom keyframe paths. The default animation camera is the recovered fixed source camera rather than an orbit, so Classic Source and a freshly opened standalone file begin from the same camera family as the historical movie. Scene motion for the juggler is reconstructed from source-frame phase data, ballistic ball arcs, Meatfighter-style body motion, and limb posing.
 
 Rendered animation frames retain metadata for inspection and export, including source-frame labels, camera pose, render profile, modern effects, ball positions, wrist positions, clearances, source-fit diagnostics, timing, and render statistics.
 
@@ -125,12 +128,14 @@ Scene Edit mode uses click/drag for group movement in the view plane and Shift-d
 - `src/viewport.ts` contains testable orbit, pan, dolly, and scene-edit drag math.
 - `src/live-playback.ts` contains source-frame advancement and stale-frame skipping logic for live playback.
 - `src/animation.ts` resolves camera paths, queues frame rendering, and builds animation manifests.
+- `src/calibration.ts` contains Classic Source calibration helpers that mirror Eric Graham's source pixel-ray math and compare rendered frames with archival movie frames.
 - `src/motion-data.ts` stores reconstruction constants and reference-derived screen anchors.
 - `src/motion.ts` resolves reconstructed juggler ball, body, limb, source-fit, and diagnostic motion.
 - `src/app.ts` wires the browser UI, rendering loop, playback, and export actions.
 - `scripts/build-single.mjs` inlines compiled JS and CSS into `index.html`.
 - `scripts/extract-reference-frames.mjs` regenerates the historical reference-frame fixture from the local archival movie, preferring `reference/.../media/juggler.avi`.
 - `scripts/probe-movie-data.mjs` inspects recovered `movie.data` and `movie2.data` headers without decoding the compressed frame payload.
+- `scripts/classic-calibration.mjs` compares the current Classic Source reconstruction with the archival 24-frame `juggler.avi`.
 
 ## Development
 
@@ -158,7 +163,13 @@ Build the standalone HTML file:
 npm run build:single
 ```
 
-Generated `dist/` and `dist-test/` files are ignored. The checked-in `index.html` should be rebuilt after meaningful source changes.
+Run the Classic Source calibration harness when the local archival movie is available:
+
+```bash
+npm run calibrate:classic
+```
+
+Generated `dist/`, `dist-test/`, and `dist-calibration/` files are ignored. The checked-in `index.html` should be rebuilt after meaningful source changes.
 
 ## Verification
 

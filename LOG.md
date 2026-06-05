@@ -928,3 +928,26 @@ git diff --check
 ```
 
 Browser automation was unavailable for this pass because the browser tool rejected further actions after the local diagnosis snapshot.
+
+## 2026-06-05: Classic Source Calibration Harness And Fixed-Camera Defaults
+
+The default animation/camera behavior was still biased toward an inspection orbit, which made the Classic Source experience start from the wrong family of views compared with the archival Juggler movie. The Classic Source display path also applied the source-HAM render profile and then an approximate HAM display constraint, effectively double-encoding the source-like output.
+
+Implemented changes:
+
+- Added a `Calibration` namespace with Eric Graham source-equivalent pixel-ray math, Classic Source render options, 24-frame render helpers, and frame/summary comparison metrics.
+- Added `scripts/classic-calibration.mjs` plus `npm run calibrate:classic` to build the non-UI calibration bundle, decode the local archival `juggler.avi` with `ffmpeg`, render all 24 Classic Source frames at 320 x 200, and print per-frame comparison metrics.
+- Changed Classic Source to use the source-HAM render profile with a neutral RGB display constraint so HAM-like output is not encoded twice.
+- Changed default animation settings and Classic Source preset application to use the fixed source camera and full reconstructed 24-frame source cycle instead of a 360 degree orbit.
+- Tuned the ballistic cascade constants against the archival movie while preserving positive ball/body and ball/ball clearance.
+- Recorded `classicCalibrationReference: "juggler-avi-320x200"` in Classic Source animation manifests.
+- Tightened tests so source-equivalent calibration rays match renderer pixel rays and the reconstructed ball fit stays within the current calibrated error bounds.
+
+Verification:
+
+```bash
+npm test
+npm run calibrate:classic
+```
+
+The calibration run used `reference/Eric-Graham-1987-Juggler-Raytracer-1.0/media/juggler.avi`. The 24-frame summary reported mean ball pixel error `24.04`, max ball pixel error `51.06`, foreground overlap `0.879`, and mean framing error `2.71` pixels. Whole-frame color error remains high because the available reference has conversion/compression history and the renderer is still a source-aware TypeScript reconstruction, not a direct C/HAM movie decoder.

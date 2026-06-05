@@ -11,6 +11,7 @@ namespace Juggler {
   export type PreviewMode = "raytrace" | "live-raytrace" | "wireframe" | "solid";
   export type DisplayConstraintId = "rgb" | "ocs-12bit" | "ehb-64" | "ham6-approx";
   export type ExperiencePresetId = "classic-source" | "modern-studio" | "custom";
+  export type ClassicCalibrationReference = "juggler-avi-320x200";
   export type GroupTransformState = Record<number, Vec3>;
   export type CameraPathId = "static" | "orbit-360" | "orbit-arc" | "dolly" | "custom-keyframes";
   export type CameraPresetId = "custom" | "source-camera" | "source-orbit" | "left-catch-arc" | "right-catch-arc" | "overhead-clearance" | "source-dolly";
@@ -277,6 +278,27 @@ namespace Juggler {
     maxLeftLegBendRatio: number | null;
   }
 
+  export interface ClassicFitFrame {
+    sourceFrame: number;
+    meanAbsoluteError: number;
+    rootMeanSquareError: number;
+    foregroundOverlap: number;
+    framingError: number;
+    meanBallPixelError: number | null;
+    maxBallPixelError: number | null;
+  }
+
+  export interface ClassicFitSummary {
+    reference: ClassicCalibrationReference;
+    frameCount: number;
+    meanAbsoluteError: number;
+    rootMeanSquareError: number;
+    foregroundOverlap: number;
+    framingError: number;
+    meanBallPixelError: number | null;
+    maxBallPixelError: number | null;
+  }
+
   export interface AnimationManifestDiagnostics {
     minBodyClearance: number;
     minBodyClearanceFrame: number;
@@ -325,6 +347,7 @@ namespace Juggler {
       qualityId: RenderQualityId;
       antiAliasMode: AntiAliasModeId;
       modernEffects: ModernEffectsSettings;
+      classicCalibrationReference: ClassicCalibrationReference | null;
     };
     animation: CameraPathSettings;
     motion: SceneMotionSettings;

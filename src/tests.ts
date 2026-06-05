@@ -135,7 +135,7 @@ namespace Juggler.Tests {
     const classic = Experience.byId("classic-source");
     assert(classic.previewMode === "raytrace", "classic uses still raytrace");
     assert(classic.profileId === "reference", "classic uses reference profile");
-    assert(classic.displayConstraintId === "ham6-approx", "classic uses source-like display");
+    assert(classic.displayConstraintId === "rgb", "classic avoids double HAM display encoding");
     assert(classic.qualityId === "legacy", "classic uses legacy quality");
     assert(classic.antiAliasMode === "off", "classic disables AA");
     assert(classic.useSourceCamera, "classic uses source camera");
@@ -192,6 +192,7 @@ namespace Juggler.Tests {
     settings.frameCount = 5;
     settings.orbitRadius = 10;
     settings.orbitHeight = 0;
+    settings.startAngleDeg = 0;
     const target = Scenes.sceneTarget(world);
     const first = Animation.evaluateCameraPath(scene, world, settings, 0);
     const middle = Animation.evaluateCameraPath(scene, world, settings, 2);
@@ -214,9 +215,10 @@ namespace Juggler.Tests {
 
   function testAnimationPresets(): void {
     const settings = Animation.defaultSettings();
+    assert(settings.pathId === "static", "default animation uses source camera");
     const sourceCamera = Animation.applyCameraPreset(settings, "source-camera");
     assert(sourceCamera.pathId === "static", "source camera preset selects static path");
-    assert(settings.pathId === "orbit-360", "camera preset does not mutate input settings");
+    assert(settings.pathId === "static", "camera preset does not mutate input settings");
 
     const overhead = Animation.applyCameraPreset(settings, "overhead-clearance");
     assert(overhead.pathId === "orbit-360", "overhead preset uses orbit");
@@ -229,6 +231,44 @@ namespace Juggler.Tests {
     assert(Motion.sourceFrameLabel(0).includes("apex"), "source frame label includes apex phase");
     assert(Motion.sourceFrameLabel(8).includes("left catch"), "source frame label includes left catch phase");
     assert(Motion.sourceRangeLabel({ motionId: "juggler-reconstructed", sourceFrame: 0 }, 0, 8, 24).includes("->"), "source range label spans frames");
+  }
+
+  function testClassicCalibration(): void {
+    const scene = parse("robot");
+    const world = Scenes.buildWorld(scene);
+    const observer = Scenes.createObserver(scene, world, Calibration.CLASSIC_WIDTH, Calibration.CLASSIC_HEIGHT, {
+      enabled: false,
+      angleDeg: 0,
+      radius: 10
+    });
+
+    for (const [x, y] of [[0, 0], [160, 100], [319, 199]]) {
+      const sourceRay = Calibration.sourceEquivalentPixelRay(observer, x, y);
+      const rendererRay = Renderer.pixelRay(observer, x, y);
+      close(sourceRay.origin[0], rendererRay.origin[0], 0, "source ray origin x");
+      close(sourceRay.origin[1], rendererRay.origin[1], 0, "source ray origin y");
+      close(sourceRay.origin[2], rendererRay.origin[2], 0, "source ray origin z");
+      close(sourceRay.direction[0], rendererRay.direction[0], 1e-12, "source ray direction x");
+      close(sourceRay.direction[1], rendererRay.direction[1], 1e-12, "source ray direction y");
+      close(sourceRay.direction[2], rendererRay.direction[2], 1e-12, "source ray direction z");
+    }
+
+    const same = new Uint8ClampedArray([
+      0, 0, 0, 255,
+      255, 255, 255, 255
+    ]);
+    const shifted = new Uint8ClampedArray([
+      0, 0, 0, 255,
+      238, 238, 238, 255
+    ]);
+    const exact = Calibration.compareClassicFrame(same, same, 2, 1, 0);
+    const changed = Calibration.compareClassicFrame(same, shifted, 2, 1, 1);
+    close(exact.meanAbsoluteError, 0, 0, "identical calibration frame has zero error");
+    assert(changed.meanAbsoluteError > 0, "changed calibration frame has positive error");
+    const summary = Calibration.summarizeClassicFit([exact, changed]);
+    assert(summary.reference === "juggler-avi-320x200", "classic calibration records reference");
+    assert(summary.frameCount === 2, "classic calibration summary counts frames");
+    assert(Number.isFinite(summary.rootMeanSquareError), "classic calibration summary is finite");
   }
 
   function testPreviewProjection(): void {
@@ -274,11 +314,11 @@ namespace Juggler.Tests {
     // one left-hand ball on the low arc, and one right-hand ball on the high arc.
     close(frame0.spheres[0].position[0], -2, 1e-9, "first ball cascade plane x");
     close(frame0.spheres[0].position[1], 0, 1e-9, "first ball apex y");
-    close(frame0.spheres[0].position[2], 7, 1e-9, "first ball apex z");
+    close(frame0.spheres[0].position[2], 6.475, 1e-9, "first ball apex z");
     close(frame0.spheres[1].position[1], 1.45, 1e-9, "second ball left hand y");
-    close(frame0.spheres[1].position[2], 4.05, 1e-9, "second ball left hand z");
+    close(frame0.spheres[1].position[2], 3.75, 1e-9, "second ball left hand z");
     close(frame0.spheres[2].position[1], -1.45, 1e-9, "third ball right hand y");
-    close(frame0.spheres[2].position[2], 4.05, 1e-9, "third ball right hand z");
+    close(frame0.spheres[2].position[2], 3.75, 1e-9, "third ball right hand z");
 
     const frame20 = Motion.resolveWorld(robot, robotWorld, { motionId: "juggler-reconstructed", sourceFrame: 0 }, 20);
     assert(Math.abs(frame20.spheres[0].position[2] - frame0.spheres[0].position[2]) > 1.0, "first ball descends across ballistic arc");
@@ -318,7 +358,8 @@ namespace Juggler.Tests {
     assert(fitSummary !== null, "source fit summary available");
     assert(fitSummary!.frameCount === Motion.SOURCE_FRAME_COUNT, "source fit summary covers full source cycle");
     assert(Number.isFinite(fitSummary!.meanBallPixelError), "source fit summary mean error is finite");
-    assert(fitSummary!.maxBallPixelError < 220, `source fit max ball error stays bounded, max ${fitSummary!.maxBallPixelError}`);
+    assert(fitSummary!.meanBallPixelError < 25, `source fit mean ball error stays calibrated, mean ${fitSummary!.meanBallPixelError}`);
+    assert(fitSummary!.maxBallPixelError < 55, `source fit max ball error stays calibrated, max ${fitSummary!.maxBallPixelError}`);
     assert(fitSummary!.maxHandContactError !== null && fitSummary!.maxHandContactError < 0.15, "source fit hand error tracks contact frames");
     assert(fitSummary!.maxLeftLegBendRatio !== null && fitSummary!.maxLeftLegBendRatio < 0.55, "source fit keeps character left leg straighter");
     assert(Motion.sourceFitSummary(robot, robotWorld, { motionId: "static", sourceFrame: 0 }) === null, "static motion has no source fit summary");
@@ -420,6 +461,7 @@ namespace Juggler.Tests {
     assert(manifest.render.displayConstraintId === "ehb-64", "manifest records display constraint");
     assert(manifest.render.qualityId === "legacy", "manifest records render quality");
     assert(manifest.render.antiAliasMode === "off", "manifest records anti-alias mode");
+    assert(manifest.render.classicCalibrationReference === null, "manifest does not mark non-classic display output as calibrated");
     assert(manifest.diagnostics?.sourceFit?.frameCount === renderer.frames.length, "manifest diagnostics summarize exported source-fit frames");
     assert(manifest.frames.length === renderer.frames.length, "manifest frame count");
     assert(manifest.frames[0].sourceFrameLabel.includes("apex"), "manifest source frame label");
@@ -430,6 +472,18 @@ namespace Juggler.Tests {
     assert(renderer.frames[0].motionBalls[0].position[0] !== 999, "manifest samples are defensive copies");
     manifest.frames[0].sourceFit!.balls[0].projectedPixel[0] = 999;
     assert(renderer.frames[0].sourceFit!.balls[0].projectedPixel[0] !== 999, "manifest source fit samples are defensive copies");
+
+    const classicFrames = renderer.frames.map((frame): RenderedFrame => ({ ...frame, displayConstraintId: "rgb" }));
+    const classicManifest = Animation.createManifest(
+      sceneSource,
+      world,
+      settings,
+      { motionId: "juggler-reconstructed", sourceFrame: 0 },
+      diagnostics,
+      classicFrames,
+      "2026-06-04T00:00:00.000Z"
+    );
+    assert(classicManifest.render.classicCalibrationReference === "juggler-avi-320x200", "manifest records classic calibration reference for exact classic output");
 
     const rangeSettings = Animation.defaultSettings();
     rangeSettings.pathId = "static";
@@ -720,6 +774,7 @@ namespace Juggler.Tests {
     testReferenceFrames();
     testAnimationPaths();
     testAnimationPresets();
+    testClassicCalibration();
     testPreviewProjection();
     testGroupTransforms();
     testSceneMotion();

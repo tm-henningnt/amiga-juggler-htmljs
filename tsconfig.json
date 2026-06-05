@@ -29,6 +29,7 @@
     "src/viewport.ts",
     "src/live-playback.ts",
     "src/animation.ts",
+    "src/calibration.ts",
     "src/app.ts"
   ]
 }

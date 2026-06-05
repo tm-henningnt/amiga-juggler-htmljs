@@ -68,13 +68,13 @@ namespace Juggler.Animation {
 
   export function defaultSettings(): CameraPathSettings {
     return {
-      pathId: "orbit-360",
+      pathId: "static",
       frameCount: 24,
       rangeStartFrame: 0,
       rangeEndFrame: 23,
       fps: 12,
-      startAngleDeg: 0,
-      endAngleDeg: 360,
+      startAngleDeg: 20,
+      endAngleDeg: 20,
       orbitRadius: 10,
       orbitHeight: 0,
       dollyStartRadius: 14,
@@ -193,7 +193,8 @@ namespace Juggler.Animation {
         displayConstraintId: first?.displayConstraintId ?? "rgb",
         qualityId: first?.qualityId ?? "legacy",
         antiAliasMode: first?.antiAliasMode ?? "off",
-        modernEffects: Experience.copyModernEffects(first?.modernEffects)
+        modernEffects: Experience.copyModernEffects(first?.modernEffects),
+        classicCalibrationReference: isClassicCalibrationFrame(first) ? "juggler-avi-320x200" : null
       },
       animation: copyPathSettings(pathSettings),
       motion: { ...motionSettings },
@@ -412,6 +413,21 @@ namespace Juggler.Animation {
       position: [...sample.position],
       radius: sample.radius
     }));
+  }
+
+  function isClassicCalibrationFrame(frame: RenderedFrame | undefined): boolean {
+    if (!frame) {
+      return false;
+    }
+    const effects = frame.modernEffects ?? Experience.disabledModernEffects();
+    return frame.profileId === "reference" &&
+      frame.displayConstraintId === "rgb" &&
+      frame.qualityId === "legacy" &&
+      frame.antiAliasMode === "off" &&
+      !effects.softShadows.enabled &&
+      !effects.ambientOcclusion.enabled &&
+      !effects.depthOfField.enabled &&
+      !effects.motionBlur.enabled;
   }
 
   function now(): number {

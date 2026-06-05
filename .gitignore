@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-test/
+dist-calibration/
 tmp/
 CLAUDE.md
 .impeccable.md

@@ -47,6 +47,8 @@ From the browser UI you can:
 - Source-like and modern render profiles, including explicit source-quirk study mode.
 - Reconstructed 24-frame juggling motion with ball, wrist, clearance, source-frame, and source-fit metadata.
 - Embedded 24-frame historical reference fixture generated from the archival 320 x 200 movie, with overlay and side-by-side comparison controls.
+- Classic Source defaults anchored to the recovered fixed camera, static source view, source-HAM render path, and archival `juggler.avi` calibration reference.
+- Local calibration harness for comparing all 24 Classic Source frames against the archival 320 x 200 movie.
 - Camera paths, source-cycle presets, timeline scrubbing, and animation manifests with per-frame source-fit diagnostics.
 - BVH-accelerated CPU raytracing, worker-backed still renders, live raytraced previews, and modern AA.
 - Optional non-source soft shadows, contact ambient occlusion, depth of field, and live motion blur.

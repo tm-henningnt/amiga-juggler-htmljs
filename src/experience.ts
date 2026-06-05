@@ -21,7 +21,7 @@ namespace Juggler.Experience {
       label: "Classic Source",
       previewMode: "raytrace",
       profileId: "reference",
-      displayConstraintId: "ham6-approx",
+      displayConstraintId: "rgb",
       qualityId: "legacy",
       antiAliasMode: "off",
       maxDepth: 4,
