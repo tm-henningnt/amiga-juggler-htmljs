@@ -157,6 +157,8 @@ namespace Juggler.App {
   const exportManifestButton = document.getElementById("exportManifest") as HTMLButtonElement;
   const canvas = document.getElementById("frame") as HTMLCanvasElement;
   const context = canvas.getContext("2d");
+  canvas.tabIndex = 0;
+  canvas.setAttribute("aria-label", "Rendered frame viewport");
 
   const sources = Scenes.builtInSceneSources();
   let active: ActiveScene;
@@ -861,6 +863,7 @@ namespace Juggler.App {
       return;
     }
     event.preventDefault();
+    focusCanvasForFlyView();
     const point = canvasCssPoint(event);
     const observer = createDisplayObserver(canvas.width || parseResolution()[0], canvas.height || parseResolution()[1]);
 
@@ -1184,6 +1187,7 @@ namespace Juggler.App {
         flyState.nextRenderAtMs = 0;
         flyState.rafId = window.requestAnimationFrame(flyTick);
       }
+      focusCanvasForFlyView();
       if (requestLock) {
         requestCanvasPointerLock();
       }
@@ -1209,8 +1213,13 @@ namespace Juggler.App {
       setStatus("Pointer lock is unavailable in this browser.");
       return;
     }
+    focusCanvasForFlyView();
     const result = canvas.requestPointerLock() as Promise<void> | undefined;
     result?.catch(() => setStatus("Click the render canvas to start mouse look."));
+  }
+
+  function focusCanvasForFlyView(): void {
+    canvas.focus({ preventScroll: true });
   }
 
   function handlePointerLockChange(): void {
@@ -1244,6 +1253,9 @@ namespace Juggler.App {
     const key = flyKey(event.code);
     if (!key) {
       return;
+    }
+    if (flyState.enabled && !isTypingTarget(event.target)) {
+      event.preventDefault();
     }
     flyState.keys[key] = false;
   }
@@ -1378,7 +1390,7 @@ namespace Juggler.App {
 
   function isTypingTarget(target: EventTarget | null): boolean {
     const element = target instanceof HTMLElement ? target : null;
-    return !!element && ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(element.tagName);
+    return !!element && Viewport.isFlyTextEntryTarget(element.tagName, element.isContentEditable);
   }
 
   function playLiveRaytrace(): void {

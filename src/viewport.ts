@@ -84,6 +84,10 @@ namespace Juggler.Viewport {
     };
   }
 
+  export function isFlyTextEntryTarget(tagName: string | null | undefined, isContentEditable = false): boolean {
+    return isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes((tagName ?? "").toUpperCase());
+  }
+
   export function sceneEditOffsetFromDrag(
     startOffset: Vec3,
     observer: Observer,

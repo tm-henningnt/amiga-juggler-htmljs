@@ -6141,6 +6141,10 @@ var Juggler;
             };
         }
         Viewport.flyPose = flyPose;
+        function isFlyTextEntryTarget(tagName, isContentEditable = false) {
+            return isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes((tagName ?? "").toUpperCase());
+        }
+        Viewport.isFlyTextEntryTarget = isFlyTextEntryTarget;
         function sceneEditOffsetFromDrag(startOffset, observer, dx, dy, depthMode, scale) {
             if (depthMode) {
                 return Juggler.Math3.add(startOffset, Juggler.Math3.mul(observer.viewDir, -dy * scale));
@@ -6678,6 +6682,8 @@ var Juggler;
         const exportManifestButton = document.getElementById("exportManifest");
         const canvas = document.getElementById("frame");
         const context = canvas.getContext("2d");
+        canvas.tabIndex = 0;
+        canvas.setAttribute("aria-label", "Rendered frame viewport");
         const sources = Juggler.Scenes.builtInSceneSources();
         let active;
         let abortToken = 0;
@@ -7336,6 +7342,7 @@ var Juggler;
                 return;
             }
             event.preventDefault();
+            focusCanvasForFlyView();
             const point = canvasCssPoint(event);
             const observer = createDisplayObserver(canvas.width || parseResolution()[0], canvas.height || parseResolution()[1]);
             if (flyState.enabled) {
@@ -7636,6 +7643,7 @@ var Juggler;
                     flyState.nextRenderAtMs = 0;
                     flyState.rafId = window.requestAnimationFrame(flyTick);
                 }
+                focusCanvasForFlyView();
                 if (requestLock) {
                     requestCanvasPointerLock();
                 }
@@ -7661,8 +7669,12 @@ var Juggler;
                 setStatus("Pointer lock is unavailable in this browser.");
                 return;
             }
+            focusCanvasForFlyView();
             const result = canvas.requestPointerLock();
             result?.catch(() => setStatus("Click the render canvas to start mouse look."));
+        }
+        function focusCanvasForFlyView() {
+            canvas.focus({ preventScroll: true });
         }
         function handlePointerLockChange() {
             flyState.pointerLocked = document.pointerLockElement === canvas;
@@ -7692,6 +7704,9 @@ var Juggler;
             const key = flyKey(event.code);
             if (!key) {
                 return;
+            }
+            if (flyState.enabled && !isTypingTarget(event.target)) {
+                event.preventDefault();
             }
             flyState.keys[key] = false;
         }
@@ -7808,7 +7823,7 @@ var Juggler;
         }
         function isTypingTarget(target) {
             const element = target instanceof HTMLElement ? target : null;
-            return !!element && ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(element.tagName);
+            return !!element && Juggler.Viewport.isFlyTextEntryTarget(element.tagName, element.isContentEditable);
         }
         function playLiveRaytrace() {
             if (!active) {

@@ -637,6 +637,12 @@ namespace Juggler.Tests {
     const risen = Viewport.flyPose(pose, { forward: 0, right: 0, up: 1 }, 0.25, 4);
     close(risen.position[2] - pose.position[2], 1, 1e-9, "fly up follows world up");
 
+    assert(!Viewport.isFlyTextEntryTarget("BUTTON", false), "fly keys work after toolbar button focus");
+    assert(!Viewport.isFlyTextEntryTarget("CANVAS", false), "fly keys work after canvas focus");
+    assert(Viewport.isFlyTextEntryTarget("INPUT", false), "fly keys leave inputs alone");
+    assert(Viewport.isFlyTextEntryTarget("TEXTAREA", false), "fly keys leave textareas alone");
+    assert(Viewport.isFlyTextEntryTarget("DIV", true), "fly keys leave editable elements alone");
+
     const editPlane = Viewport.sceneEditOffsetFromDrag([0, 0, 0], observer, 10, 0, false, 0.1);
     assert(Math.abs(Math3.dot(editPlane, observer.uhat)) > 0.9, "scene edit plane drag follows camera right");
     const editDepth = Viewport.sceneEditOffsetFromDrag([0, 0, 0], observer, 0, 10, true, 0.1);

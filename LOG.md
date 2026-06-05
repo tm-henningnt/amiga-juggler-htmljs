@@ -905,3 +905,26 @@ git diff --check
 ```
 
 Browser smoke reloaded the standalone `index.html` directly from disk and confirmed the embedded reference source is `juggler.avi`, the 320 x 200 render canvas is nonblank, source-fit data covers all 24 frames with three unique ball-anchor assignments, and no console messages are present.
+
+## 2026-06-05: Fly View Keyboard Focus Fix
+
+Diagnosis:
+
+- Fly View could be entered from the toolbar button or checkbox while that control retained browser focus.
+- `handleFlyKeyDown` treated buttons as typing targets, so WASD/QE keydown events were ignored even though pointer-lock mouse look still worked.
+
+Implemented changes:
+
+- Made the render canvas focusable and moved focus to it when Fly View starts, when pointer lock is requested, and when the canvas is clicked.
+- Kept fly key suppression for real text-entry controls and editable content, but no longer suppresses keys just because a toolbar button has focus.
+- Added regression assertions that fly keys are not suppressed for `BUTTON` or `CANVAS`, while `INPUT`, `TEXTAREA`, and editable elements remain protected.
+
+Verification:
+
+```bash
+npm test
+npm run build:single
+git diff --check
+```
+
+Browser automation was unavailable for this pass because the browser tool rejected further actions after the local diagnosis snapshot.
