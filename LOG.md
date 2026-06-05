@@ -874,3 +874,34 @@ npm run build:single
 ```
 
 Browser smoke opened the rebuilt standalone `index.html` directly from disk and confirmed the Classic Source canvas was nonblank, Source Fit diagnostics were populated, and no console messages were present after reload. A brief Live playback smoke confirmed a completed live render updates telemetry while stale frames are skipped instead of queued.
+
+## 2026-06-05: Archival Movie Calibration Pass
+
+The new local `reference/` material includes the recovered AlphaPixel archive, Ernie Wright material, Meatfighter reference material, the original 320 x 200 AVI conversion, and the compressed `movie.data` / `movie2.data` payloads.
+
+Findings:
+
+- The checked-in `src/original/robot.dat`, `ele.dat`, and `dragon.dat` match the recovered AlphaPixel archive copies byte for byte.
+- `juggler.avi` is the preferred frame fixture source because it is already 320 x 200, while `Juggler.mp4` is an upscaled transcode.
+- `movie.data` and `movie2.data` both report 24 frames at 320 x 200, share the same 16-entry raw 4-bit RGB palette, and contain compressed payloads averaging roughly 11 to 12 KB per frame.
+- Automated ball detection from converted movie frames is useful for inspection but not reliable enough for hard identity tracking when balls overlap hands/body or cross paths.
+
+Implemented changes:
+
+- Updated `scripts/extract-reference-frames.mjs` to prefer the local archival `juggler.avi`, while still accepting an explicit movie path and falling back to MP4 copies.
+- Regenerated `src/reference-frames.ts` from `juggler.avi` instead of the upscaled MP4.
+- Added `scripts/probe-movie-data.mjs` to verify recovered `movie.data` headers, dimensions, palette, and payload sizes without claiming to decode the compressed HAM frames.
+- Changed Source Fit ball comparison to choose the best assignment between the three rendered balls and three source anchors per frame, avoiding false error from arbitrary image-derived ball identity swaps.
+- Documented the updated reference workflow and moved the completed movie-header probe out of TODO.
+
+Verification:
+
+```bash
+node scripts/probe-movie-data.mjs
+node scripts/extract-reference-frames.mjs
+npm test
+npm run build:single
+git diff --check
+```
+
+Browser smoke reloaded the standalone `index.html` directly from disk and confirmed the embedded reference source is `juggler.avi`, the 320 x 200 render canvas is nonblank, source-fit data covers all 24 frames with three unique ball-anchor assignments, and no console messages are present.

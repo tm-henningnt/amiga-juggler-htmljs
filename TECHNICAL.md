@@ -29,11 +29,11 @@ The original recovered scene descriptions are static. Juggler motion is reconstr
 
 The project keeps source-derived constants and reconstruction notes close to the motion code so future fitting work can be audited.
 
-`scripts/extract-reference-frames.mjs` extracts the first 24 frames from `tmp/Juggler.mp4`, scales them to the source 320 x 200 frame, and writes `src/reference-frames.ts` as embedded PNG data URLs. The generated fixture is checked in so the standalone HTML can compare against historical frames without fetching external assets.
+`scripts/extract-reference-frames.mjs` extracts the first 24 frames from the best local historical movie source and writes `src/reference-frames.ts` as embedded PNG data URLs. It prefers `reference/Eric-Graham-1987-Juggler-Raytracer-1.0/media/juggler.avi`, the archived 320 x 200 AVI conversion, then falls back to local MP4 copies. The generated fixture is checked in so the standalone HTML can compare against historical frames without fetching external assets.
 
-`movie.data` and `movie2.data` are not present in this working tree. They remain historical archive inputs to investigate when the original recovered data files are available locally.
+`scripts/probe-movie-data.mjs` verifies recovered `movie.data` and `movie2.data` headers when the local `reference/` archive is present. Both payloads report 24 frames at 320 x 200 with the same 16-entry raw 4-bit RGB palette. The script intentionally stops at header/palette/payload-size inspection; decoding the compressed HAM frame payload remains future work.
 
-Source-fit diagnostics are evidence-guided, not pixel-perfect. The reference movie frames have passed through conversion and recompression, so the app reports projected pixel error against the reference-derived ball anchors, camera/focal/aperture facts, physical clearance, hand contact, and leg-bend sanity instead of treating the encoded movie as an exact oracle.
+Source-fit diagnostics are evidence-guided, not pixel-perfect. The reference movie frames have passed through conversion and recompression, so the app reports projected pixel error against the reference-derived ball anchors, camera/focal/aperture facts, physical clearance, hand contact, and leg-bend sanity instead of treating the encoded movie as an exact oracle. Ball error uses a best-assignment match between the three rendered balls and the three source anchors for each frame, avoiding false error spikes from arbitrary ball identity swaps in the image-derived reference.
 
 ## Rendering Pipeline
 
@@ -129,7 +129,8 @@ Scene Edit mode uses click/drag for group movement in the view plane and Shift-d
 - `src/motion.ts` resolves reconstructed juggler ball, body, limb, source-fit, and diagnostic motion.
 - `src/app.ts` wires the browser UI, rendering loop, playback, and export actions.
 - `scripts/build-single.mjs` inlines compiled JS and CSS into `index.html`.
-- `scripts/extract-reference-frames.mjs` regenerates the historical reference-frame fixture from `tmp/Juggler.mp4` when the source movie is available locally.
+- `scripts/extract-reference-frames.mjs` regenerates the historical reference-frame fixture from the local archival movie, preferring `reference/.../media/juggler.avi`.
+- `scripts/probe-movie-data.mjs` inspects recovered `movie.data` and `movie2.data` headers without decoding the compressed frame payload.
 
 ## Development
 

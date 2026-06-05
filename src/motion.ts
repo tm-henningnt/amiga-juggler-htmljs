@@ -53,6 +53,22 @@ namespace Juggler.Motion {
     oscillation: number;
   }
 
+  interface SourceFitAnchorCandidate {
+    referencePathIndex: number;
+    anchorPixel: [number, number];
+  }
+
+  interface SourceFitProjectedBall {
+    label: string;
+    groupIndex: number;
+    projectedPixel: [number, number];
+  }
+
+  interface SourceFitAssignment {
+    anchor: SourceFitAnchorCandidate;
+    pixelError: number;
+  }
+
   export interface MotionDiagnostics {
     minBodyClearance: number;
     minBodyClearanceFrame: number;
@@ -289,24 +305,39 @@ namespace Juggler.Motion {
 
     const normalizedFrame = Math.floor(mod(sourceFrame, SOURCE_FRAME_COUNT));
     const sourceObserver = sourceObserverFor(scene);
-    const balls = BALL_GROUPS.map((ball, index): SourceFitBallSample | null => {
+    const projectedBalls = BALL_GROUPS.map((ball, index): SourceFitProjectedBall | null => {
       const sphere = world.spheres.find((candidate) => candidate.groupIndex === ball.groupIndex);
       if (!sphere) {
         return null;
       }
-      const referencePathIndex = Math.floor(mod(normalizedFrame + SOURCE_ANCHOR_OFFSETS[index], SOURCE_FRAME_COUNT));
       const projectedPixel = projectWithObserver(sourceObserver, sphere.position);
-      const anchorPixel = projectWithObserver(sourceObserver, rawSourcePathPoint(referencePathIndex));
-      const pixelError = Math.hypot(projectedPixel[0] - anchorPixel[0], projectedPixel[1] - anchorPixel[1]);
       return {
         label: `ball ${index + 1}`,
         groupIndex: ball.groupIndex,
-        referencePathIndex,
-        projectedPixel,
-        anchorPixel,
-        pixelError
+        projectedPixel
       };
-    }).filter((sample): sample is SourceFitBallSample => sample !== null);
+    }).filter((sample): sample is SourceFitProjectedBall => sample !== null);
+
+    const anchorCandidates = SOURCE_ANCHOR_OFFSETS.map((offset): SourceFitAnchorCandidate => {
+      const referencePathIndex = Math.floor(mod(normalizedFrame + offset, SOURCE_FRAME_COUNT));
+      return {
+        referencePathIndex,
+        anchorPixel: projectWithObserver(sourceObserver, rawSourcePathPoint(referencePathIndex))
+      };
+    });
+
+    const assignments = assignSourceFitAnchors(projectedBalls, anchorCandidates);
+    const balls = projectedBalls.map((ball, index): SourceFitBallSample => {
+      const assignment = assignments[index];
+      return {
+        label: ball.label,
+        groupIndex: ball.groupIndex,
+        referencePathIndex: assignment.anchor.referencePathIndex,
+        projectedPixel: ball.projectedPixel,
+        anchorPixel: assignment.anchor.anchorPixel,
+        pixelError: assignment.pixelError
+      };
+    });
 
     const meanBallPixelError = balls.length
       ? balls.reduce((sum, sample) => sum + sample.pixelError, 0) / balls.length
@@ -680,6 +711,67 @@ namespace Juggler.Motion {
       angleDeg: 0,
       radius: 10
     });
+  }
+
+  function assignSourceFitAnchors(
+    projectedBalls: SourceFitProjectedBall[],
+    anchors: SourceFitAnchorCandidate[]
+  ): SourceFitAssignment[] {
+    if (!projectedBalls.length || !anchors.length) {
+      return [];
+    }
+
+    let bestCost = BIG;
+    let bestIndexes: number[] | null = null;
+
+    const search = (ballIndex: number, usedIndexes: number[], cost: number): void => {
+      if (cost >= bestCost) {
+        return;
+      }
+      if (ballIndex >= projectedBalls.length) {
+        bestCost = cost;
+        bestIndexes = [...usedIndexes];
+        return;
+      }
+
+      for (let anchorIndex = 0; anchorIndex < anchors.length; anchorIndex += 1) {
+        if (usedIndexes.includes(anchorIndex)) {
+          continue;
+        }
+        const error = sourceFitPixelError(projectedBalls[ballIndex].projectedPixel, anchors[anchorIndex].anchorPixel);
+        usedIndexes.push(anchorIndex);
+        search(ballIndex + 1, usedIndexes, cost + error);
+        usedIndexes.pop();
+      }
+    };
+
+    search(0, [], 0);
+
+    const indexes = bestIndexes ?? projectedBalls.map((ball) => nearestSourceFitAnchorIndex(ball, anchors));
+    return projectedBalls.map((ball, ballIndex): SourceFitAssignment => {
+      const anchor = anchors[indexes[ballIndex]] ?? anchors[0];
+      return {
+        anchor,
+        pixelError: sourceFitPixelError(ball.projectedPixel, anchor.anchorPixel)
+      };
+    });
+  }
+
+  function nearestSourceFitAnchorIndex(ball: SourceFitProjectedBall, anchors: SourceFitAnchorCandidate[]): number {
+    let bestIndex = 0;
+    let bestError = sourceFitPixelError(ball.projectedPixel, anchors[0].anchorPixel);
+    for (let index = 1; index < anchors.length; index += 1) {
+      const error = sourceFitPixelError(ball.projectedPixel, anchors[index].anchorPixel);
+      if (error < bestError) {
+        bestError = error;
+        bestIndex = index;
+      }
+    }
+    return bestIndex;
+  }
+
+  function sourceFitPixelError(a: [number, number], b: [number, number]): number {
+    return Math.hypot(a[0] - b[0], a[1] - b[1]);
   }
 
   function projectWithObserver(observer: Observer, point: Vec3): [number, number] {

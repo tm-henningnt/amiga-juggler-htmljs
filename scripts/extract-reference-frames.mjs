@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,11 +7,11 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const moviePath = resolve(root, "tmp/Juggler.mp4");
 const outputPath = resolve(root, "src/reference-frames.ts");
 const width = 320;
 const height = 200;
 const frameCount = 24;
+const moviePath = await resolveMoviePath();
 const tempDir = await mkdtemp(join(tmpdir(), "juggler-reference-"));
 
 try {
@@ -71,7 +71,41 @@ try {
 `;
 
   await writeFile(outputPath, source, "utf8");
-  console.log(`Wrote ${frames.length} reference frames to ${outputPath}`);
+  console.log(`Wrote ${frames.length} reference frames from ${moviePath} to ${outputPath}`);
 } finally {
   await rm(tempDir, { recursive: true, force: true });
+}
+
+async function resolveMoviePath() {
+  const explicitPath = process.argv[2] ?? process.env.JUGGLER_REFERENCE_MOVIE ?? "";
+  const candidates = explicitPath
+    ? [explicitPath]
+    : [
+      "reference/Eric-Graham-1987-Juggler-Raytracer-1.0/media/juggler.avi",
+      "tmp/juggler.avi",
+      "reference/Eric-Graham-1987-Juggler-Raytracer-1.0/media/Juggler.mp4",
+      "tmp/Juggler.mp4"
+    ];
+
+  for (const candidate of candidates) {
+    const resolved = resolve(root, candidate);
+    if (await fileExists(resolved)) {
+      return resolved;
+    }
+  }
+
+  throw new Error([
+    "No source movie found for reference-frame extraction.",
+    "Pass a movie path as the first argument, set JUGGLER_REFERENCE_MOVIE, or place one of these files:",
+    ...candidates.map((candidate) => `- ${candidate}`)
+  ].join("\n"));
+}
+
+async function fileExists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
 }

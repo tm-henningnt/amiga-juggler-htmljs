@@ -12,8 +12,9 @@ This file is a forward-looking backlog. Completed foundations belong in `LOG.md`
 
 ## Historical Accuracy
 
-- If `movie.data` and `movie2.data` are added to the workspace, probe and document their compressed HAM movie formats. They are not present in the current committed tree.
+- Decode or further document the compressed `movie.data` / `movie2.data` HAM frame payload beyond the now-probed header, palette, and payload sizes.
 - Use Source Fit diagnostics to tune reconstructed body pose, hand timing, ball arcs, and camera assumptions against key historical frames.
+- Improve source-frame ball anchors with manual labels or a more reliable tracker before using them as hard fitting targets.
 - Preserve evidence for every source-truth decision in code comments, documentation, reference fixtures, or manifest/source-fit metadata.
 - Avoid pixel-perfect targets unless a less-compressed original frame source is available.
 

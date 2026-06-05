@@ -20,7 +20,7 @@ Additional sources used while reconstructing the render and motion behavior:
 
 - Ernie Wright's historical Juggler notes: http://www.etwright.org/cghist/juggler_rt.html
 - Meatfighter's Java Juggler reimplementation, used as a reference for body and juggling motion patterns: https://meatfighter.com/juggler/
-- Historical movie and frame material from the AlphaPixel archive, used to guide source-frame labeling and visual comparison.
+- Historical movie and frame material from the AlphaPixel archive, including the original 320 x 200 `juggler.avi` conversion and compressed `movie.data` payloads, used to guide source-frame labeling and visual comparison.
 
 ## Use
 
@@ -46,7 +46,7 @@ From the browser UI you can:
 - Original `robot.dat`, `ele.dat`, and `dragon.dat` scene parsing and standalone loading.
 - Source-like and modern render profiles, including explicit source-quirk study mode.
 - Reconstructed 24-frame juggling motion with ball, wrist, clearance, source-frame, and source-fit metadata.
-- Embedded 24-frame historical reference fixture with overlay and side-by-side comparison controls.
+- Embedded 24-frame historical reference fixture generated from the archival 320 x 200 movie, with overlay and side-by-side comparison controls.
 - Camera paths, source-cycle presets, timeline scrubbing, and animation manifests with per-frame source-fit diagnostics.
 - BVH-accelerated CPU raytracing, worker-backed still renders, live raytraced previews, and modern AA.
 - Optional non-source soft shadows, contact ambient occlusion, depth of field, and live motion blur.

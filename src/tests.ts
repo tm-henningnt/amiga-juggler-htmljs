@@ -172,8 +172,10 @@ namespace Juggler.Tests {
   function testReferenceFrames(): void {
     assert(ReferenceFrames.COUNT === 24, "reference fixture has 24 frames");
     assert(ReferenceFrames.WIDTH === 320 && ReferenceFrames.HEIGHT === 200, "reference fixture is source resolution");
+    assert(ReferenceFrames.SOURCE_MOVIE.length > 0, "reference fixture records source movie");
     assert(ReferenceFrames.FRAMES.length === ReferenceFrames.COUNT, "reference fixture frame array count");
     assert(ReferenceFrames.FRAMES.every((frame, index) => frame.index === index), "reference fixture keeps zero-based index");
+    assert(ReferenceFrames.FRAMES.every((frame) => frame.source === ReferenceFrames.SOURCE_MOVIE), "reference fixture source labels are consistent");
     assert(ReferenceFrames.FRAMES.every((frame) => frame.dataUrl.startsWith("data:image/png;base64,")), "reference fixture embeds png data urls");
     assert(ReferenceFrames.bySourceFrame(0).frameNumber === 1, "reference fixture returns first frame");
     assert(ReferenceFrames.bySourceFrame(24).frameNumber === 1, "reference fixture wraps forward");
@@ -306,6 +308,7 @@ namespace Juggler.Tests {
     const frameFit = Motion.sourceFitFrame(robot, frame0, 0);
     assert(frameFit !== null, "source fit frame available");
     assert(frameFit!.balls.length === 3, "source fit records three ball errors");
+    assert(new Set(frameFit!.balls.map((sample) => sample.referencePathIndex)).size === 3, "source fit assigns unique source anchors");
     assert(frameFit!.balls.every((sample) => Number.isFinite(sample.pixelError)), "source fit ball errors are finite");
     close(frameFit!.camera.focalLength, 35, 0, "source fit records .dat focal length");
     close(frameFit!.camera.aperture, 0, 0, "source fit records source pinhole aperture");
