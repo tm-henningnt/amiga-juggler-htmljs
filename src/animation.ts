@@ -175,6 +175,7 @@ namespace Juggler.Animation {
     exportedAt = new Date().toISOString()
   ): AnimationManifest {
     const first = frames[0];
+    const sourceFitSummary = Motion.summarizeSourceFitFrames(frames.map((frame) => frame.sourceFit));
     return {
       format: "amiga-juggler-animation-manifest",
       version: 1,
@@ -196,7 +197,7 @@ namespace Juggler.Animation {
       },
       animation: copyPathSettings(pathSettings),
       motion: { ...motionSettings },
-      diagnostics: diagnostics ? { ...diagnostics } : null,
+      diagnostics: diagnostics ? { ...diagnostics, sourceFit: sourceFitSummary } : null,
       frames: frames.map((frame, bufferIndex) => ({
         bufferIndex,
         outputFrame: frame.index,
@@ -213,7 +214,8 @@ namespace Juggler.Animation {
           ballClearance: frame.motionBallClearance,
           balls: copyMotionSamples(frame.motionBalls),
           hands: copyMotionSamples(frame.motionHands)
-        }
+        },
+        sourceFit: Motion.copySourceFitFrame(frame.sourceFit)
       }))
     };
   }
@@ -229,6 +231,7 @@ namespace Juggler.Animation {
     private currentBallClearance: number | null = null;
     private currentBallSamples: MotionObjectSample[] = [];
     private currentHandSamples: MotionObjectSample[] = [];
+    private currentSourceFit: SourceFitFrame | null = null;
 
     constructor(
       private readonly scene: ParsedScene,
@@ -261,6 +264,9 @@ namespace Juggler.Animation {
         this.currentBallClearance = Motion.frameBallClearance(frameWorld);
         this.currentBallSamples = Motion.frameBallSamples(frameWorld);
         this.currentHandSamples = Motion.frameHandSamples(frameWorld);
+        this.currentSourceFit = this.motionSettings.motionId === "juggler-reconstructed"
+          ? Motion.sourceFitFrame(this.scene, frameWorld, sourceFrame)
+          : null;
         const observer = Scenes.createObserverFromPose(this.currentPose, this.width, this.height);
         this.frameRenderer = new Renderer.FrameRenderer(frameWorld, observer, this.renderOptions);
         this.frameStarted = now();
@@ -287,7 +293,8 @@ namespace Juggler.Animation {
           displayConstraintId: this.renderOptions.displayConstraintId ?? "rgb",
           qualityId: this.renderOptions.qualityId ?? "legacy",
           antiAliasMode: this.renderOptions.antiAliasMode ?? "off",
-          modernEffects: Experience.copyModernEffects(this.renderOptions.modernEffects)
+          modernEffects: Experience.copyModernEffects(this.renderOptions.modernEffects),
+          sourceFit: Motion.copySourceFitFrame(this.currentSourceFit)
         };
         this.frames.push(completedFrame);
         this.frameIndex += 1;
@@ -298,6 +305,7 @@ namespace Juggler.Animation {
         this.currentBallClearance = null;
         this.currentBallSamples = [];
         this.currentHandSamples = [];
+        this.currentSourceFit = null;
       }
 
       return this.progress(completedFrame, this.renderedIndex >= outputFrameCount);

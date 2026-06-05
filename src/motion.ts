@@ -25,6 +25,7 @@ namespace Juggler.Motion {
   const BODY_COLLISION_GROUPS = [3, 4, 5, 6, 7, 8];
   const LEFT_CONTACT_INDEX = 8;
   const RIGHT_CONTACT_INDEX = 16;
+  const SOURCE_ANCHOR_OFFSETS = [0, LEFT_CONTACT_INDEX, RIGHT_CONTACT_INDEX];
 
   const HIPS_MIN_Z = 3.18;
   const HIPS_MAX_Z = 3.36;
@@ -281,6 +282,153 @@ namespace Juggler.Motion {
     };
   }
 
+  export function sourceFitFrame(scene: ParsedScene, world: World, sourceFrame: number): SourceFitFrame | null {
+    if (!supportsJugglerMotion(scene)) {
+      return null;
+    }
+
+    const normalizedFrame = Math.floor(mod(sourceFrame, SOURCE_FRAME_COUNT));
+    const sourceObserver = sourceObserverFor(scene);
+    const balls = BALL_GROUPS.map((ball, index): SourceFitBallSample | null => {
+      const sphere = world.spheres.find((candidate) => candidate.groupIndex === ball.groupIndex);
+      if (!sphere) {
+        return null;
+      }
+      const referencePathIndex = Math.floor(mod(normalizedFrame + SOURCE_ANCHOR_OFFSETS[index], SOURCE_FRAME_COUNT));
+      const projectedPixel = projectWithObserver(sourceObserver, sphere.position);
+      const anchorPixel = projectWithObserver(sourceObserver, rawSourcePathPoint(referencePathIndex));
+      const pixelError = Math.hypot(projectedPixel[0] - anchorPixel[0], projectedPixel[1] - anchorPixel[1]);
+      return {
+        label: `ball ${index + 1}`,
+        groupIndex: ball.groupIndex,
+        referencePathIndex,
+        projectedPixel,
+        anchorPixel,
+        pixelError
+      };
+    }).filter((sample): sample is SourceFitBallSample => sample !== null);
+
+    const meanBallPixelError = balls.length
+      ? balls.reduce((sum, sample) => sum + sample.pixelError, 0) / balls.length
+      : 0;
+    const maxBallPixelError = balls.reduce((max, sample) => Math.max(max, sample.pixelError), 0);
+    const handError = contactPulse(sourceFrame) > 0.9
+      ? Math.max(handContactError(world, RIGHT_ARM_GROUP), handContactError(world, LEFT_ARM_GROUP))
+      : null;
+
+    return {
+      sourceFrame: normalizedFrame,
+      sourceFrameNumber: normalizedFrame + 1,
+      sourceFrameLabel: sourceFrameLabel(normalizedFrame),
+      camera: {
+        position: [...scene.observerPosition],
+        altitudeDeg: scene.altitudeDeg,
+        azimuthDeg: scene.azimuthDeg,
+        focalLength: scene.focalLength,
+        effectiveFocalLength: sourceObserver.focalLength,
+        aperture: 0
+      },
+      balls,
+      meanBallPixelError,
+      maxBallPixelError,
+      bodyClearance: frameBodyClearance(world),
+      ballClearance: frameBallClearance(world),
+      handContactError: handError === null || handError >= BIG ? null : handError,
+      legBend: legBendSummary(world)
+    };
+  }
+
+  export function sourceFitSummary(
+    scene: ParsedScene,
+    baseWorld: World,
+    settings: SceneMotionSettings
+  ): SourceFitSummary | null {
+    if (settings.motionId !== "juggler-reconstructed" || !supportsJugglerMotion(scene)) {
+      return null;
+    }
+
+    const frames: SourceFitFrame[] = [];
+    for (let frame = 0; frame < SOURCE_FRAME_COUNT; frame += 1) {
+      const sourceFrame = frame + settings.sourceFrame;
+      const fit = sourceFitFrame(scene, resolveWorld(scene, baseWorld, settings, sourceFrame), sourceFrame);
+      if (fit) {
+        frames.push(fit);
+      }
+    }
+    return summarizeSourceFitFrames(frames);
+  }
+
+  export function summarizeSourceFitFrames(frames: Array<SourceFitFrame | null>): SourceFitSummary | null {
+    const usable = frames.filter((frame): frame is SourceFitFrame => frame !== null);
+    if (!usable.length) {
+      return null;
+    }
+
+    let totalBallPixelError = 0;
+    let maxBallPixelError = -BIG;
+    let maxBallPixelErrorFrame = usable[0].sourceFrame;
+    let minBodyClearance: number | null = null;
+    let minBallClearance: number | null = null;
+    let maxHandContactError: number | null = null;
+    let maxLeftLegBendRatio: number | null = null;
+
+    for (const frame of usable) {
+      totalBallPixelError += frame.meanBallPixelError;
+      if (frame.maxBallPixelError > maxBallPixelError) {
+        maxBallPixelError = frame.maxBallPixelError;
+        maxBallPixelErrorFrame = frame.sourceFrame;
+      }
+      minBodyClearance = minNullable(minBodyClearance, frame.bodyClearance);
+      minBallClearance = minNullable(minBallClearance, frame.ballClearance);
+      maxHandContactError = maxNullable(maxHandContactError, frame.handContactError);
+      maxLeftLegBendRatio = maxNullable(maxLeftLegBendRatio, frame.legBend?.leftToRightRatio ?? null);
+    }
+
+    return {
+      frameCount: usable.length,
+      meanBallPixelError: totalBallPixelError / usable.length,
+      maxBallPixelError,
+      maxBallPixelErrorFrame,
+      minBodyClearance,
+      minBallClearance,
+      maxHandContactError,
+      maxLeftLegBendRatio
+    };
+  }
+
+  export function copySourceFitFrame(frame: SourceFitFrame | null): SourceFitFrame | null {
+    if (!frame) {
+      return null;
+    }
+    return {
+      sourceFrame: frame.sourceFrame,
+      sourceFrameNumber: frame.sourceFrameNumber,
+      sourceFrameLabel: frame.sourceFrameLabel,
+      camera: {
+        position: [...frame.camera.position],
+        altitudeDeg: frame.camera.altitudeDeg,
+        azimuthDeg: frame.camera.azimuthDeg,
+        focalLength: frame.camera.focalLength,
+        effectiveFocalLength: frame.camera.effectiveFocalLength,
+        aperture: frame.camera.aperture
+      },
+      balls: frame.balls.map((sample) => ({
+        label: sample.label,
+        groupIndex: sample.groupIndex,
+        referencePathIndex: sample.referencePathIndex,
+        projectedPixel: [...sample.projectedPixel],
+        anchorPixel: [...sample.anchorPixel],
+        pixelError: sample.pixelError
+      })),
+      meanBallPixelError: frame.meanBallPixelError,
+      maxBallPixelError: frame.maxBallPixelError,
+      bodyClearance: frame.bodyClearance,
+      ballClearance: frame.ballClearance,
+      handContactError: frame.handContactError,
+      legBend: frame.legBend ? { ...frame.legBend } : null
+    };
+  }
+
   export function motionSummary(scene: ParsedScene, settings: SceneMotionSettings): string {
     if (settings.motionId === "juggler-reconstructed" && supportsJugglerMotion(scene)) {
       return `source ${sourceFrameLabel(settings.sourceFrame)}`;
@@ -493,6 +641,70 @@ namespace Juggler.Motion {
       best = Math.min(best, surfaceDistance);
     }
     return best;
+  }
+
+  function legBendSummary(world: World): SourceFitLegBend | null {
+    const characterRight = legBendDistance(world, CHARACTER_RIGHT_LEG_GROUP);
+    const characterLeft = legBendDistance(world, CHARACTER_LEFT_LEG_GROUP);
+    if (characterRight === null || characterLeft === null) {
+      return null;
+    }
+    return {
+      characterRight,
+      characterLeft,
+      leftToRightRatio: characterRight > 1e-9 ? characterLeft / characterRight : null
+    };
+  }
+
+  function legBendDistance(world: World, groupIndex: number): number | null {
+    const spheres = world.spheres.filter((sphere) => sphere.groupIndex === groupIndex);
+    if (spheres.length < 3) {
+      return null;
+    }
+    const hip = spheres[0].position;
+    const knee = spheres[Math.min(6, spheres.length - 2)].position;
+    const foot = spheres[spheres.length - 1].position;
+    const hipToFoot = Math3.sub(foot, hip);
+    const denominator = Math3.dot(hipToFoot, hipToFoot);
+    if (denominator < 1e-9) {
+      return null;
+    }
+    const t = Math.max(0, Math.min(1, Math3.dot(Math3.sub(knee, hip), hipToFoot) / denominator));
+    const onStraightLeg = Math3.add(hip, Math3.mul(hipToFoot, t));
+    return Math3.length(Math3.sub(knee, onStraightLeg));
+  }
+
+  function sourceObserverFor(scene: ParsedScene): Observer {
+    return Scenes.createObserver(scene, Scenes.buildWorld(scene), 320, 200, {
+      enabled: false,
+      angleDeg: 0,
+      radius: 10
+    });
+  }
+
+  function projectWithObserver(observer: Observer, point: Vec3): [number, number] {
+    const delta = Math3.sub(point, observer.position);
+    const forward = Math3.dot(delta, observer.viewDir);
+    const x = Math3.dot(delta, observer.uhat) * observer.focalLength / forward;
+    const y = Math3.dot(delta, observer.vhat) * observer.focalLength / forward;
+    return [
+      x / observer.px + 0.5 * observer.nx,
+      0.5 * observer.ny - y / observer.py
+    ];
+  }
+
+  function minNullable(current: number | null, candidate: number | null): number | null {
+    if (candidate === null) {
+      return current;
+    }
+    return current === null ? candidate : Math.min(current, candidate);
+  }
+
+  function maxNullable(current: number | null, candidate: number | null): number | null {
+    if (candidate === null) {
+      return current;
+    }
+    return current === null ? candidate : Math.max(current, candidate);
   }
 
   function motionObjectSample(sphere: Sphere, label: string): MotionObjectSample {

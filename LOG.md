@@ -848,3 +848,29 @@ Verification:
 npm test
 npm run build:single
 ```
+
+## 2026-06-05: Source-Fit Diagnostics And Live Double Buffering
+
+This pass tightened the historical-fidelity loop before further modern experiments.
+
+The Live Raytrace flicker diagnosis was that live rendering wrote partially completed frame data directly into the visible canvas on every time-budget tick. Starting a live render also resized the canvas up front, which cleared the visible bitmap before the replacement frame was ready.
+
+Implemented changes:
+
+- Changed Live Raytrace and Fly View rendering to keep the current visible canvas unchanged while a new live frame renders into the renderer back buffer.
+- Added a completed-frame commit helper that swaps live display data only after the frame is done, with live motion blur applied before the swap.
+- Preserved stale-frame skipping and live playback telemetry.
+- Added source-fit data structures for projected ball error, source camera/focal/aperture facts, physical clearances, hand contact error, and left/right leg-bend sanity.
+- Added Source Fit facts to Diagnostics.
+- Stored per-frame `sourceFit` data on rendered animation frames and JSON manifests, plus a manifest `diagnostics.sourceFit` summary.
+- Documented that source fit is evidence-guided rather than pixel-perfect because the available movie fixture has been converted and recompressed.
+- Checked the workspace for `movie.data` and `movie2.data`; neither file is present in the committed tree, so direct HAM movie decoding remains dependent on adding those archive files locally.
+
+Verification:
+
+```bash
+npm test
+npm run build:single
+```
+
+Browser smoke opened the rebuilt standalone `index.html` directly from disk and confirmed the Classic Source canvas was nonblank, Source Fit diagnostics were populated, and no console messages were present after reload. A brief Live playback smoke confirmed a completed live render updates telemetry while stale frames are skipped instead of queued.

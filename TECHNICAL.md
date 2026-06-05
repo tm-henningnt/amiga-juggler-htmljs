@@ -31,6 +31,10 @@ The project keeps source-derived constants and reconstruction notes close to the
 
 `scripts/extract-reference-frames.mjs` extracts the first 24 frames from `tmp/Juggler.mp4`, scales them to the source 320 x 200 frame, and writes `src/reference-frames.ts` as embedded PNG data URLs. The generated fixture is checked in so the standalone HTML can compare against historical frames without fetching external assets.
 
+`movie.data` and `movie2.data` are not present in this working tree. They remain historical archive inputs to investigate when the original recovered data files are available locally.
+
+Source-fit diagnostics are evidence-guided, not pixel-perfect. The reference movie frames have passed through conversion and recompression, so the app reports projected pixel error against the reference-derived ball anchors, camera/focal/aperture facts, physical clearance, hand contact, and leg-bend sanity instead of treating the encoded movie as an exact oracle.
+
 ## Rendering Pipeline
 
 The renderer expands parsed sphere controls into renderable sphere lists, then raytraces the scene in the browser.
@@ -49,6 +53,7 @@ At a high level it supports:
 - Deterministic non-source soft shadows, contact ambient occlusion, and depth of field through `ModernEffectsSettings`.
 - Live motion-blur accumulation for source-frame playback.
 - Live-render effect caps: soft-shadow samples are limited and depth of field is disabled for Live Raytrace, while still and buffered animation renders keep the selected effect settings.
+- Double-buffered Live Raytrace display: live and Fly View renders write into a back buffer and swap the visible canvas only after a full frame is complete. Progress updates continue while incomplete frames are hidden to avoid visible flicker from partial tile/row data or canvas resizing.
 - Optional RGB, OCS 12-bit, Extra Half-Brite-style, and approximate HAM6 display constraints.
 - Render profiles that make historically relevant quirks explicit.
 - Fast wireframe and solid previews for interactive scene inspection.
@@ -63,11 +68,13 @@ Animation resolves two things for each frame:
 
 Camera motion can use static, orbit, dolly, arc, or custom keyframe paths. Scene motion for the juggler is reconstructed from source-frame phase data, ballistic ball arcs, Meatfighter-style body motion, and limb posing.
 
-Rendered animation frames retain metadata for inspection and export, including source-frame labels, camera pose, render profile, modern effects, ball positions, wrist positions, clearances, timing, and render statistics.
+Rendered animation frames retain metadata for inspection and export, including source-frame labels, camera pose, render profile, modern effects, ball positions, wrist positions, clearances, source-fit diagnostics, timing, and render statistics.
 
 Long animation renders report the buffered frame index, sampled source frame, row progress, elapsed time, and expected remaining time in the status strip. Final animation telemetry aggregates render statistics across the buffered frame set.
 
 Live Raytrace playback is separate from buffered animation playback. It advances reconstructed source frames at the selected FPS and starts a new interactive-quality raytrace only when the previous live render is no longer active. If the clock falls behind, stale source frames are skipped and counted in diagnostics instead of queued.
+
+Animation manifests include a `sourceFit` object per rendered frame and a `diagnostics.sourceFit` summary for the exported frame set. The source-fit data includes projected ball pixel errors against the reference-derived anchors, the source camera/focal/aperture values, physical clearance, hand contact error, and left-leg bend ratio.
 
 Modern effects are explicit non-source metadata. Classic Source applies disabled effect settings; Modern Studio enables conservative soft shadow and contact AO defaults while keeping DOF and motion blur available as advanced opt-ins.
 
@@ -88,7 +95,7 @@ Detailed controls are grouped into collapsible Workbench windows for Scene, Came
 
 Reference Compare is a separate collapsed Workbench window. It can keep the historical reference frame synchronized with the currently displayed source frame, or unlock the reference slider for manual comparison. Overlay mode draws the reference frame over the render canvas with adjustable opacity; side-by-side mode keeps both images at the same 16:10 source aspect.
 
-Diagnostics includes render telemetry for the latest still, live, and buffered animation render, plus material and lighting inspection facts for the selected scene group. The inspection pane reports selected group material/source type, color, control count, rendered sphere bounds, lamp position/color, exposure, and ambient/sky values.
+Diagnostics includes render telemetry for the latest still, live, and buffered animation render, source-fit facts for the reconstructed Juggler cycle, plus material and lighting inspection facts for the selected scene group. The inspection pane reports selected group material/source type, color, control count, rendered sphere bounds, lamp position/color, exposure, and ambient/sky values.
 
 Experience presets are high-level defaults, not locked modes:
 
@@ -119,7 +126,7 @@ Scene Edit mode uses click/drag for group movement in the view plane and Shift-d
 - `src/live-playback.ts` contains source-frame advancement and stale-frame skipping logic for live playback.
 - `src/animation.ts` resolves camera paths, queues frame rendering, and builds animation manifests.
 - `src/motion-data.ts` stores reconstruction constants and reference-derived screen anchors.
-- `src/motion.ts` resolves reconstructed juggler ball, body, limb, and diagnostic motion.
+- `src/motion.ts` resolves reconstructed juggler ball, body, limb, source-fit, and diagnostic motion.
 - `src/app.ts` wires the browser UI, rendering loop, playback, and export actions.
 - `scripts/build-single.mjs` inlines compiled JS and CSS into `index.html`.
 - `scripts/extract-reference-frames.mjs` regenerates the historical reference-frame fixture from `tmp/Juggler.mp4` when the source movie is available locally.

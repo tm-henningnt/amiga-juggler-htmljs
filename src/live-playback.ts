@@ -5,6 +5,12 @@ namespace Juggler.LivePlayback {
     dueAtMs: number;
   }
 
+  export interface LiveFrameCommitResult {
+    committed: boolean;
+    displayData: Uint8ClampedArray | null;
+    previousData: Uint8ClampedArray | null;
+  }
+
   export function nextFrame(frame: number, frameCount: number, steps = 1): number {
     const count = Math.max(1, Math.round(frameCount));
     return ((Math.round(frame) + Math.max(1, Math.round(steps))) % count + count) % count;
@@ -37,6 +43,28 @@ namespace Juggler.LivePlayback {
       frame: nextFrame(currentFrame, frameCount, elapsedSteps),
       skippedFrames: Math.max(0, elapsedSteps - 1),
       dueAtMs: nextDue
+    };
+  }
+
+  export function commitCompletedFrame(
+    currentData: Uint8ClampedArray,
+    previousData: Uint8ClampedArray | null,
+    motionBlur: MotionBlurSettings | undefined,
+    done: boolean
+  ): LiveFrameCommitResult {
+    if (!done) {
+      return {
+        committed: false,
+        displayData: null,
+        previousData
+      };
+    }
+
+    const displayData = Renderer.blendMotionSamples(currentData, previousData, motionBlur);
+    return {
+      committed: true,
+      displayData,
+      previousData: new Uint8ClampedArray(displayData)
     };
   }
 }

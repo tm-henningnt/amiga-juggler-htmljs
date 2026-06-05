@@ -121,6 +121,7 @@ namespace Juggler.App {
   const sceneFacts = document.getElementById("sceneFacts") as HTMLElement;
   const cameraFacts = document.getElementById("cameraFacts") as HTMLElement;
   const animationFacts = document.getElementById("animationFacts") as HTMLElement;
+  const sourceFitFacts = document.getElementById("sourceFitFacts") as HTMLElement;
   const inspectionFacts = document.getElementById("inspectionFacts") as HTMLElement;
   const renderTelemetryFacts = document.getElementById("renderTelemetryFacts") as HTMLElement;
   const canvasFrame = document.getElementById("canvasFrame") as HTMLElement;
@@ -480,6 +481,7 @@ namespace Juggler.App {
     refreshInspectionFacts();
     refreshTelemetryFacts();
     refreshProfileIndicators();
+    refreshSourceFitFacts();
     renderStill();
   }
 
@@ -517,6 +519,7 @@ namespace Juggler.App {
     renderFacts();
     setDisplayedSourceFrame(readSceneMotionSettings().sourceFrame);
     refreshAnimationFacts();
+    refreshSourceFitFacts();
     refreshSelectionFacts();
     updateCanvasHint();
     setStatus(`${preset.label} preset applied.`);
@@ -617,6 +620,7 @@ namespace Juggler.App {
       refreshLivePlaybackFacts();
       setDisplayedSourceFrame(readSceneMotionSettings().sourceFrame);
       refreshInspectionFacts();
+      refreshSourceFitFacts();
       updateCanvasHint();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
@@ -768,7 +772,6 @@ namespace Juggler.App {
       ...readSceneMotionSettings(),
       sourceFrame
     };
-    setDisplayedSourceFrame(sourceFrame);
     const renderWorld = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
     const observer = createDisplayObserver(width, height);
     const profile = Profiles.byId(profileSelect.value);
@@ -780,11 +783,7 @@ namespace Juggler.App {
       tileSize: 16
     };
     const renderer = new Renderer.FrameRenderer(renderWorld, observer, options);
-    const image = new ImageData(renderer.data as ImageDataArray, width, height);
 
-    canvas.width = width;
-    canvas.height = height;
-    context.imageSmoothingEnabled = false;
     progressElement.value = 0;
     livePreviewRenderBusy = true;
     if (playbackFrame) {
@@ -803,7 +802,6 @@ namespace Juggler.App {
         return;
       }
       renderer.renderBudget(10);
-      context.putImageData(image, 0, 0);
       progressElement.value = renderer.progress();
       if (!renderer.done()) {
         window.requestAnimationFrame(tick);
@@ -811,13 +809,21 @@ namespace Juggler.App {
       }
       const seconds = (performance.now() - started) / 1000;
       livePreviewRenderBusy = false;
-      let data = renderer.data;
+      const previousData = playbackFrame && livePlayback.previousWidth === width && livePlayback.previousHeight === height
+        ? livePlayback.previousData
+        : null;
+      const commit = LivePlayback.commitCompletedFrame(
+        renderer.data,
+        previousData,
+        playbackFrame ? options.modernEffects?.motionBlur : undefined,
+        true
+      );
+      if (commit.displayData) {
+        drawImageData(commit.displayData, width, height);
+        setDisplayedSourceFrame(sourceFrame);
+      }
       if (playbackFrame) {
-        data = Renderer.blendMotionSamples(renderer.data, livePlayback.previousData, options.modernEffects?.motionBlur);
-        if (data !== renderer.data) {
-          drawImageData(data, width, height);
-        }
-        livePlayback.previousData = new Uint8ClampedArray(data);
+        livePlayback.previousData = commit.previousData;
         livePlayback.previousWidth = width;
         livePlayback.previousHeight = height;
         livePlayback.lastRenderMs = performance.now() - started;
@@ -1954,6 +1960,7 @@ namespace Juggler.App {
       ["Hand contact", diagnostics ? diagnostics.maxHandContactError.toFixed(2) : "n/a"],
       ["Lamp exposure", active.world.lampExposure.toFixed(2)]
     ]);
+    refreshSourceFitFacts();
   }
 
   function refreshCameraFacts(): void {
@@ -1975,6 +1982,42 @@ namespace Juggler.App {
       ["Height", readNumber(orbitHeightInput.value, 0).toFixed(2)],
       ["Focal", observer.focalLength.toFixed(3)]
     ]);
+  }
+
+  function refreshSourceFitFacts(): void {
+    if (!active) {
+      return;
+    }
+    const motionSettings = readSceneMotionSettings();
+    const summary = Motion.sourceFitSummary(active.parsed, active.world, motionSettings);
+    const currentWorld = resolvedDisplayWorld(motionSettings, lastDisplayedSourceFrame);
+    const currentFrame = summary ? Motion.sourceFitFrame(active.parsed, currentWorld, lastDisplayedSourceFrame) : null;
+    const rows: [string, string][] = [
+      ["Source Fit", summary ? "evidence-guided" : "n/a"],
+      ["Reference basis", summary ? "24-frame fixture" : "n/a"],
+      ["Camera aperture", summary ? "0 (source pinhole)" : "n/a"]
+    ];
+
+    if (summary) {
+      rows.push(
+        ["Mean ball error", `${summary.meanBallPixelError.toFixed(1)} px`],
+        ["Max ball error", `${summary.maxBallPixelError.toFixed(1)} px @ ${Motion.sourceFrameLabel(summary.maxBallPixelErrorFrame)}`],
+        ["Min body clearance", summary.minBodyClearance === null ? "n/a" : summary.minBodyClearance.toFixed(2)],
+        ["Min ball spacing", summary.minBallClearance === null ? "n/a" : summary.minBallClearance.toFixed(2)],
+        ["Max hand error", summary.maxHandContactError === null ? "n/a" : summary.maxHandContactError.toFixed(2)],
+        ["Left leg bend", summary.maxLeftLegBendRatio === null ? "n/a" : `${summary.maxLeftLegBendRatio.toFixed(2)} x right`]
+      );
+    }
+
+    if (currentFrame) {
+      rows.push(
+        ["Visible frame", currentFrame.sourceFrameLabel],
+        ["Visible ball error", `${currentFrame.meanBallPixelError.toFixed(1)} px mean, ${currentFrame.maxBallPixelError.toFixed(1)} px max`],
+        ["Source focal", `${currentFrame.camera.focalLength.toFixed(1)} (${currentFrame.camera.effectiveFocalLength.toFixed(3)} effective)`]
+      );
+    }
+
+    setFacts(sourceFitFacts, rows);
   }
 
   function refreshAnimationFacts(): void {
@@ -2006,6 +2049,7 @@ namespace Juggler.App {
       ["JSON manifest", animationFrames.length ? "available" : "render frames first"]
     ]);
     updateAnimationButtons(false);
+    refreshSourceFitFacts();
   }
 
   function setDisplayedSourceFrame(sourceFrame: number): void {
@@ -2014,6 +2058,7 @@ namespace Juggler.App {
       referenceFrameInput.value = String(lastDisplayedSourceFrame + 1);
     }
     refreshReferenceComparison();
+    refreshSourceFitFacts();
   }
 
   function refreshReferenceComparison(): void {

@@ -12,20 +12,21 @@ This file is a forward-looking backlog. Completed foundations belong in `LOG.md`
 
 ## Historical Accuracy
 
-- Decode or document the `movie.data` and `movie2.data` compressed HAM movie formats.
-- Continue fitting the reconstructed juggling motion frame-by-frame against historical frames.
-- Continue refining robot body pose, hand timing, and ball arcs until key frames match the source output more closely.
-- Preserve evidence for every source-truth decision in code comments, documentation, or reference fixtures.
+- If `movie.data` and `movie2.data` are added to the workspace, probe and document their compressed HAM movie formats. They are not present in the current committed tree.
+- Use Source Fit diagnostics to tune reconstructed body pose, hand timing, ball arcs, and camera assumptions against key historical frames.
+- Preserve evidence for every source-truth decision in code comments, documentation, reference fixtures, or manifest/source-fit metadata.
+- Avoid pixel-perfect targets unless a less-compressed original frame source is available.
 
 ## Rendering Fidelity And Performance
 
 - Continue validating camera setup, sphere hierarchy, material IDs, lighting, and reflections against known original frames.
-- Use the embedded historical reference fixture and render telemetry to tune camera, lighting, material, and modern-effect defaults against known original frames.
+- Use Source Fit diagnostics and render telemetry to tune source-camera, lighting, material, and source-profile defaults against known original frames.
+- Keep modern effects outside Classic Source unless a source-backed reason exists.
 - Revisit WASM or direct C-port research only if stricter renderer parity becomes more valuable than TypeScript maintainability.
 
 ## Animation, Export, And Data
 
-- Use structured manifests to drive future source-frame comparison and motion-fitting tools.
+- Use exported manifest `sourceFit` data to drive future source-frame comparison and motion-fitting tools.
 - Define a future JSON scene format only after there is a concrete import/export workflow that needs it.
 - Add import/export tools for reconstructed motion keyframes if motion fitting starts happening outside source code.
 - Add validation errors that explain malformed `.dat` scene or motion data.

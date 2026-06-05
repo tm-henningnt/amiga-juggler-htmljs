@@ -225,6 +225,56 @@ namespace Juggler {
     qualityId: RenderQualityId;
     antiAliasMode: AntiAliasModeId;
     modernEffects: ModernEffectsSettings;
+    sourceFit: SourceFitFrame | null;
+  }
+
+  export interface SourceFitCamera {
+    position: Vec3;
+    altitudeDeg: number;
+    azimuthDeg: number;
+    focalLength: number;
+    effectiveFocalLength: number;
+    aperture: number;
+  }
+
+  export interface SourceFitBallSample {
+    label: string;
+    groupIndex: number;
+    referencePathIndex: number;
+    projectedPixel: [number, number];
+    anchorPixel: [number, number];
+    pixelError: number;
+  }
+
+  export interface SourceFitLegBend {
+    characterRight: number;
+    characterLeft: number;
+    leftToRightRatio: number | null;
+  }
+
+  export interface SourceFitFrame {
+    sourceFrame: number;
+    sourceFrameNumber: number;
+    sourceFrameLabel: string;
+    camera: SourceFitCamera;
+    balls: SourceFitBallSample[];
+    meanBallPixelError: number;
+    maxBallPixelError: number;
+    bodyClearance: number | null;
+    ballClearance: number | null;
+    handContactError: number | null;
+    legBend: SourceFitLegBend | null;
+  }
+
+  export interface SourceFitSummary {
+    frameCount: number;
+    meanBallPixelError: number;
+    maxBallPixelError: number;
+    maxBallPixelErrorFrame: number;
+    minBodyClearance: number | null;
+    minBallClearance: number | null;
+    maxHandContactError: number | null;
+    maxLeftLegBendRatio: number | null;
   }
 
   export interface AnimationManifestDiagnostics {
@@ -234,6 +284,7 @@ namespace Juggler {
     minBallClearance: number;
     minBallClearanceFrame: number;
     maxHandContactError: number;
+    sourceFit: SourceFitSummary | null;
   }
 
   export interface AnimationManifestFrame {
@@ -253,6 +304,7 @@ namespace Juggler {
       balls: MotionObjectSample[];
       hands: MotionObjectSample[];
     };
+    sourceFit: SourceFitFrame | null;
   }
 
   export interface AnimationManifest {

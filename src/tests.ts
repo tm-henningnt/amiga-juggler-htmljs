@@ -303,6 +303,23 @@ namespace Juggler.Tests {
     assert(motionDiagnostics.minBallClearance > 0.2, `juggler balls clear each other, min ${motionDiagnostics.minBallClearance}`);
     assert(motionDiagnostics.maxHandContactError < 0.15, `juggler hands meet balls, max ${motionDiagnostics.maxHandContactError}`);
 
+    const frameFit = Motion.sourceFitFrame(robot, frame0, 0);
+    assert(frameFit !== null, "source fit frame available");
+    assert(frameFit!.balls.length === 3, "source fit records three ball errors");
+    assert(frameFit!.balls.every((sample) => Number.isFinite(sample.pixelError)), "source fit ball errors are finite");
+    close(frameFit!.camera.focalLength, 35, 0, "source fit records .dat focal length");
+    close(frameFit!.camera.aperture, 0, 0, "source fit records source pinhole aperture");
+    assert(frameFit!.legBend !== null && frameFit!.legBend.leftToRightRatio !== null, "source fit records leg bend sanity");
+
+    const fitSummary = Motion.sourceFitSummary(robot, robotWorld, { motionId: "juggler-reconstructed", sourceFrame: 0 });
+    assert(fitSummary !== null, "source fit summary available");
+    assert(fitSummary!.frameCount === Motion.SOURCE_FRAME_COUNT, "source fit summary covers full source cycle");
+    assert(Number.isFinite(fitSummary!.meanBallPixelError), "source fit summary mean error is finite");
+    assert(fitSummary!.maxBallPixelError < 220, `source fit max ball error stays bounded, max ${fitSummary!.maxBallPixelError}`);
+    assert(fitSummary!.maxHandContactError !== null && fitSummary!.maxHandContactError < 0.15, "source fit hand error tracks contact frames");
+    assert(fitSummary!.maxLeftLegBendRatio !== null && fitSummary!.maxLeftLegBendRatio < 0.55, "source fit keeps character left leg straighter");
+    assert(Motion.sourceFitSummary(robot, robotWorld, { motionId: "static", sourceFrame: 0 }) === null, "static motion has no source fit summary");
+
     const elephant = parse("ele");
     assert(!Motion.availableMotions(elephant).some((motion) => motion.id === "juggler-reconstructed"), "elephant stays static-only");
     const staticWorld = Motion.resolveWorld(elephant, Scenes.buildWorld(elephant), { motionId: "juggler-reconstructed", sourceFrame: 0 }, 0);
@@ -374,6 +391,8 @@ namespace Juggler.Tests {
     assert(renderer.frames.every((frame) => frame.motionBallClearance !== null), "animation frames record ball spacing");
     assert(renderer.frames.every((frame) => frame.motionBalls.length === 3), "animation frames record ball samples");
     assert(renderer.frames.every((frame) => frame.motionHands.length === 2), "animation frames record wrist samples");
+    assert(renderer.frames.every((frame) => frame.sourceFit !== null), "animation frames record source fit");
+    assert(renderer.frames.every((frame) => frame.sourceFit?.balls.length === 3), "animation source fit records ball samples");
     assert(renderer.frames[1].sceneFrame > renderer.frames[0].sceneFrame, "animation frames advance scene source frame");
 
     const sceneSource: SceneSource = {
@@ -398,12 +417,16 @@ namespace Juggler.Tests {
     assert(manifest.render.displayConstraintId === "ehb-64", "manifest records display constraint");
     assert(manifest.render.qualityId === "legacy", "manifest records render quality");
     assert(manifest.render.antiAliasMode === "off", "manifest records anti-alias mode");
+    assert(manifest.diagnostics?.sourceFit?.frameCount === renderer.frames.length, "manifest diagnostics summarize exported source-fit frames");
     assert(manifest.frames.length === renderer.frames.length, "manifest frame count");
     assert(manifest.frames[0].sourceFrameLabel.includes("apex"), "manifest source frame label");
     assert(manifest.frames[0].motion.balls.length === 3, "manifest records ball samples");
     assert(manifest.frames[0].motion.hands.some((sample) => sample.label === "left wrist"), "manifest records hand samples");
+    assert(manifest.frames[0].sourceFit?.balls.length === 3, "manifest records per-frame source fit");
     manifest.frames[0].motion.balls[0].position[0] = 999;
     assert(renderer.frames[0].motionBalls[0].position[0] !== 999, "manifest samples are defensive copies");
+    manifest.frames[0].sourceFit!.balls[0].projectedPixel[0] = 999;
+    assert(renderer.frames[0].sourceFit!.balls[0].projectedPixel[0] !== 999, "manifest source fit samples are defensive copies");
 
     const rangeSettings = Animation.defaultSettings();
     rangeSettings.pathId = "static";
@@ -628,6 +651,17 @@ namespace Juggler.Tests {
     const busy = LivePlayback.advance(2, 24, 10, 1000, 1300, true);
     assert(busy.frame === 6, "busy live playback advances past stale frames");
     assert(busy.skippedFrames === 4, "busy live playback skips every due frame while rendering");
+
+    const current = new Uint8ClampedArray([100, 0, 0, 255]);
+    const previous = new Uint8ClampedArray([0, 0, 100, 255]);
+    const incomplete = LivePlayback.commitCompletedFrame(current, previous, { enabled: true, strength: 0.5, samples: 2 }, false);
+    assert(!incomplete.committed && incomplete.displayData === null, "incomplete live frame is not committed to display");
+    assert(incomplete.previousData === previous, "incomplete live frame keeps previous buffer");
+    const committed = LivePlayback.commitCompletedFrame(current, previous, { enabled: true, strength: 0.5, samples: 2 }, true);
+    assert(committed.committed && committed.displayData !== null, "completed live frame commits display data");
+    assert(committed.displayData![0] === 50 && committed.displayData![2] === 50, "completed live frame applies motion blur before swap");
+    committed.displayData![0] = 1;
+    assert(committed.previousData![0] === 50, "completed live frame stores a defensive previous buffer");
   }
 
   function testRenderSmoke(): void {
