@@ -46,11 +46,13 @@ From the browser UI you can:
 - Original `robot.dat`, `ele.dat`, and `dragon.dat` scene parsing and standalone loading.
 - Source-like and modern render profiles, including explicit source-quirk study mode.
 - Reconstructed 24-frame juggling motion with ball, wrist, clearance, and source-frame metadata.
+- Embedded 24-frame historical reference fixture with overlay and side-by-side comparison controls.
 - Camera paths, source-cycle presets, timeline scrubbing, and animation manifests.
 - BVH-accelerated CPU raytracing, worker-backed still renders, live raytraced previews, and modern AA.
 - Optional non-source soft shadows, contact ambient occlusion, depth of field, and live motion blur.
 - Workbench 1.3 inspired UI with collapsible control windows and a compact command strip.
 - Fly View mode with pointer-lock mouse look, keyboard movement, and gamepad stick/trigger input.
+- Render telemetry and material/lighting inspection facts in the Diagnostics window.
 
 ## Documentation
 

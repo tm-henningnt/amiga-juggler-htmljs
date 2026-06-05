@@ -30,6 +30,18 @@ namespace Juggler.App {
     previousHeight: number;
   }
 
+  type ReferenceCompareMode = "off" | "overlay" | "side-by-side";
+
+  interface RenderTelemetryRecord {
+    label: string;
+    renderMs: number;
+    width: number;
+    height: number;
+    stats: RenderStats;
+    effects: ModernEffectsSettings;
+    note: string;
+  }
+
   interface FlyState {
     enabled: boolean;
     rafId: number;
@@ -109,6 +121,15 @@ namespace Juggler.App {
   const sceneFacts = document.getElementById("sceneFacts") as HTMLElement;
   const cameraFacts = document.getElementById("cameraFacts") as HTMLElement;
   const animationFacts = document.getElementById("animationFacts") as HTMLElement;
+  const inspectionFacts = document.getElementById("inspectionFacts") as HTMLElement;
+  const renderTelemetryFacts = document.getElementById("renderTelemetryFacts") as HTMLElement;
+  const canvasFrame = document.getElementById("canvasFrame") as HTMLElement;
+  const referenceFrameImage = document.getElementById("referenceFrameImage") as HTMLImageElement;
+  const referenceCompareModeSelect = document.getElementById("referenceCompareMode") as HTMLSelectElement;
+  const referenceOpacityInput = document.getElementById("referenceOpacity") as HTMLInputElement;
+  const referenceFollowFrameInput = document.getElementById("referenceFollowFrame") as HTMLInputElement;
+  const referenceFrameInput = document.getElementById("referenceFrameInput") as HTMLInputElement;
+  const referenceFacts = document.getElementById("referenceFacts") as HTMLElement;
   const animationCameraPresetSelect = document.getElementById("animationCameraPreset") as HTMLSelectElement;
   const animationPathSelect = document.getElementById("animationPath") as HTMLSelectElement;
   const animationCyclePresetSelect = document.getElementById("animationCyclePreset") as HTMLSelectElement;
@@ -153,6 +174,10 @@ namespace Juggler.App {
   let applyingExperiencePreset = false;
   let crtModeIndex = 1;
   let livePreviewRenderBusy = false;
+  let lastDisplayedSourceFrame = 0;
+  let lastStillTelemetry: RenderTelemetryRecord | null = null;
+  let lastLiveTelemetry: RenderTelemetryRecord | null = null;
+  let lastAnimationTelemetry: RenderTelemetryRecord | null = null;
   let livePlayback: LivePlaybackState = {
     playing: false,
     rafId: 0,
@@ -248,6 +273,12 @@ namespace Juggler.App {
     animationPathSelect.value = Animation.defaultSettings().pathId;
     animationCameraPresetSelect.value = "custom";
     animationCyclePresetSelect.value = "full-cycle";
+    referenceFrameInput.min = "1";
+    referenceFrameInput.max = String(ReferenceFrames.COUNT);
+    referenceFrameInput.step = "1";
+    referenceFrameInput.value = "1";
+    referenceFrameImage.width = ReferenceFrames.WIDTH;
+    referenceFrameImage.height = ReferenceFrames.HEIGHT;
 
     experienceSelect.addEventListener("change", () => {
       const presetId = experienceSelect.value as ExperiencePresetId;
@@ -264,13 +295,17 @@ namespace Juggler.App {
       refreshMotionFrameBounds();
       resetAnimationBuffer();
       renderFacts();
+      setDisplayedSourceFrame(readSceneMotionSettings().sourceFrame);
       refreshAnimationFacts();
+      refreshInspectionFacts();
       refreshActiveView();
     });
     motionFrameInput.addEventListener("input", () => {
       resetAnimationBuffer();
       renderFacts();
+      setDisplayedSourceFrame(readSceneMotionSettings().sourceFrame);
       refreshAnimationFacts();
+      refreshInspectionFacts();
       refreshActiveView();
     });
     flyViewButton.addEventListener("click", () => setFlyMode(!flyState.enabled, true));
@@ -286,9 +321,17 @@ namespace Juggler.App {
     pauseLiveButton.addEventListener("click", pauseLiveRaytrace);
     renderButton.addEventListener("click", () => renderStill());
     abortButton.addEventListener("click", abortWork);
+    referenceCompareModeSelect.addEventListener("change", refreshReferenceComparison);
+    referenceOpacityInput.addEventListener("input", refreshReferenceComparison);
+    referenceFollowFrameInput.addEventListener("change", refreshReferenceComparison);
+    referenceFrameInput.addEventListener("input", () => {
+      referenceFollowFrameInput.checked = false;
+      refreshReferenceComparison();
+    });
     previewModeSelect.addEventListener("change", () => {
       abortWork();
       markExperienceCustom();
+      refreshProfileIndicators();
       refreshActiveView();
     });
     profileSelect.addEventListener("change", () => {
@@ -433,6 +476,9 @@ namespace Juggler.App {
     applyExperiencePreset("classic-source", false);
     updateCanvasHint();
     refreshLivePlaybackFacts();
+    refreshReferenceComparison();
+    refreshInspectionFacts();
+    refreshTelemetryFacts();
     refreshProfileIndicators();
     renderStill();
   }
@@ -469,6 +515,7 @@ namespace Juggler.App {
     refreshProfileIndicators();
     refreshCameraFacts();
     renderFacts();
+    setDisplayedSourceFrame(readSceneMotionSettings().sourceFrame);
     refreshAnimationFacts();
     refreshSelectionFacts();
     updateCanvasHint();
@@ -568,6 +615,8 @@ namespace Juggler.App {
       refreshAnimationFacts();
       refreshSelectionFacts();
       refreshLivePlaybackFacts();
+      setDisplayedSourceFrame(readSceneMotionSettings().sourceFrame);
+      refreshInspectionFacts();
       updateCanvasHint();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
@@ -603,8 +652,9 @@ namespace Juggler.App {
     const profile = Profiles.byId(profileSelect.value);
     const displayConstraint = readDisplayConstraint();
     const quality = readRenderQuality();
-    const renderOptions = readRenderOptions(profile);
+    const renderOptions = readRenderOptions(profile, "still");
     const rowsPerTick = readRowsPerTick();
+    setDisplayedSourceFrame(motionSettings.sourceFrame);
 
     canvas.width = width;
     canvas.height = height;
@@ -642,8 +692,18 @@ namespace Juggler.App {
         return;
       }
 
-      const seconds = (performance.now() - started) / 1000;
+      const renderMs = performance.now() - started;
+      const seconds = renderMs / 1000;
       renderButton.disabled = false;
+      recordTelemetry("still", {
+        label: "main thread",
+        renderMs,
+        width,
+        height,
+        stats: { ...renderer.stats },
+        effects: Experience.copyModernEffects(renderOptions.modernEffects),
+        note: Renderer.qualityLabelFor(quality)
+      });
       setStatus(
         `Done in ${seconds.toFixed(2)}s, ${profile.label}, ${active.world.spheres.length} spheres, ` +
         `${Display.labelFor(displayConstraint)} display, ${Renderer.qualityLabelFor(quality)}, ` +
@@ -708,11 +768,12 @@ namespace Juggler.App {
       ...readSceneMotionSettings(),
       sourceFrame
     };
+    setDisplayedSourceFrame(sourceFrame);
     const renderWorld = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
     const observer = createDisplayObserver(width, height);
     const profile = Profiles.byId(profileSelect.value);
     const options: RenderOptions = {
-      ...readRenderOptions(profile),
+      ...readRenderOptions(profile, "live"),
       qualityId: "interactive",
       antiAliasMode: "off",
       maxDepth: Math.min(2, Math.max(1, Number(maxDepthInput.value) || 2)),
@@ -762,6 +823,15 @@ namespace Juggler.App {
         livePlayback.lastRenderMs = performance.now() - started;
         livePlayback.renderInProgress = false;
       }
+      recordTelemetry("live", {
+        label: playbackFrame ? "live playback" : "live preview",
+        renderMs: performance.now() - started,
+        width,
+        height,
+        stats: { ...renderer.stats },
+        effects: Experience.copyModernEffects(options.modernEffects),
+        note: playbackFrame ? `${livePlayback.skippedFrames} skipped` : "preview"
+      });
       refreshLivePlaybackFacts();
       setStatus(
         livePlayback.playing
@@ -988,6 +1058,35 @@ namespace Juggler.App {
       ["Selected", hasSelection ? `Group ${selectedGroupIndex}` : "none"],
       ["Offset", Math3.formatVec(offset, 2)],
       ["Transforms", String(Object.keys(groupTransforms).length)]
+    ]);
+    refreshInspectionFacts();
+  }
+
+  function refreshInspectionFacts(): void {
+    if (!active) {
+      return;
+    }
+    const motionSettings = readSceneMotionSettings();
+    const world = resolvedDisplayWorld(motionSettings, motionSettings.sourceFrame);
+    const group = selectedGroupIndex === null ? null : active.parsed.groups[selectedGroupIndex] ?? null;
+    const groupSpheres = selectedGroupIndex === null
+      ? []
+      : world.spheres.filter((sphere) => sphere.groupIndex === selectedGroupIndex);
+    const lamp = world.lamps[0] ?? null;
+    setFacts(inspectionFacts, [
+      ["Selected group", selectedGroupIndex === null ? "none" : String(selectedGroupIndex)],
+      ["Material", group ? surfaceTypeLabel(group.type) : "n/a"],
+      ["Source type", group ? String(group.sourceType) : "n/a"],
+      ["Group color", group ? Math3.formatVec(group.color, 2) : "n/a"],
+      ["Controls", group ? String(group.controls.length) : "n/a"],
+      ["Rendered spheres", groupSpheres.length ? String(groupSpheres.length) : "n/a"],
+      ["Bounds", groupSpheres.length ? formatSphereBounds(groupSpheres) : "n/a"],
+      ["Lamps", String(world.lamps.length)],
+      ["Lamp 1", lamp ? `${Math3.formatVec(lamp.position, 1)}, r ${lamp.radius.toFixed(2)}` : "none"],
+      ["Lamp color", lamp ? Math3.formatVec(lamp.color, 1) : "n/a"],
+      ["Exposure", world.lampExposure.toFixed(2)],
+      ["Illum", Math3.formatVec(world.illum, 2)],
+      ["Sky zenith", Math3.formatVec(world.skyZenith, 2)]
     ]);
   }
 
@@ -1416,7 +1515,7 @@ namespace Juggler.App {
       active.world,
       width,
       height,
-      readRenderOptions(profile),
+      readRenderOptions(profile, "animation"),
       settings,
       motionSettings,
       groupTransforms
@@ -1449,12 +1548,20 @@ namespace Juggler.App {
         animationFrames = renderer.frames;
         timelineInput.max = String(Math.max(0, animationFrames.length - 1));
         timelineInput.value = String(animationFrames.length - 1);
+        setDisplayedSourceFrame(progress.completedFrame.sceneFrame);
       }
       progressElement.value = progress.overallProgress;
+      const absoluteFrame = settings.rangeStartFrame + Math.min(progress.frameIndex, progress.frameCount - 1);
+      const sourceFrame = Motion.animationSampleFrame(motionSettings, absoluteFrame, settings.frameCount);
+      const elapsedMs = performance.now() - started;
+      const etaMs = progress.overallProgress > 0.01 && progress.overallProgress < 1
+        ? elapsedMs / progress.overallProgress - elapsedMs
+        : NaN;
       setStatus(
         `Animation frame ${Math.min(progress.frameIndex + 1, progress.frameCount)}/${progress.frameCount}, ` +
-        `${Motion.labelFor(motionSettings.motionId)}, ` +
-        `${Math.round(progress.rowProgress * 100)}% row pass`
+        `source ${motionSettings.motionId === "static" ? "static" : Motion.sourceFrameLabel(sourceFrame)}, ` +
+        `${Math.round(progress.rowProgress * 100)}% row pass, elapsed ${formatDuration(elapsedMs)}, ` +
+        `eta ${formatDuration(etaMs)}`
       );
 
       if (!progress.done) {
@@ -1464,6 +1571,15 @@ namespace Juggler.App {
 
       const seconds = (performance.now() - started) / 1000;
       updateAnimationButtons(false);
+      recordTelemetry("animation", {
+        label: `${animationFrames.length} buffered frames`,
+        renderMs: performance.now() - started,
+        width,
+        height,
+        stats: combineFrameStats(animationFrames),
+        effects: Experience.copyModernEffects(renderer.frames[0]?.modernEffects),
+        note: `${settings.fps} fps`
+      });
       refreshAnimationFacts();
       setStatus(
         `Animation ready: ${animationFrames.length} frames at ${settings.fps} fps in ${seconds.toFixed(2)}s, ` +
@@ -1509,6 +1625,7 @@ namespace Juggler.App {
     const safeIndex = Math.max(0, Math.min(animationFrames.length - 1, index));
     const frame = animationFrames[safeIndex];
     drawImageData(frame.data, frame.width, frame.height);
+    setDisplayedSourceFrame(frame.sceneFrame);
     timelineInput.value = String(safeIndex);
     playbackIndex = safeIndex;
     const fps = readAnimationSettingsLenient().fps;
@@ -1682,6 +1799,15 @@ namespace Juggler.App {
       cleanupRenderWorker();
       renderButton.disabled = false;
       const seconds = message.renderMs / 1000;
+      recordTelemetry("still", {
+        label: "worker",
+        renderMs: message.renderMs,
+        width: message.width,
+        height: message.height,
+        stats: { ...message.stats },
+        effects: Experience.copyModernEffects(renderOptions.modernEffects),
+        note: Renderer.qualityLabelFor(renderOptions.qualityId ?? "legacy")
+      });
       setStatus(
         `Done in ${seconds.toFixed(2)}s worker, ${profile.label}, ${active.world.spheres.length} spheres, ` +
         `${Display.labelFor(displayConstraint)} display, ${Renderer.qualityLabelFor(renderOptions.qualityId ?? "legacy")}, ` +
@@ -1882,6 +2008,58 @@ namespace Juggler.App {
     updateAnimationButtons(false);
   }
 
+  function setDisplayedSourceFrame(sourceFrame: number): void {
+    lastDisplayedSourceFrame = normalizeSourceFrame(sourceFrame);
+    if (referenceFollowFrameInput.checked) {
+      referenceFrameInput.value = String(lastDisplayedSourceFrame + 1);
+    }
+    refreshReferenceComparison();
+  }
+
+  function refreshReferenceComparison(): void {
+    const mode = readReferenceCompareMode();
+    const sourceFrame = referenceFollowFrameInput.checked
+      ? lastDisplayedSourceFrame
+      : normalizeSourceFrame(Number(referenceFrameInput.value) - 1);
+    const frame = ReferenceFrames.bySourceFrame(sourceFrame);
+    const opacity = clampNumber(Number(referenceOpacityInput.value), 0, 1, 0.5);
+    referenceFrameInput.value = String(frame.frameNumber);
+    canvasFrame.dataset.compareMode = mode;
+    canvasFrame.style.setProperty("--reference-opacity", opacity.toFixed(2));
+    referenceFrameImage.src = frame.dataUrl;
+    referenceFrameImage.alt = `Historical Juggler reference frame ${frame.frameNumber}`;
+    setFacts(referenceFacts, [
+      ["Compare", compareModeLabel(mode)],
+      ["Reference", Motion.sourceFrameLabel(frame.sourceFrame)],
+      ["Follow source", referenceFollowFrameInput.checked ? "on" : "off"],
+      ["Opacity", `${Math.round(opacity * 100)}%`],
+      ["Native size", `${frame.width} x ${frame.height}`],
+      ["Source", frame.source]
+    ]);
+  }
+
+  function refreshTelemetryFacts(): void {
+    setFacts(renderTelemetryFacts, [
+      ["Still", formatTelemetry(lastStillTelemetry)],
+      ["Still stats", formatTelemetryStats(lastStillTelemetry)],
+      ["Live", formatTelemetry(lastLiveTelemetry)],
+      ["Live stats", formatTelemetryStats(lastLiveTelemetry)],
+      ["Animation", formatTelemetry(lastAnimationTelemetry)],
+      ["Animation stats", formatTelemetryStats(lastAnimationTelemetry)]
+    ]);
+  }
+
+  function recordTelemetry(kind: "still" | "live" | "animation", record: RenderTelemetryRecord): void {
+    if (kind === "still") {
+      lastStillTelemetry = record;
+    } else if (kind === "live") {
+      lastLiveTelemetry = record;
+    } else {
+      lastAnimationTelemetry = record;
+    }
+    refreshTelemetryFacts();
+  }
+
   function readAnimationSettings(): CameraPathSettings {
     const settings = readAnimationSettingsLenient();
     if (settings.pathId === "custom-keyframes") {
@@ -1971,8 +2149,9 @@ namespace Juggler.App {
     };
   }
 
-  function readRenderOptions(profile: RenderProfile): RenderOptions {
+  function readRenderOptions(profile: RenderProfile, context: RenderContextId): RenderOptions {
     const qualityId = readRenderQuality();
+    const modernEffects = Experience.effectiveModernEffects(readModernEffects(), context);
     return {
       profileId: profile.id,
       outputMode: profile.outputMode,
@@ -1984,7 +2163,7 @@ namespace Juggler.App {
       displayConstraintId: readDisplayConstraint(),
       qualityId,
       antiAliasMode: readEffectiveAntiAliasMode(),
-      modernEffects: readModernEffects(),
+      modernEffects,
       acceleration: "bvh",
       tileSize: qualityId === "interactive" ? 16 : 12
     };
@@ -2036,6 +2215,18 @@ namespace Juggler.App {
     effectsNode.className = "mode-tag mode-tag-neutral";
     effectsNode.textContent = `FX ${Experience.effectsSummary(readModernEffects())}`;
     profileIndicators.appendChild(effectsNode);
+    const selectedEffects = readModernEffects();
+    const liveEffects = Experience.effectiveModernEffects(selectedEffects, "live");
+    if (
+      readPreviewMode() === "live-raytrace" &&
+      ((selectedEffects.softShadows.enabled && liveEffects.softShadows.samples !== selectedEffects.softShadows.samples) ||
+        (selectedEffects.depthOfField.enabled && !liveEffects.depthOfField.enabled))
+    ) {
+      const capsNode = document.createElement("span");
+      capsNode.className = "mode-tag mode-tag-modern";
+      capsNode.textContent = "Live FX caps";
+      profileIndicators.appendChild(capsNode);
+    }
   }
 
   function copyAnimationSettings(settings: CameraPathSettings): CameraPathSettings {
@@ -2208,6 +2399,96 @@ namespace Juggler.App {
       return `${(bytes / 1024).toFixed(1)} KB`;
     }
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function formatDuration(milliseconds: number): string {
+    if (!Number.isFinite(milliseconds) || milliseconds < 0) {
+      return "n/a";
+    }
+    if (milliseconds < 1000) {
+      return `${milliseconds.toFixed(0)} ms`;
+    }
+    const seconds = milliseconds / 1000;
+    if (seconds < 60) {
+      return `${seconds.toFixed(1)}s`;
+    }
+    const minutes = Math.floor(seconds / 60);
+    const remainder = Math.round(seconds % 60);
+    return `${minutes}m ${String(remainder).padStart(2, "0")}s`;
+  }
+
+  function formatTelemetry(record: RenderTelemetryRecord | null): string {
+    if (!record) {
+      return "n/a";
+    }
+    return `${record.label}, ${record.width} x ${record.height}, ${formatDuration(record.renderMs)}${record.note ? `, ${record.note}` : ""}`;
+  }
+
+  function formatTelemetryStats(record: RenderTelemetryRecord | null): string {
+    if (!record) {
+      return "n/a";
+    }
+    const stats = record.stats;
+    const effectSamples = stats.modernEffectSamples ? `, ${stats.modernEffectSamples} fx samples` : "";
+    const tiles = stats.tiles ? `, ${stats.tiles} tiles` : "";
+    return `${stats.rays} rays, ${stats.sphereTests ?? 0} sphere tests${effectSamples}${tiles}, ${Experience.effectsSummary(record.effects)}`;
+  }
+
+  function combineFrameStats(frames: RenderedFrame[]): RenderStats {
+    return frames.reduce<RenderStats>((sum, frame) => ({
+      rays: sum.rays + frame.stats.rays,
+      mirrorFallbacks: sum.mirrorFallbacks + frame.stats.mirrorFallbacks,
+      sphereTests: (sum.sphereTests ?? 0) + (frame.stats.sphereTests ?? 0),
+      bvhNodeTests: (sum.bvhNodeTests ?? 0) + (frame.stats.bvhNodeTests ?? 0),
+      pixels: (sum.pixels ?? 0) + (frame.stats.pixels ?? 0),
+      tiles: (sum.tiles ?? 0) + (frame.stats.tiles ?? 0),
+      modernEffectSamples: (sum.modernEffectSamples ?? 0) + (frame.stats.modernEffectSamples ?? 0)
+    }), { rays: 0, mirrorFallbacks: 0 });
+  }
+
+  function formatSphereBounds(spheres: Sphere[]): string {
+    const first = spheres[0];
+    const min: Vec3 = [...first.position];
+    const max: Vec3 = [...first.position];
+    for (const sphere of spheres) {
+      for (let axis = 0; axis < 3; axis += 1) {
+        min[axis] = Math.min(min[axis], sphere.position[axis] - sphere.radius);
+        max[axis] = Math.max(max[axis], sphere.position[axis] + sphere.radius);
+      }
+    }
+    return `${Math3.formatVec(min, 1)} to ${Math3.formatVec(max, 1)}`;
+  }
+
+  function surfaceTypeLabel(type: SurfaceType): string {
+    if (type === DULL) {
+      return "dull";
+    }
+    if (type === BRIGHT) {
+      return "bright";
+    }
+    if (type === MIRROR) {
+      return "mirror";
+    }
+    return "unknown";
+  }
+
+  function normalizeSourceFrame(sourceFrame: number): number {
+    return ((Math.floor(sourceFrame) % ReferenceFrames.COUNT) + ReferenceFrames.COUNT) % ReferenceFrames.COUNT;
+  }
+
+  function readReferenceCompareMode(): ReferenceCompareMode {
+    const mode = referenceCompareModeSelect.value;
+    return mode === "overlay" || mode === "side-by-side" ? mode : "off";
+  }
+
+  function compareModeLabel(mode: ReferenceCompareMode): string {
+    if (mode === "overlay") {
+      return "overlay";
+    }
+    if (mode === "side-by-side") {
+      return "side-by-side";
+    }
+    return "off";
   }
 
   function clampInt(value: number, min: number, max: number, fallback: number): number {

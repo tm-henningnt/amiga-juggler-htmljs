@@ -90,6 +90,15 @@ namespace Juggler.Experience {
     return enabled.length ? enabled.join(", ") : "source-clean";
   }
 
+  export function effectiveModernEffects(settings: ModernEffectsSettings, context: RenderContextId): ModernEffectsSettings {
+    const effective = copyModernEffects(settings);
+    if (context === "live") {
+      effective.softShadows.samples = Math.min(effective.softShadows.samples, 2);
+      effective.depthOfField.enabled = false;
+    }
+    return effective;
+  }
+
   function copyPreset(preset: ExperiencePreset): ExperiencePreset {
     return {
       ...preset,

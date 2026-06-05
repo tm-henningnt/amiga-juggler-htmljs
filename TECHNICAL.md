@@ -29,6 +29,8 @@ The original recovered scene descriptions are static. Juggler motion is reconstr
 
 The project keeps source-derived constants and reconstruction notes close to the motion code so future fitting work can be audited.
 
+`scripts/extract-reference-frames.mjs` extracts the first 24 frames from `tmp/Juggler.mp4`, scales them to the source 320 x 200 frame, and writes `src/reference-frames.ts` as embedded PNG data URLs. The generated fixture is checked in so the standalone HTML can compare against historical frames without fetching external assets.
+
 ## Rendering Pipeline
 
 The renderer expands parsed sphere controls into renderable sphere lists, then raytraces the scene in the browser.
@@ -46,6 +48,7 @@ At a high level it supports:
 - Opt-in modern quality anti-aliasing.
 - Deterministic non-source soft shadows, contact ambient occlusion, and depth of field through `ModernEffectsSettings`.
 - Live motion-blur accumulation for source-frame playback.
+- Live-render effect caps: soft-shadow samples are limited and depth of field is disabled for Live Raytrace, while still and buffered animation renders keep the selected effect settings.
 - Optional RGB, OCS 12-bit, Extra Half-Brite-style, and approximate HAM6 display constraints.
 - Render profiles that make historically relevant quirks explicit.
 - Fast wireframe and solid previews for interactive scene inspection.
@@ -61,6 +64,8 @@ Animation resolves two things for each frame:
 Camera motion can use static, orbit, dolly, arc, or custom keyframe paths. Scene motion for the juggler is reconstructed from source-frame phase data, ballistic ball arcs, Meatfighter-style body motion, and limb posing.
 
 Rendered animation frames retain metadata for inspection and export, including source-frame labels, camera pose, render profile, modern effects, ball positions, wrist positions, clearances, timing, and render statistics.
+
+Long animation renders report the buffered frame index, sampled source frame, row progress, elapsed time, and expected remaining time in the status strip. Final animation telemetry aggregates render statistics across the buffered frame set.
 
 Live Raytrace playback is separate from buffered animation playback. It advances reconstructed source frames at the selected FPS and starts a new interactive-quality raytrace only when the previous live render is no longer active. If the clock falls behind, stale source frames are skipped and counted in diagnostics instead of queued.
 
@@ -81,6 +86,10 @@ The primary command strip exposes:
 
 Detailed controls are grouped into collapsible Workbench windows for Scene, Camera, Render Details, Modern Effects, Animation, and Diagnostics.
 
+Reference Compare is a separate collapsed Workbench window. It can keep the historical reference frame synchronized with the currently displayed source frame, or unlock the reference slider for manual comparison. Overlay mode draws the reference frame over the render canvas with adjustable opacity; side-by-side mode keeps both images at the same 16:10 source aspect.
+
+Diagnostics includes render telemetry for the latest still, live, and buffered animation render, plus material and lighting inspection facts for the selected scene group. The inspection pane reports selected group material/source type, color, control count, rendered sphere bounds, lamp position/color, exposure, and ambient/sky values.
+
 Experience presets are high-level defaults, not locked modes:
 
 - Classic Source selects still Raytrace, the reference/source-like profile, legacy quality, AA off, source camera, scanline CRT, and disabled modern effects.
@@ -97,6 +106,7 @@ Scene Edit mode uses click/drag for group movement in the view plane and Shift-d
 
 - `src/types.ts` defines shared scene, render, camera, animation, and motion contracts.
 - `src/experience.ts` defines Classic Source, Modern Studio, and modern effect defaults.
+- `src/reference-frames.ts` embeds optimized historical reference-frame PNG data URLs generated from archived movie output.
 - `src/parser.ts` parses the original text `.dat` scene format.
 - `src/scenes.ts` expands parsed scenes into renderable worlds and creates observers.
 - `src/renderer.ts` implements the CPU raytracer.
@@ -112,6 +122,7 @@ Scene Edit mode uses click/drag for group movement in the view plane and Shift-d
 - `src/motion.ts` resolves reconstructed juggler ball, body, limb, and diagnostic motion.
 - `src/app.ts` wires the browser UI, rendering loop, playback, and export actions.
 - `scripts/build-single.mjs` inlines compiled JS and CSS into `index.html`.
+- `scripts/extract-reference-frames.mjs` regenerates the historical reference-frame fixture from `tmp/Juggler.mp4` when the source movie is available locally.
 
 ## Development
 
@@ -157,3 +168,7 @@ Manual browser checks should use the standalone `index.html` loaded from disk. T
 - Apply Classic Source and Modern Studio presets and confirm the Diagnostics window reports the expected profile/display/quality/AA/effect state.
 - In canvas modes, test drag orbit, Shift/right-drag pan, wheel dolly, Scene Edit group picking, view-plane movement, depth movement, and reset camera.
 - Start Live playback in Live Raytrace mode and confirm source frames advance, stale-frame count remains visible, and frames stay nonblank.
+- Open Reference Compare, try overlay and side-by-side modes, and confirm the reference frame follows still, live, and buffered timeline source-frame changes.
+- Check Diagnostics after still, live, and animation renders to confirm latency/stat telemetry updates.
+
+WASM or a direct C port remains a research path rather than an active implementation target. The TypeScript renderer is currently more useful for auditability, deterministic tests, and fast UI iteration; a lower-level port should only be reconsidered if stricter original-renderer parity becomes the dominant project goal.

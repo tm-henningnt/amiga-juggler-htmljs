@@ -202,6 +202,16 @@ npm test
 npm run build:single
 ```
 
+Browser smoke verification opened the generated `index.html` directly from disk in Chrome and confirmed:
+
+- Classic Source rendered a nonblank 320 x 200 source-like worker frame.
+- Modern Studio switched to Live Raytrace with modern indicators and Live FX caps.
+- Reference Compare overlay and side-by-side modes loaded embedded PNG data URLs and tracked source-frame labels.
+- Live Raytrace completed a nonblank live frame and updated live telemetry.
+- Live playback advanced reconstructed source frames and reported skipped stale frames.
+- A two-frame low-resolution buffered animation completed and updated animation telemetry/reference sync.
+- No runtime errors appeared in the console; the only warning came from verification-time canvas readbacks.
+
 Browser smoke checks included:
 
 - Opening `index.html` directly from disk.
@@ -412,6 +422,7 @@ Verification:
 
 ```bash
 npm test
+npm run build:single
 ```
 
 The tests now assert source frame 1 has one apex ball, one left-hand ball, and one right-hand ball; they also require positive body/head clearance and positive ball/ball spacing across the reconstructed cycle.
@@ -793,3 +804,23 @@ npm run build:single
 ```
 
 Browser smoke remains queued in `TODO.md` because browser automation is unavailable in this execution environment.
+
+## 2026-06-05: Reference Compare, Telemetry, And Inspection Pass
+
+Implemented changes:
+
+- Added a generated `src/reference-frames.ts` fixture with 24 source-resolution PNG frames extracted from `tmp/Juggler.mp4`.
+- Added `scripts/extract-reference-frames.mjs` to regenerate that fixture from the archived movie when the local source file is present.
+- Added Reference Compare controls for off, overlay, and side-by-side historical-frame comparison.
+- Synced the reference frame with still renders, Live Raytrace playback, source-frame scrubbing, and buffered animation timeline playback.
+- Added long animation progress text with output frame, sampled source frame, row progress, elapsed time, and ETA.
+- Added still/live/animation render telemetry to Diagnostics.
+- Added material and lighting inspection facts for the selected group without changing source-like render defaults.
+- Added live-mode modern effect caps: soft-shadow samples are limited and depth of field is disabled for Live Raytrace, while still/animation renders keep selected settings.
+- Documented the TypeScript-first renderer stance and moved completed near-term/rendering items out of TODO.
+
+Verification:
+
+```bash
+npm test
+```

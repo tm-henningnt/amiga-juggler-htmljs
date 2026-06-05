@@ -29,8 +29,9 @@
           <span class="wb-gadget wb-gadget-depth"></span>
         </div>
         <div class="wb-body">
-          <div class="canvas-frame">
+          <div id="canvasFrame" class="canvas-frame" data-compare-mode="off">
             <canvas id="frame" width="320" height="200"></canvas>
+            <img id="referenceFrameImage" class="reference-frame" alt="Historical Juggler reference frame">
           </div>
           <div class="command-strip" aria-label="Primary render commands">
             <label>
@@ -387,6 +388,37 @@
         </div>
       </section>
 
+      <section class="wb-window" data-collapsed="true" aria-labelledby="title-reference">
+        <div class="wb-titlebar">
+          <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
+          <span class="wb-title-text" id="title-reference">Reference Compare</span>
+          <span class="wb-gadget wb-gadget-depth" aria-hidden="true"></span>
+        </div>
+        <div class="wb-body">
+          <label>
+            Compare
+            <select id="referenceCompareMode">
+              <option value="off" selected>Off</option>
+              <option value="overlay">Overlay</option>
+              <option value="side-by-side">Side-by-side</option>
+            </select>
+          </label>
+          <label>
+            Opacity
+            <input id="referenceOpacity" type="range" min="0" max="1" step="0.05" value="0.5">
+          </label>
+          <label class="check-row">
+            <input id="referenceFollowFrame" type="checkbox" checked>
+            Follow source frame
+          </label>
+          <label>
+            Reference frame
+            <input id="referenceFrameInput" type="range" min="1" max="24" step="1" value="1">
+          </label>
+          <dl id="referenceFacts" class="facts"></dl>
+        </div>
+      </section>
+
       <section class="wb-window" data-collapsed="true" aria-labelledby="title-diagnostics">
         <div class="wb-titlebar">
           <span class="wb-gadget wb-gadget-close" aria-hidden="true"></span>
@@ -399,6 +431,8 @@
           <dl id="sceneFacts" class="facts"></dl>
           <dl id="cameraFacts" class="facts"></dl>
           <dl id="animationFacts" class="facts"></dl>
+          <dl id="inspectionFacts" class="facts"></dl>
+          <dl id="renderTelemetryFacts" class="facts"></dl>
         </div>
       </section>
 

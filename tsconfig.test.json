@@ -16,6 +16,7 @@
     "src/experience.ts",
     "src/profiles.ts",
     "src/original-data.ts",
+    "src/reference-frames.ts",
     "src/scenes.ts",
     "src/parser.ts",
     "src/motion-data.ts",

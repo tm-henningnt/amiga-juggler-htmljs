@@ -144,6 +144,29 @@ namespace Juggler.Tests {
     assert(modern.crtMode === "soft-glow", "modern uses soft CRT glow");
     assert(modern.modernEffects.softShadows.enabled, "modern enables soft shadows");
     assert(modern.modernEffects.ambientOcclusion.enabled, "modern enables AO");
+
+    const selectedEffects = {
+      ...Experience.modernStudioEffects(),
+      softShadows: { enabled: true, samples: 8, radius: 1 },
+      depthOfField: { enabled: true, samples: 8, aperture: 0.1, focusDistance: 8 }
+    };
+    const liveEffects = Experience.effectiveModernEffects(selectedEffects, "live");
+    assert(liveEffects.softShadows.samples === 2, "live effects cap soft shadow samples");
+    assert(!liveEffects.depthOfField.enabled, "live effects disable DOF");
+    const stillEffects = Experience.effectiveModernEffects(selectedEffects, "still");
+    assert(stillEffects.softShadows.samples === 8, "still effects keep selected soft shadow samples");
+    assert(stillEffects.depthOfField.enabled, "still effects keep DOF");
+  }
+
+  function testReferenceFrames(): void {
+    assert(ReferenceFrames.COUNT === 24, "reference fixture has 24 frames");
+    assert(ReferenceFrames.WIDTH === 320 && ReferenceFrames.HEIGHT === 200, "reference fixture is source resolution");
+    assert(ReferenceFrames.FRAMES.length === ReferenceFrames.COUNT, "reference fixture frame array count");
+    assert(ReferenceFrames.FRAMES.every((frame, index) => frame.index === index), "reference fixture keeps zero-based index");
+    assert(ReferenceFrames.FRAMES.every((frame) => frame.dataUrl.startsWith("data:image/png;base64,")), "reference fixture embeds png data urls");
+    assert(ReferenceFrames.bySourceFrame(0).frameNumber === 1, "reference fixture returns first frame");
+    assert(ReferenceFrames.bySourceFrame(24).frameNumber === 1, "reference fixture wraps forward");
+    assert(ReferenceFrames.bySourceFrame(-1).frameNumber === 24, "reference fixture wraps backward");
   }
 
   function testAnimationPaths(): void {
@@ -639,6 +662,7 @@ namespace Juggler.Tests {
     testMathAndIntersections();
     testProfilesAndReflection();
     testExperiencePresets();
+    testReferenceFrames();
     testAnimationPaths();
     testAnimationPresets();
     testPreviewProjection();

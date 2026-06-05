@@ -6,6 +6,7 @@ namespace Juggler {
   export type RenderProfileId = "reference" | "wright-rgb" | "source-quirk";
   export type RenderQualityId = "legacy" | "interactive" | "modern-quality";
   export type AntiAliasModeId = "off" | "ordered-2x" | "adaptive-2x";
+  export type RenderContextId = "still" | "animation" | "live";
   export type RenderAccelerationMode = "none" | "bvh";
   export type PreviewMode = "raytrace" | "live-raytrace" | "wireframe" | "solid";
   export type DisplayConstraintId = "rgb" | "ocs-12bit" | "ehb-64" | "ham6-approx";
