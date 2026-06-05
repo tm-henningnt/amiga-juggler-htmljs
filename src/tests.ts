@@ -565,6 +565,17 @@ namespace Juggler.Tests {
     const dolly = Viewport.dollyPose(pose, -100);
     assert(Math3.length(Math3.sub(dolly.target, dolly.position)) > Math3.length(Math3.sub(pose.target, pose.position)), "negative wheel delta dollies away");
 
+    const looked = Viewport.lookPoseFromDelta(pose, 100, -20);
+    close(Math3.length(Math3.sub(looked.target, looked.position)), Math3.length(Math3.sub(pose.target, pose.position)), 1e-9, "mouse look preserves view distance");
+    assert(Math3.length(Math3.sub(looked.target, pose.target)) > 0.01, "mouse look changes target");
+
+    const flown = Viewport.flyPose(pose, { forward: 1, right: 0, up: 0 }, 0.5, 4);
+    close(Math3.length(Math3.sub(flown.target, flown.position)), Math3.length(Math3.sub(pose.target, pose.position)), 1e-9, "fly move preserves view distance");
+    assert(Math3.length(Math3.sub(flown.position, pose.position)) > 1.9, "fly move advances camera by speed and time");
+
+    const risen = Viewport.flyPose(pose, { forward: 0, right: 0, up: 1 }, 0.25, 4);
+    close(risen.position[2] - pose.position[2], 1, 1e-9, "fly up follows world up");
+
     const editPlane = Viewport.sceneEditOffsetFromDrag([0, 0, 0], observer, 10, 0, false, 0.1);
     assert(Math.abs(Math3.dot(editPlane, observer.uhat)) > 0.9, "scene edit plane drag follows camera right");
     const editDepth = Viewport.sceneEditOffsetFromDrag([0, 0, 0], observer, 0, 10, true, 0.1);

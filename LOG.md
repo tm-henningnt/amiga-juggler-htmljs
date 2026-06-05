@@ -770,3 +770,26 @@ The TODO file had become a mix of completed history, architecture notes, validat
 - Removed completed foundations from `TODO.md`.
 - Reframed TODO as a forward-looking backlog with near-term priorities, historical accuracy work, rendering/performance work, animation/data work, and deferred ideas.
 - Marked GIF export, batch PNG zip packaging, WebGPU, and additional content pages as deferred until there is a stronger reason to prioritize them.
+
+## 2026-06-05: Fly View And Mouse-Control Clarification
+
+The canvas drag controls were technically attached to the render canvas, but camera drag used internal render-pixel deltas. That made Live Raytrace drags feel inconsistent when the visible canvas was much larger than the interactive render resolution. Pointer capture also meant drags continued after leaving the canvas, which could feel like the whole browser window was being controlled.
+
+Implemented changes:
+
+- Camera drag now uses visible CSS-pixel deltas.
+- Scene/object picking still uses render-pixel coordinates for accurate group selection.
+- Added Fly View as a top-level command-strip toggle and Camera window option.
+- Fly View switches still Raytrace view to Live Raytrace, uses pointer lock for mouse look, and supports WASD/arrow movement plus Q/E or Shift/Space vertical movement.
+- Added optional gamepad polling in Fly View: left stick moves, right stick looks, and triggers/face buttons move vertically.
+- Added camera diagnostics and canvas hints for Fly View state, pointer lock, fly speed, and gamepad status.
+- Added tests for mouse-look and fly-movement camera math.
+
+Verification:
+
+```bash
+npm test
+npm run build:single
+```
+
+Browser smoke remains queued in `TODO.md` because browser automation is unavailable in this execution environment.

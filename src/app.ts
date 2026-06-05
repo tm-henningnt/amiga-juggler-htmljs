@@ -30,6 +30,16 @@ namespace Juggler.App {
     previousHeight: number;
   }
 
+  interface FlyState {
+    enabled: boolean;
+    rafId: number;
+    lastTickMs: number;
+    nextRenderAtMs: number;
+    keys: Record<string, boolean>;
+    pointerLocked: boolean;
+    gamepadName: string;
+  }
+
   const CRT_MODES = [
     { id: "off", label: "CRT OFF", active: "false" },
     { id: "scanlines", label: "CRT SCAN", active: "true" },
@@ -70,6 +80,10 @@ namespace Juggler.App {
   const transformZInput = document.getElementById("transformZ") as HTMLInputElement;
   const resetGroupTransformButton = document.getElementById("resetGroupTransform") as HTMLButtonElement;
   const resetAllTransformsButton = document.getElementById("resetAllTransforms") as HTMLButtonElement;
+  const flyViewButton = document.getElementById("flyView") as HTMLButtonElement;
+  const flyModeEnabledInput = document.getElementById("flyModeEnabled") as HTMLInputElement;
+  const flySpeedInput = document.getElementById("flySpeed") as HTMLInputElement;
+  const gamepadEnabledInput = document.getElementById("gamepadEnabled") as HTMLInputElement;
   const playLiveButton = document.getElementById("playLive") as HTMLButtonElement;
   const pauseLiveButton = document.getElementById("pauseLive") as HTMLButtonElement;
   const renderButton = document.getElementById("render") as HTMLButtonElement;
@@ -138,6 +152,7 @@ namespace Juggler.App {
   let playbackIndex = 0;
   let applyingExperiencePreset = false;
   let crtModeIndex = 1;
+  let livePreviewRenderBusy = false;
   let livePlayback: LivePlaybackState = {
     playing: false,
     rafId: 0,
@@ -149,6 +164,15 @@ namespace Juggler.App {
     previousData: null,
     previousWidth: 0,
     previousHeight: 0
+  };
+  let flyState: FlyState = {
+    enabled: false,
+    rafId: 0,
+    lastTickMs: 0,
+    nextRenderAtMs: 0,
+    keys: {},
+    pointerLocked: false,
+    gamepadName: "none"
   };
 
   export function start(): void {
@@ -249,6 +273,15 @@ namespace Juggler.App {
       refreshAnimationFacts();
       refreshActiveView();
     });
+    flyViewButton.addEventListener("click", () => setFlyMode(!flyState.enabled, true));
+    flyModeEnabledInput.addEventListener("change", () => setFlyMode(flyModeEnabledInput.checked, flyModeEnabledInput.checked));
+    flySpeedInput.addEventListener("change", markExperienceCustom);
+    flySpeedInput.addEventListener("input", markExperienceCustom);
+    gamepadEnabledInput.addEventListener("change", () => {
+      markExperienceCustom();
+      refreshCameraFacts();
+      updateCanvasHint();
+    });
     playLiveButton.addEventListener("click", playLiveRaytrace);
     pauseLiveButton.addEventListener("click", pauseLiveRaytrace);
     renderButton.addEventListener("click", () => renderStill());
@@ -306,6 +339,10 @@ namespace Juggler.App {
     canvas.addEventListener("pointerleave", handleCanvasPointerUp);
     canvas.addEventListener("wheel", handleCanvasWheel, { passive: false });
     canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+    document.addEventListener("pointerlockchange", handlePointerLockChange);
+    document.addEventListener("mousemove", handlePointerLockMouseMove);
+    document.addEventListener("keydown", handleFlyKeyDown);
+    document.addEventListener("keyup", handleFlyKeyUp);
     sceneEditModeInput.addEventListener("change", () => {
       markExperienceCustom();
       updateCanvasHint();
@@ -423,6 +460,7 @@ namespace Juggler.App {
       refreshMotionFrameBounds();
     }
     sceneEditModeInput.checked = false;
+    setFlyMode(false, false);
     writeModernEffects(preset.modernEffects);
     setCrtMode(preset.crtMode);
     applyingExperiencePreset = false;
@@ -687,6 +725,7 @@ namespace Juggler.App {
     canvas.height = height;
     context.imageSmoothingEnabled = false;
     progressElement.value = 0;
+    livePreviewRenderBusy = true;
     if (playbackFrame) {
       livePlayback.renderInProgress = true;
     }
@@ -695,6 +734,7 @@ namespace Juggler.App {
     const started = performance.now();
     const tick = (): void => {
       if (token !== abortToken) {
+        livePreviewRenderBusy = false;
         if (playbackFrame) {
           livePlayback.renderInProgress = false;
           refreshLivePlaybackFacts();
@@ -709,6 +749,7 @@ namespace Juggler.App {
         return;
       }
       const seconds = (performance.now() - started) / 1000;
+      livePreviewRenderBusy = false;
       let data = renderer.data;
       if (playbackFrame) {
         data = Renderer.blendMotionSamples(renderer.data, livePlayback.previousData, options.modernEffects?.motionBlur);
@@ -744,8 +785,16 @@ namespace Juggler.App {
       return;
     }
     event.preventDefault();
-    const point = canvasPoint(event);
+    const point = canvasCssPoint(event);
     const observer = createDisplayObserver(canvas.width || parseResolution()[0], canvas.height || parseResolution()[1]);
+
+    if (flyState.enabled) {
+      if (document.pointerLockElement !== canvas) {
+        requestCanvasPointerLock();
+      }
+      updateCanvasHint();
+      return;
+    }
 
     if (!sceneEditModeInput.checked) {
       const pose = ensureFreeCameraPose();
@@ -767,8 +816,9 @@ namespace Juggler.App {
       return;
     }
 
+    const renderPoint = canvasRenderPoint(event);
     const preview = previewWorldAndObserver();
-    const groupIndex = Preview.pickGroup(preview.world, preview.observer, point[0], point[1]);
+    const groupIndex = Preview.pickGroup(preview.world, preview.observer, renderPoint[0], renderPoint[1]);
     if (groupIndex === null) {
       setStatus("No group under pointer.");
       return;
@@ -798,7 +848,7 @@ namespace Juggler.App {
       return;
     }
     event.preventDefault();
-    const point = canvasPoint(event);
+    const point = canvasCssPoint(event);
     const dx = point[0] - pointerDrag.startX;
     const dy = point[1] - pointerDrag.startY;
 
@@ -865,7 +915,15 @@ namespace Juggler.App {
     return { world, observer };
   }
 
-  function canvasPoint(event: PointerEvent | WheelEvent): [number, number] {
+  function canvasCssPoint(event: PointerEvent | WheelEvent): [number, number] {
+    const rect = canvas.getBoundingClientRect();
+    return [
+      event.clientX - rect.left,
+      event.clientY - rect.top
+    ];
+  }
+
+  function canvasRenderPoint(event: PointerEvent | WheelEvent): [number, number] {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / Math.max(1, rect.width);
     const scaleY = canvas.height / Math.max(1, rect.height);
@@ -986,16 +1044,236 @@ namespace Juggler.App {
     setStatus("Camera reset to source pose.");
   }
 
-  function setFreeCameraPose(pose: CameraPose): void {
+  function setFreeCameraPose(pose: CameraPose, resetBuffer = true, render = true): void {
     if (Math3.length(Math3.sub(pose.target, pose.position)) < 0.001) {
       return;
     }
     freeCameraPose = copyCameraPose(pose);
     orbitEnabledInput.checked = false;
     writeCameraPoseInputs(freeCameraPose);
-    resetAnimationBuffer();
+    if (resetBuffer) {
+      resetAnimationBuffer();
+    }
     refreshCameraFacts();
-    refreshActiveView();
+    if (render) {
+      refreshActiveView();
+    }
+  }
+
+  function setFlyMode(enabled: boolean, requestLock: boolean): void {
+    flyState.enabled = enabled;
+    flyModeEnabledInput.checked = enabled;
+    flyViewButton.textContent = enabled ? "Exit Fly" : "Fly View";
+    sceneEditModeInput.disabled = enabled;
+    if (enabled) {
+      markExperienceCustom();
+      stopLiveRaytrace(true);
+      clearPlaybackOnly();
+      resetAnimationBuffer();
+      ensureFreeCameraPose();
+      if (readPreviewMode() === "raytrace") {
+        previewModeSelect.value = "live-raytrace";
+      }
+      if (!flyState.rafId) {
+        flyState.lastTickMs = performance.now();
+        flyState.nextRenderAtMs = 0;
+        flyState.rafId = window.requestAnimationFrame(flyTick);
+      }
+      if (requestLock) {
+        requestCanvasPointerLock();
+      }
+      setStatus("Fly View active.");
+    } else {
+      if (flyState.rafId) {
+        window.cancelAnimationFrame(flyState.rafId);
+      }
+      flyState.rafId = 0;
+      flyState.keys = {};
+      flyState.pointerLocked = false;
+      flyState.gamepadName = "none";
+      if (document.pointerLockElement === canvas) {
+        document.exitPointerLock();
+      }
+    }
+    refreshCameraFacts();
+    updateCanvasHint();
+  }
+
+  function requestCanvasPointerLock(): void {
+    if (typeof canvas.requestPointerLock !== "function") {
+      setStatus("Pointer lock is unavailable in this browser.");
+      return;
+    }
+    const result = canvas.requestPointerLock() as Promise<void> | undefined;
+    result?.catch(() => setStatus("Click the render canvas to start mouse look."));
+  }
+
+  function handlePointerLockChange(): void {
+    flyState.pointerLocked = document.pointerLockElement === canvas;
+    updateCanvasHint();
+    refreshCameraFacts();
+  }
+
+  function handlePointerLockMouseMove(event: MouseEvent): void {
+    if (!active || !flyState.enabled || document.pointerLockElement !== canvas) {
+      return;
+    }
+    event.preventDefault();
+    const pose = Viewport.lookPoseFromDelta(ensureFreeCameraPose(), event.movementX, event.movementY);
+    applyFlyPose(pose, true);
+  }
+
+  function handleFlyKeyDown(event: KeyboardEvent): void {
+    if (!flyState.enabled || isTypingTarget(event.target)) {
+      return;
+    }
+    const key = flyKey(event.code);
+    if (!key) {
+      return;
+    }
+    event.preventDefault();
+    flyState.keys[key] = true;
+  }
+
+  function handleFlyKeyUp(event: KeyboardEvent): void {
+    const key = flyKey(event.code);
+    if (!key) {
+      return;
+    }
+    flyState.keys[key] = false;
+  }
+
+  function flyTick(nowMs: number): void {
+    if (!flyState.enabled) {
+      flyState.rafId = 0;
+      return;
+    }
+    const deltaSeconds = Math.min(0.05, Math.max(0, (nowMs - flyState.lastTickMs) / 1000));
+    flyState.lastTickMs = nowMs;
+
+    let pose = ensureFreeCameraPose();
+    let changed = false;
+    const keyboardInput = keyboardFlyInput();
+    if (Math.abs(keyboardInput.forward) + Math.abs(keyboardInput.right) + Math.abs(keyboardInput.up) > 0) {
+      pose = Viewport.flyPose(pose, keyboardInput, deltaSeconds, readFlySpeed());
+      changed = true;
+    }
+
+    const gamepad = gamepadFlyInput();
+    if (gamepad.connected) {
+      flyState.gamepadName = gamepad.name;
+    } else {
+      flyState.gamepadName = "none";
+    }
+    if (gamepad.lookX || gamepad.lookY) {
+      pose = Viewport.lookPoseFromDelta(pose, gamepad.lookX * deltaSeconds * 900, gamepad.lookY * deltaSeconds * 900);
+      changed = true;
+    }
+    if (Math.abs(gamepad.move.forward) + Math.abs(gamepad.move.right) + Math.abs(gamepad.move.up) > 0) {
+      pose = Viewport.flyPose(pose, gamepad.move, deltaSeconds, readFlySpeed());
+      changed = true;
+    }
+
+    if (changed) {
+      applyFlyPose(pose, false);
+      if (nowMs >= flyState.nextRenderAtMs && !livePreviewRenderBusy) {
+        flyState.nextRenderAtMs = nowMs + 90;
+        refreshActiveView();
+      }
+    }
+    refreshCameraFacts();
+    flyState.rafId = window.requestAnimationFrame(flyTick);
+  }
+
+  function applyFlyPose(pose: CameraPose, renderNow: boolean): void {
+    setFreeCameraPose(pose, false, false);
+    if (renderNow && !livePreviewRenderBusy) {
+      refreshActiveView();
+    }
+  }
+
+  function keyboardFlyInput(): Viewport.FlyInputVector {
+    return {
+      forward: axis(flyState.keys.forward, flyState.keys.back),
+      right: axis(flyState.keys.right, flyState.keys.left),
+      up: axis(flyState.keys.up, flyState.keys.down)
+    };
+  }
+
+  function gamepadFlyInput(): {
+    connected: boolean;
+    name: string;
+    move: Viewport.FlyInputVector;
+    lookX: number;
+    lookY: number;
+  } {
+    if (!gamepadEnabledInput.checked || typeof navigator.getGamepads !== "function") {
+      return { connected: false, name: "none", move: { forward: 0, right: 0, up: 0 }, lookX: 0, lookY: 0 };
+    }
+    const gamepad = Array.from(navigator.getGamepads()).find((candidate): candidate is Gamepad => !!candidate && candidate.connected);
+    if (!gamepad) {
+      return { connected: false, name: "none", move: { forward: 0, right: 0, up: 0 }, lookX: 0, lookY: 0 };
+    }
+    const upButton = buttonValue(gamepad.buttons[7]) + buttonValue(gamepad.buttons[3]);
+    const downButton = buttonValue(gamepad.buttons[6]) + buttonValue(gamepad.buttons[0]);
+    return {
+      connected: true,
+      name: gamepad.id || "gamepad",
+      move: {
+        forward: -deadzone(gamepad.axes[1] ?? 0),
+        right: deadzone(gamepad.axes[0] ?? 0),
+        up: deadzone(upButton - downButton)
+      },
+      lookX: deadzone(gamepad.axes[2] ?? 0),
+      lookY: deadzone(gamepad.axes[3] ?? 0)
+    };
+  }
+
+  function flyKey(code: string): keyof FlyState["keys"] | null {
+    switch (code) {
+      case "KeyW":
+      case "ArrowUp":
+        return "forward";
+      case "KeyS":
+      case "ArrowDown":
+        return "back";
+      case "KeyA":
+      case "ArrowLeft":
+        return "left";
+      case "KeyD":
+      case "ArrowRight":
+        return "right";
+      case "KeyE":
+      case "Space":
+        return "up";
+      case "KeyQ":
+      case "ShiftLeft":
+      case "ShiftRight":
+        return "down";
+      default:
+        return null;
+    }
+  }
+
+  function axis(positive: boolean | undefined, negative: boolean | undefined): number {
+    return (positive ? 1 : 0) - (negative ? 1 : 0);
+  }
+
+  function deadzone(value: number, threshold = 0.12): number {
+    return Math.abs(value) < threshold ? 0 : Math.max(-1, Math.min(1, value));
+  }
+
+  function buttonValue(button: GamepadButton | undefined): number {
+    return button?.pressed ? Math.max(0.4, button.value) : button?.value ?? 0;
+  }
+
+  function readFlySpeed(): number {
+    return clampNumber(Number(flySpeedInput.value), 0.1, 30, 6);
+  }
+
+  function isTypingTarget(target: EventTarget | null): boolean {
+    const element = target instanceof HTMLElement ? target : null;
+    return !!element && ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(element.tagName);
   }
 
   function playLiveRaytrace(): void {
@@ -1347,6 +1625,7 @@ namespace Juggler.App {
   }
 
   function abortWork(): void {
+    setFlyMode(false, false);
     stopLiveRaytrace(true);
     abortRenderOnly();
     clearPlaybackOnly();
@@ -1358,6 +1637,7 @@ namespace Juggler.App {
     cleanupRenderWorker();
     renderButton.disabled = false;
     livePlayback.renderInProgress = false;
+    livePreviewRenderBusy = false;
   }
 
   function renderStillInWorker(
@@ -1560,6 +1840,9 @@ namespace Juggler.App {
     writeCameraPoseInputs(pose);
     setFacts(cameraFacts, [
       ["Mode", freeCameraPose ? "free" : orbitEnabledInput.checked ? "orbit" : "source"],
+      ["Fly View", flyState.enabled ? flyState.pointerLocked ? "mouse-look" : "keyboard/gamepad" : "off"],
+      ["Fly speed", readFlySpeed().toFixed(1)],
+      ["Gamepad", gamepadEnabledInput.checked ? flyState.gamepadName : "off"],
       ["Position", Math3.formatVec(observer.position, 2)],
       ["Altitude", `${(observer.altitudeRad * 180 / Math.PI).toFixed(2)} deg`],
       ["Azimuth", `${(observer.azimuthRad * 180 / Math.PI).toFixed(2)} deg`],
@@ -1976,6 +2259,12 @@ namespace Juggler.App {
   }
 
   function updateCanvasHint(): void {
+    if (flyState.enabled) {
+      canvasHintElement.textContent = flyState.pointerLocked
+        ? "Fly View: WASD move, QE up/down, mouse look, Esc release, gamepad sticks"
+        : "Fly View: click canvas for mouse look, WASD move, gamepad sticks";
+      return;
+    }
     if (sceneEditModeInput.checked) {
       canvasHintElement.textContent = pointerDrag?.mode === "scene-edit"
         ? "Scene Edit: drag moves selection, Shift-drag moves through depth"

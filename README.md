@@ -35,7 +35,7 @@ From the browser UI you can:
 - Choose source-like HAM output, modern RGB output, display constraints, render quality, and CRT display modes.
 - Inspect the reconstructed juggling motion frame by frame.
 - Use Live Raytrace playback for reconstructed source-frame animation without pre-rendering buffered frames.
-- Orbit, pan, dolly, and temporarily edit scene groups from the canvas.
+- Orbit, pan, dolly, fly with WASD/mouse-look or gamepad, and temporarily edit scene groups from the canvas.
 - Render still frames or animation ranges.
 - Play back buffered animation frames.
 - Export frames, video where the browser supports it, and structured animation metadata.
@@ -50,6 +50,7 @@ From the browser UI you can:
 - BVH-accelerated CPU raytracing, worker-backed still renders, live raytraced previews, and modern AA.
 - Optional non-source soft shadows, contact ambient occlusion, depth of field, and live motion blur.
 - Workbench 1.3 inspired UI with collapsible control windows and a compact command strip.
+- Fly View mode with pointer-lock mouse look, keyboard movement, and gamepad stick/trigger input.
 
 ## Documentation
 

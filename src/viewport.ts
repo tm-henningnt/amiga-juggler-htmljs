@@ -1,4 +1,10 @@
 namespace Juggler.Viewport {
+  export interface FlyInputVector {
+    forward: number;
+    right: number;
+    up: number;
+  }
+
   export function orbitPoseFromDrag(startPose: CameraPose, dx: number, dy: number, sensitivity = 0.01): CameraPose {
     const target = [...startPose.target] as Vec3;
     const offset = Math3.sub(startPose.position, target);
@@ -43,6 +49,41 @@ namespace Juggler.Viewport {
     };
   }
 
+  export function lookPoseFromDelta(startPose: CameraPose, dx: number, dy: number, sensitivity = 0.0025): CameraPose {
+    const view = Math3.sub(startPose.target, startPose.position);
+    const distance = Math.max(0.1, Math3.length(view));
+    const yawed = rotateAroundAxis(Math3.normalize(view), [0, 0, 1], -dx * sensitivity);
+    const right = cameraRight(yawed);
+    const pitched = rotateAroundAxis(yawed, right, -dy * sensitivity);
+    const direction = Math.abs(Math3.normalize(pitched)[2]) > 0.985 ? yawed : pitched;
+    return {
+      position: [...startPose.position],
+      target: Math3.add(startPose.position, Math3.mul(Math3.normalize(direction), distance)),
+      focalLength: startPose.focalLength
+    };
+  }
+
+  export function flyPose(startPose: CameraPose, input: FlyInputVector, deltaSeconds: number, speed: number): CameraPose {
+    const direction = Math3.normalize(Math3.sub(startPose.target, startPose.position));
+    const right = cameraRight(direction);
+    const up: Vec3 = [0, 0, 1];
+    const move = Math3.mul(
+      Math3.add(
+        Math3.add(Math3.mul(direction, input.forward), Math3.mul(right, input.right)),
+        Math3.mul(up, input.up)
+      ),
+      Math.max(0, deltaSeconds) * Math.max(0, speed)
+    );
+    if (Math3.length(move) < 1e-9) {
+      return copyPose(startPose);
+    }
+    return {
+      position: Math3.add(startPose.position, move),
+      target: Math3.add(startPose.target, move),
+      focalLength: startPose.focalLength
+    };
+  }
+
   export function sceneEditOffsetFromDrag(
     startOffset: Vec3,
     observer: Observer,
@@ -69,6 +110,11 @@ namespace Juggler.Viewport {
       target: [...pose.target],
       focalLength: pose.focalLength
     };
+  }
+
+  function cameraRight(direction: Vec3): Vec3 {
+    const cross = Math3.cross(Math3.normalize(direction), [0, 0, 1]);
+    return Math3.length(cross) > 0.001 ? Math3.normalize(cross) : [1, 0, 0];
   }
 
   function rotateAroundAxis(vector: Vec3, axis: Vec3, angle: number): Vec3 {

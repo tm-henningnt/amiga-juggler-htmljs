@@ -9,6 +9,7 @@ This file is a forward-looking backlog. Completed foundations belong in `LOG.md`
   - Apply Classic Source and verify a source-like still render is nonblank.
   - Apply Modern Studio and verify Live Raytrace renders with modern indicators.
   - Test drag orbit, Shift/right-drag pan, wheel dolly, Scene Edit movement, Scene Edit depth movement, and reset camera.
+  - Test Fly View pointer-lock mouse look, WASD/QE movement, gamepad movement/look, and Fly View exit.
   - Start Live playback and confirm reconstructed source frames advance with nonblank frames.
   - Confirm buffered animation render/export still works.
 - Improve long animation progress reporting so frame index, source frame, elapsed time, and expected remaining time are clear during renders.

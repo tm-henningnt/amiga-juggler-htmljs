@@ -251,7 +251,7 @@ body[data-crt-mode="soft-glow"] .canvas-frame::after {
 
 .command-strip {
   display: grid;
-  grid-template-columns: minmax(150px, 1.1fr) minmax(130px, 0.9fr) repeat(4, minmax(86px, auto));
+  grid-template-columns: minmax(150px, 1.1fr) minmax(130px, 0.9fr) repeat(5, minmax(82px, auto));
   align-items: end;
   gap: 6px;
   background: var(--wb-gray);
@@ -376,6 +376,11 @@ input[type="range"] {
   font-size: 16px;
   color: var(--wb-black);
   margin-bottom: 8px;
+}
+
+.inline-check {
+  align-content: end;
+  min-height: 100%;
 }
 
 input[type="checkbox"] {

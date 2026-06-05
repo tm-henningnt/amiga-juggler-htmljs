@@ -74,6 +74,7 @@ The primary command strip exposes:
 
 - Experience preset.
 - View mode.
+- Fly View.
 - Live playback.
 - Still render.
 - Abort.
@@ -86,7 +87,11 @@ Experience presets are high-level defaults, not locked modes:
 - Modern Studio selects Live Raytrace, modern RGB output, modern quality, adaptive AA, editable orbit/free camera behavior, soft-glow CRT, and conservative non-source effects.
 - Any manual advanced edit marks the experience as Custom.
 
-Canvas interaction follows a standard viewport model. Normal mode uses drag to orbit, Shift/right-drag to pan, and wheel to dolly. Scene Edit mode uses click/drag for group movement in the view plane and Shift-drag for view-depth movement.
+Canvas interaction follows a standard viewport model. Normal mode uses drag to orbit, Shift/right-drag to pan, and wheel to dolly. Camera drags use visible CSS-pixel deltas so pointer feel stays stable across live render resolutions; object picking still maps to render-pixel coordinates.
+
+Fly View is an explicit camera mode for navigating like a small scene drone. It switches still Raytrace view to Live Raytrace, uses pointer lock for mouse look after a canvas click, accepts WASD/arrow movement plus Q/E or Shift/Space vertical movement, and polls the first connected gamepad when gamepad input is enabled. Gamepad left stick moves, right stick looks, and trigger/face-button pairs move vertically. Scene Edit mode is disabled while Fly View is active.
+
+Scene Edit mode uses click/drag for group movement in the view plane and Shift-drag for view-depth movement.
 
 ## Module Layout
 
